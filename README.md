@@ -1,3 +1,7 @@
+# TODO : REWRITE THIS
+
+
+
 # CLEVR models
 
 This repo aims at reproducing the results of CLEVR from the following paper:
