@@ -2,7 +2,7 @@ from nltk.tokenize import TweetTokenizer
 import io
 import json
 import collections
-from clevr.data_provider.clevr_dataset import CLEVRDataset
+from clevr.data_provider.clevr_dataset import AQADataset
 import argparse
 
 
@@ -15,7 +15,7 @@ if __name__ == '__main__':
     parser.add_argument("-min_occ", type=int, default=1, help='Minimum number of occurences to add word to dictionary (for Human Clevr)')
     args = parser.parse_args()
 
-    dataset = CLEVRDataset(args.data_dir, which_set="train")
+    dataset = AQADataset(args.data_dir, which_set="train")
     games = dataset.games
 
     word2i = {'<padding>': 0,

@@ -10,9 +10,9 @@ from generic.preprocess_data.extract_img_features import extract_features
 
 from neural_toolbox import resnet
 
-from clevr.data_provider.clevr_dataset import CLEVRDataset
+# TODO : Rename clevr
+from clevr.data_provider.clevr_dataset import AQADataset
 from clevr.data_provider.clevr_batchifier import CLEVRBatchifier
-
 
 
 parser = argparse.ArgumentParser('Feature extractor! ')
@@ -38,14 +38,14 @@ args = parser.parse_args()
 
 # define image
 if args.subtract_mean:
+    # FIXME : Change this hardcoded mean (Was for clevr)
     channel_mean = np.array([123.68, 116.779, 103.939])
 else:
     channel_mean = None
 
 
 # define the image loader
-source = 'image'
-images = tf.placeholder(tf.float32, [None, args.img_size, args.img_size, 3], name=source)
+images = tf.placeholder(tf.float32, [None, args.img_size, args.img_size, 3], name='image')
 image_builder = RawImageBuilder(args.img_dir,
                                 height=args.img_size,
                                 width=args.img_size,
@@ -62,7 +62,7 @@ ft_output = resnet.create_resnet(images,
 extract_features(
     img_input = images,
     ft_output = ft_output,
-    dataset_cstor = CLEVRDataset,
+    dataset_cstor = AQADataset,
     dataset_args = {"folder": args.data_dir, "image_builder":image_builder},
     batchifier_cstor = CLEVRBatchifier,
     out_dir = args.out_dir,

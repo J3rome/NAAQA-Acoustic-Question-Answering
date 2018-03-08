@@ -81,10 +81,60 @@ class CLEVRDataset(AbstractDataset):
         super(CLEVRDataset, self).__init__(games)
 
 
+class AQADataset(AbstractDataset):
+    """Loads the AQA dataset."""
+
+    def __init__(self, folder, which_set, image_builder=None):
+
+        question_file_path = '{}/questions/AQA_{}_questions.json'.format(folder, which_set)
+
+        games = []
+        self.question_family_index = collections.Counter()
+        self.answer_counter = collections.Counter()
+
+        with open(question_file_path) as question_file:
+            print("Loading questions...")
+            data = json.load(question_file)
+            info = data["info"]
+            samples = data["questions"]
+
+            assert info["split"] == which_set
+
+            print("Successfully Loaded AQA v{} ({})".format(info["version"], which_set))
+
+            for sample in samples:
+
+                question_id = int(sample["question_index"])
+                question = sample["question"]
+                question_family_index = sample.get("question_family_index", -1)  # -1 for test set
+
+                answer = sample.get("answer", None)  # None for test set
+
+                image_id = sample["image_index"]
+                image_filename = sample["image_filename"]
+                image_filename = os.path.join(which_set, image_filename)
+
+                print(image_filename)
+
+                games.append(Game(id=question_id,
+                                  image=Image(image_id, image_filename, image_builder, which_set),
+                                  question=question,
+                                  answer=answer,
+                                  question_family_index=question_family_index))
+
+                self.question_family_index[question_family_index] += 1
+                self.answer_counter[answer] += 1
+
+                if use_100 and len(games) > 100:
+                    break
+
+        print('{} games loaded...'.format(len(games)))
+        super(AQADataset, self).__init__(games)
+
 
 
 if __name__ == '__main__':
-    dataset = CLEVRDataset("/home/fstrub/Projects/clevr_data/", which_set="val")
+    dataset = CLEVRDataset("/home/j3romee/dev/CLEVR_v1.0/", which_set="val")
 
     for d in dataset.games:
         if "How many things are" in d.question:
