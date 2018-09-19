@@ -1,0 +1,6 @@
+-data_dir=data/0.1.2
+-img_dir=data/0.1.2/preprocessed
+-config=config/clevr/film.json
+-exp_dir=out/aqa
+-no_thread=6
+-gpu_ratio=0.9
