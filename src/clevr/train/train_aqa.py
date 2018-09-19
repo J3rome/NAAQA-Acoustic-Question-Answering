@@ -26,7 +26,7 @@ from clevr.models.clever_network_factory import create_network
 #  LOAD CONFIG
 #############################
 
-parser = argparse.ArgumentParser('AQA network baseline!')
+parser = argparse.ArgumentParser('AQA network baseline!', fromfile_prefix_chars='@')
 
 parser.add_argument("-data_dir", type=str, help="Directory with data")
 parser.add_argument("-img_dir", type=str, help="Directory with image")

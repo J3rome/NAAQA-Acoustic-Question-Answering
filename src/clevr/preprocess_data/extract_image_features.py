@@ -15,7 +15,7 @@ from clevr.data_provider.clevr_dataset import AQADataset
 from clevr.data_provider.clevr_batchifier import CLEVRBatchifier
 
 
-parser = argparse.ArgumentParser('Feature extractor! ')
+parser = argparse.ArgumentParser('Feature extractor! ', fromfile_prefix_chars='@')
 
 parser.add_argument("-img_dir", type=str, required=True, help="Input Image folder")
 parser.add_argument("-data_dir", type=str, required=True,help="Dataset folder")
@@ -42,6 +42,10 @@ if args.subtract_mean:
     channel_mean = np.array([123.68, 116.779, 103.939])
 else:
     channel_mean = None
+
+# Verify that the output folder exist
+if not os.path.isdir(args.out_dir):
+  os.mkdir(args.out_dir)
 
 
 # define the image loader

@@ -8,7 +8,7 @@ import argparse
 
 if __name__ == '__main__':
 
-    parser = argparse.ArgumentParser('Creating dictionary..')
+    parser = argparse.ArgumentParser('Creating dictionary..', fromfile_prefix_chars='@')
 
     parser.add_argument("-data_dir", type=str, help="Path to VQA dataset")
     parser.add_argument("-dict_file", type=str, default="dict.json", help="Name of the dictionary file")
