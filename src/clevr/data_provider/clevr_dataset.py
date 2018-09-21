@@ -114,8 +114,6 @@ class AQADataset(AbstractDataset):
                 image_filename = sample["image_filename"]
                 image_filename = os.path.join(which_set, image_filename)
 
-                print(image_filename)
-
                 games.append(Game(id=question_id,
                                   image=Image(image_id, image_filename, image_builder, which_set),
                                   question=question,
