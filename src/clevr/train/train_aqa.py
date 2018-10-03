@@ -16,6 +16,8 @@ from generic.utils.config import load_config
 from generic.utils.file_handlers import pickle_dump
 from generic.data_provider.image_loader import get_img_builder
 
+
+from clevr.utils.file_handler import save_training_stats
 from clevr.data_provider.clevr_tokenizer import CLEVRTokenizer
 from clevr.data_provider.clevr_dataset import AQADataset
 from clevr.data_provider.clevr_batchifier import CLEVRBatchifier
@@ -174,16 +176,25 @@ with tf.Session(config=tf.ConfigProto(gpu_options=gpu_options, allow_soft_placem
 
             [valid_loss, valid_accuracy] = evaluator.process(sess, valid_iterator, outputs=outputs)
 
+
+
         logger.info("Training loss: {}".format(train_loss))
         logger.info("Training accuracy: {}".format(train_accuracy))
         logger.info("Validation loss: {}".format(valid_loss))
         logger.info("Validation accuracy: {}".format(valid_accuracy))
 
+        save_training_stats(save_path.format('stats.json'), t, train_accuracy, train_loss, valid_accuracy, valid_loss)
+
+        saver.save(sess, save_path.format('params_%.2d.ckpt' % t))
+        logger.info("checkpoint saved...")
+
+        pickle_dump({'epoch': t}, save_path.format('status_%.2d.pkl' % t))
+
         if valid_accuracy >= best_val_acc:
             best_train_acc = train_accuracy
             best_val_acc = valid_accuracy
-            saver.save(sess, save_path.format('params.ckpt'))
+            saver.save(sess, save_path.format('params_best.ckpt'))
             logger.info("checkpoint saved...")
 
-            pickle_dump({'epoch': t}, save_path.format('status.pkl'))
+            pickle_dump({'epoch': t}, save_path.format('status_best.pkl'))
 
