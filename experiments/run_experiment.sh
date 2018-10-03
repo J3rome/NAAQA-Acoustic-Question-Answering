@@ -2,23 +2,32 @@
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null && pwd )"
 ROOTDIR="${DIR}/.."
 OLDDIR=$PWD
+CURRENT_DATE_TIME=$(date +'%d-%m-%Y_%Hh%M')
 
 EXPERIMENT_NAME=$1
+if [ "${EXPERIMENT_NAME: -1}" = "/" ]; then
+    EXPERIMENT_NAME="${EXPERIMENT_NAME:: -1}"
+fi
 EXPERIMENT_DIR="${DIR}/${EXPERIMENT_NAME}"
-LOG_DIR="${EXPERIMENT_DIR}/log"
+ROOT_LOG_DIR="${EXPERIMENT_DIR}/log"
 
-# TODO : This script must be run in the virtual environment. Figure a way to make sure we are in the environment ?
+if [ ! -d "${ROOT_LOG_DIR}" ]; then
+  mkdir "${ROOT_LOG_DIR}"
+fi
 
+LOG_DIR="${ROOT_LOG_DIR}/${CURRENT_DATE_TIME}"
 if [ ! -d "${LOG_DIR}" ]; then
   mkdir "${LOG_DIR}"
 fi
+
+# TODO : This script must be run in the virtual environment. Figure a way to make sure we are in the environment ?
 
 # Will stop the script on first error
 set -e
 
 cd $ROOTDIR
 echo "-----------------------------------------------------------------------------------------------------------"
-echo "    AQA Dataset Generation"
+echo "    AQA Film Network"
 echo "-----------------------------------------------------------------------------------------------------------"
 echo "[NOTE] This script should be run inside the virtual environment associated with aqa neural network"
 echo "[NOTE] The output of each process can be found in the log folder of the experiment"
