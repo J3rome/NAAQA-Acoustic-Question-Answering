@@ -47,11 +47,12 @@
   },
 
   "optimizer": {
-    "no_epoch": 50,
+    "no_epoch": 40,
     "learning_rate": 3e-4,
-    "batch_size": 16,
+    "batch_size": 64,
     "clip_val": 0.0,
-    "weight_decay": 1e-06
+    "weight_decay": 1e-5,
+    "weight_decay_remove" : ["kernel:0", "bias:0", "biases:0"]
   },
 
   "dico_name" : "dict.json",
