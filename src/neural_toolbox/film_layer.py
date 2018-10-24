@@ -68,6 +68,7 @@ class FiLMResblock(object):
         self.conv2_bn = slim.batch_norm(self.conv2,
                                         center=False,
                                         scale=False,
+                                        scope='conv2_bn',
                                         decay=0.9,
                                         is_training=is_training,
                                         reuse=reuse)
