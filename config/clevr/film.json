@@ -49,7 +49,7 @@
   "optimizer": {
     "no_epoch": 25,
     "learning_rate": 3e-4,
-    "batch_size": 64,
+    "batch_size": 512,
     "clip_val": 0.0,
     "weight_decay": 1e-5,
     "weight_decay_remove" : ["kernel:0", "bias:0", "biases:0"]
