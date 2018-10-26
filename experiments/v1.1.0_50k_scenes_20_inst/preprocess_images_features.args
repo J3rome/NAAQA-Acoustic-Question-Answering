@@ -6,4 +6,4 @@
 -feature_name=block3/unit_22/bottleneck_v1
 -subtract_mean=False
 -batch_size=512
--no_thread=12
+-no_thread=6
