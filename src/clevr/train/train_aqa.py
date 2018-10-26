@@ -122,6 +122,7 @@ if use_resnet:
 
 
 gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=args.gpu_ratio)
+#gpu_options = tf.GPUOptions(allow_growth=True)
 
 with tf.Session(config=tf.ConfigProto(gpu_options=gpu_options, allow_soft_placement=True)) as sess:
 
@@ -197,4 +198,6 @@ with tf.Session(config=tf.ConfigProto(gpu_options=gpu_options, allow_soft_placem
             logger.info("checkpoint saved...")
 
             pickle_dump({'epoch': t}, save_path.format('status_best.pkl'))
+
+        cpu_pool.close()
 
