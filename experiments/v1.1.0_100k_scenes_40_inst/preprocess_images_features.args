@@ -1,6 +1,6 @@
--img_dir=data/v1.1.0_100k_scenes_20_inst/images
--data_dir=data/v1.1.0_100k_scenes_20_inst
--out_dir=data/v1.1.0_100k_scenes_20_inst/preprocessed
+-img_dir=data/v1.1.0_100k_scenes_40_inst/images
+-data_dir=data/v1.1.0_100k_scenes_40_inst
+-out_dir=data/v1.1.0_100k_scenes_40_inst/preprocessed
 -img_size=224
 -ckpt=data/resnet/resnet_v1_101.ckpt
 -feature_name=block3/unit_22/bottleneck_v1

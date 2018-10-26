@@ -1,6 +1,6 @@
 -data_dir=data/v1.1.0_100k_scenes_20_inst
 -img_dir=data/v1.1.0_100k_scenes_20_inst/preprocessed
--config=config/clevr/film.json
+-config=config/clevr/film_batch1024.json
 -exp_dir=out/v1.1.0_100k_scenes_20_inst
 -no_thread=12
 -gpu_ratio=0.99
