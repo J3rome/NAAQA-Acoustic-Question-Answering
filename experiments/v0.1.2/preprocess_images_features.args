@@ -1,9 +1,0 @@
--img_dir=data/0.1.2/images
--data_dir=data/0.1.2
--out_dir=data/0.1.2/preprocessed
--img_size=224
--ckpt=data/resnet/resnet_v1_101.ckpt
--feature_name=block3/unit_22/bottleneck_v1
--subtract_mean=False
--batch_size=16
--no_thread=6

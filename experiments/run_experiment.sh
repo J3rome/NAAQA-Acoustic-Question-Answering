@@ -27,7 +27,7 @@ set -e
 
 cd $ROOTDIR
 echo "-----------------------------------------------------------------------------------------------------------"
-echo "    AQA Film Network"
+echo "    AQA Film Network  --- Experiment : ${EXPERIMENT_NAME}  ---  `date +"%d/%m/%Y %H:%M"`"
 echo "-----------------------------------------------------------------------------------------------------------"
 echo "[NOTE] This script should be run inside the virtual environment associated with aqa neural network"
 echo "[NOTE] The output of each process can be found in the log folder of the experiment"
@@ -49,7 +49,5 @@ echo -e "Preprocessing of questions done\n"
 # Train network
 echo "Starting network training"
 python src/clevr/train/train_aqa.py @${EXPERIMENT_DIR}/training.args
-#   - Save network at each epoch (This way we can exit)
-#   - Save some stats on the training
 
 # Save trained network in specific place

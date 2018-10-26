@@ -1,2 +1,0 @@
--data_dir=data/v0.2.0_10000_scenes
--dict_file=data/v0.2.0_10000_scenes/preprocessed/dict.json

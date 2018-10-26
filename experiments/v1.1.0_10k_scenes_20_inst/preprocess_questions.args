@@ -1,0 +1,2 @@
+-data_dir=data/v1.1.0_10k_scenes_20_inst
+-dict_file=data/v1.1.0_10k_scenes_20_inst/preprocessed/dict.json

@@ -1,6 +1,0 @@
--data_dir=data/v0.2.0_10000_scenes
--img_dir=data/v0.2.0_10000_scenes/preprocessed
--config=config/clevr/film.json
--exp_dir=out/aqa_v0.2.0
--no_thread=7
--gpu_ratio=0.99
