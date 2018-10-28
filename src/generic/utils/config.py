@@ -11,7 +11,7 @@ def load_config(config_file, exp_dir):
         config_hash = hashlib.md5(config_str).hexdigest()
         config = json.loads(config_str.decode('utf-8'))
 
-    exp_identifier = "%s-%s" % (config['name'].replace(' ', '_'), config_hash)
+    exp_identifier = "%s-%s" % (config['model']['name'].replace(' ', '_'), config_hash)
 
     save_path = '{}/{{}}'.format(os.path.join(exp_dir, exp_identifier))
     if not os.path.isdir(save_path.format('')):
