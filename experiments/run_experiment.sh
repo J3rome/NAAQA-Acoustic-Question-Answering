@@ -4,6 +4,9 @@ ROOTDIR="${DIR}/.."
 OLDDIR=$PWD
 CURRENT_DATE_TIME=$(date +'%d-%m-%Y_%Hh%M')
 
+# Initialise timer
+SECONDS=0
+
 EXPERIMENT_NAME=$1
 if [ "${EXPERIMENT_NAME: -1}" = "/" ]; then
     EXPERIMENT_NAME="${EXPERIMENT_NAME:: -1}"
@@ -49,5 +52,11 @@ echo -e "Preprocessing of questions done\n"
 # Train network
 echo "Starting network training"
 python src/clevr/train/train_aqa.py @${EXPERIMENT_DIR}/training.args
+
+DURATION=$SECONDS
+HOURS=$((${DURATION} / 3600))
+SECONDS_REMAINDER=$((${DURATION} % 3600))
+MINUTES=$((SECONDS_REMAINDER / 60))
+echo "Preprocessing & Training time : ${HOURS} hours ${MINUTES} min" > ${LOG_DIR}/duration.timing
 
 # Save trained network in specific place
