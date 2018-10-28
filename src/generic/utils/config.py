@@ -18,7 +18,7 @@ def load_config(config_file, exp_dir):
     # create logger
     logger = create_logger(save_path.format('train.log'))
     logger.info("Config Hash {}".format(exp_identifier))
-    logger.info(config)
+    logger.info(json.dumps(config, indent=2))
 
     # set seed
     set_seed(config)
