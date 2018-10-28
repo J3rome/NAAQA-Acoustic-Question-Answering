@@ -8,8 +8,10 @@ from  generic.utils.logger import create_logger
 def load_config(config_file, exp_dir):
     with open(config_file, 'rb') as f_config:
         config_str = f_config.read()
-        exp_identifier = hashlib.md5(config_str).hexdigest()
+        config_hash = hashlib.md5(config_str).hexdigest()
         config = json.loads(config_str.decode('utf-8'))
+
+    exp_identifier = "%s-%s" % (config['name'].replace(' ', '_'), config_hash)
 
     save_path = '{}/{{}}'.format(os.path.join(exp_dir, exp_identifier))
     if not os.path.isdir(save_path.format('')):
