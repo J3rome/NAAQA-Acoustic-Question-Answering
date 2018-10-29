@@ -141,6 +141,9 @@ with tf.Session(config=tf.ConfigProto(gpu_options=gpu_options, allow_soft_placem
   accuracy = correct_answer_count/total_answer_count
   print("Accuracy is : %f" % accuracy)
 
+  if not os.path.isdir(args.exp_dir):
+    os.mkdir(args.exp_dir)
+
   result_filepath = os.path.join(args.exp_dir, '%s_results.json' % args.set_type)
   with open(result_filepath, 'w') as f:
     json.dump(results, f, indent=2)
