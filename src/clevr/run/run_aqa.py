@@ -148,5 +148,12 @@ with tf.Session(config=tf.ConfigProto(gpu_options=gpu_options, allow_soft_placem
   with open(result_filepath, 'w') as f:
     json.dump(results, f, indent=2)
 
+  accuracy_filepath = os.path.join(args.exp_dir, '%s_accuracy.json' % args.set_type)
+  with open(accuracy_filepath, 'w') as f:
+    json.dump({
+      'set': args.set_type,
+      'accuracy': accuracy
+    }, f, indent=2)
+
   print("Results have been saved in '%s'" % result_filepath)
 
