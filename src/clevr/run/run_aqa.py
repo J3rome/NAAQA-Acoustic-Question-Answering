@@ -41,6 +41,7 @@ parser.add_argument("-config", type=str, help='Config file')
 parser.add_argument("-gpu_ratio", type=float, default=0.95, help="How many GPU ram is required? (ratio)")
 parser.add_argument("-no_gpu", type=int, default=1, help="How many GPU ?")
 parser.add_argument("-no_thread", type=int, default=6, help="How many thread should be used ?")
+parser.add_argument("-dict_path", type=str, default=None, help="Path to dictionary file")
 
 args = parser.parse_args()
 logger = logging.getLogger()
@@ -55,8 +56,13 @@ with open(args.config, 'rb') as f_config:
 image_builder = get_img_builder(config['model']['image'], args.img_dir, bufferize=None)
 
 # Load dictionary
-# FIXME : Do not hardcode folder name
-tokenizer = CLEVRTokenizer(os.path.join(args.data_dir, 'preprocessed', config["dico_name"]))
+if args.dict_path:
+  dict_path = args.dict_path
+else:
+  # FIXME : Do not hardcode folder name
+  dict_path = os.path.join(args.data_dir, 'preprocessed', config["dico_name"])
+
+tokenizer = CLEVRTokenizer(dict_path)
 
 # Load data
 dataset = AQADataset(args.data_dir, which_set=args.set_type, image_builder=image_builder)
