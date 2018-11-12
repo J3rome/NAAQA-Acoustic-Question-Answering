@@ -12,7 +12,7 @@ def is_optimizer(x):
     return hasattr(x, 'op_def')
 
 def is_summary(x):
-    return isinstance(x, tf.Tensor) and x.dtype is tf.string
+    return (isinstance(x, tf.Tensor) and x.dtype is tf.string)
 
 
 def is_float(x):
@@ -165,6 +165,10 @@ class MultiGPUEvaluator(object):
 
                 n_iter += 1
 
+                summaries = [tf.summary.merge_all()]
+
+                outputs = summaries + outputs
+
                 # Execute the batch
                 results = self.execute(sess, outputs, multi_gpu_batch)
 
@@ -181,7 +185,8 @@ class MultiGPUEvaluator(object):
                         i += 1
 
                     elif is_summary(var):  # move into listener?
-                        self.writer.add_summary(result)
+                        if self.writer:
+                            self.writer.add_summary(result)
 
                     elif is_list_int(var):
                         aggregated_outputs[i] += list(result)
