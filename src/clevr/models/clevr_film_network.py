@@ -57,6 +57,8 @@ class FiLM_CLEVRNetwork(ResnetModel):
             assert len(self._image.get_shape()) == 4, \
                 "Incorrect image input and/or attention mechanism (should be none)"
 
+            #tf.summary.image(self._image.name, self._image)
+
             #####################
             #   STEM
             #####################
