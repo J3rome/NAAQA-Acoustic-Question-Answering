@@ -12,7 +12,7 @@ def save_training_stats(stats_output_file, epoch_nb, train_accuracy, train_loss,
   else:
     stats = {}
 
-  stats["epoch_%d" % (epoch_nb + 1)] = {
+  stats["epoch_%.3d" % (epoch_nb + 1)] = {
     'train_acc': train_accuracy,
     'train_loss': train_loss,
     'val_accuracy': val_accuracy,
