@@ -165,9 +165,9 @@ class MultiGPUEvaluator(object):
 
                 n_iter += 1
 
-                summaries = [tf.summary.merge_all()]
+                #summaries = [tf.summary.merge_all()]
 
-                outputs = summaries + outputs
+                #outputs = summaries + outputs
 
                 # Execute the batch
                 results = self.execute(sess, outputs, multi_gpu_batch)
