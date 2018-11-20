@@ -146,7 +146,7 @@ with tf.Session(config=tf.ConfigProto(gpu_options=gpu_options, allow_soft_placem
 
     # start actual training
     best_val_acc, best_train_acc = 0, 0
-    for t in range(start_epoch, no_epoch):
+    for step in range(start_epoch, no_epoch):
 
         # CPU/GPU option
         # h5 requires a Tread pool while raw images requires to create new process
@@ -156,8 +156,7 @@ with tf.Session(config=tf.ConfigProto(gpu_options=gpu_options, allow_soft_placem
             cpu_pool = ThreadPool(args.no_thread)
             cpu_pool._maxtasksperchild = 1000
 
-
-        logger.info('Epoch {}/{}..'.format(t + 1,no_epoch))
+        logger.info('Epoch {}/{}..'.format(step + 1, no_epoch))
 
         train_iterator = Iterator(trainset,
                                   batch_size=batch_size,
@@ -166,8 +165,7 @@ with tf.Session(config=tf.ConfigProto(gpu_options=gpu_options, allow_soft_placem
                                   pool=cpu_pool)
         [train_loss, train_accuracy] = evaluator.process(sess, train_iterator, outputs=outputs + [optimize])
 
-
-        valid_loss, valid_accuracy = 0,0
+        valid_loss, valid_accuracy = 0, 0
         if not merge_dataset:
             valid_iterator = Iterator(validset,
                                       batch_size=batch_size*2,
@@ -177,27 +175,21 @@ with tf.Session(config=tf.ConfigProto(gpu_options=gpu_options, allow_soft_placem
 
             [valid_loss, valid_accuracy] = evaluator.process(sess, valid_iterator, outputs=outputs)
 
-
-
         logger.info("Training loss: {}".format(train_loss))
         logger.info("Training accuracy: {}".format(train_accuracy))
         logger.info("Validation loss: {}".format(valid_loss))
         logger.info("Validation accuracy: {}".format(valid_accuracy))
 
-        save_training_stats(save_path.format('stats.json'), t, train_accuracy, train_loss, valid_accuracy, valid_loss)
+        save_training_stats(save_path.format('stats.json'), step, train_accuracy, train_loss, valid_accuracy, valid_loss)
 
-        saver.save(sess, save_path.format('params_%.2d.ckpt' % t))
+        saver.save(sess, save_path.format('film-checkpoint'), global_step=step)
         logger.info("checkpoint saved...")
-
-        pickle_dump({'epoch': t}, save_path.format('status_%.2d.pkl' % t))
 
         if valid_accuracy >= best_val_acc:
             best_train_acc = train_accuracy
             best_val_acc = valid_accuracy
-            saver.save(sess, save_path.format('params_best.ckpt'))
+            saver.save(sess, save_path.format('film-checkpoint-best'))
             logger.info("checkpoint saved...")
-
-            pickle_dump({'epoch': t}, save_path.format('status_best.pkl'))
 
         cpu_pool.close()
 
