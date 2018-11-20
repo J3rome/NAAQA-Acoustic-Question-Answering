@@ -112,7 +112,7 @@ optimize, outputs = create_multi_gpu_optimizer(networks, config, finetune=finetu
 #############################
 
 # create a saver to store/load checkpoint
-saver = tf.train.Saver()
+saver = tf.train.Saver(max_to_keep=None, pad_step_number=3)
 resnet_saver = None
 
 # Retrieve only resnet variables
