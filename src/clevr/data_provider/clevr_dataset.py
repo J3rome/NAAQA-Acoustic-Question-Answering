@@ -86,7 +86,7 @@ class AQADataset(AbstractDataset):
 
     def __init__(self, folder, which_set, image_builder=None):
 
-        question_file_path = '{}/questions/AQA_{}_questions.json'.format(folder, which_set)
+        question_file_path = '{}/questions/CLEAR_{}_questions.json'.format(folder, which_set)
 
         games = []
         self.question_family_index = collections.Counter()
@@ -98,7 +98,7 @@ class AQADataset(AbstractDataset):
             info = data["info"]
             samples = data["questions"]
 
-            assert info["split"] == which_set
+            assert info["set_type"] == which_set
 
             print("Successfully Loaded AQA v{} ({})".format(info["version"], which_set))
 
