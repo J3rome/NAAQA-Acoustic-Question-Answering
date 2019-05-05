@@ -1,7 +1,0 @@
--data_dir=data/v1.1.0_10k_scenes_40_inst
--img_dir=data/v1.1.0_10k_scenes_40_inst/preprocessed
--config=config/clevr/film_2resblock_batch512.json
--exp_dir=out/v1.1.0_10k_scenes_40_inst
--no_thread=6
--gpu_ratio=0.99
--no_gpu=1
