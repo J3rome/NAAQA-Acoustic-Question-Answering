@@ -110,7 +110,7 @@ class AQADataset(AbstractDataset):
 
                 answer = sample.get("answer", None)  # None for test set
 
-                image_id = sample["scene_index"]
+                image_id = int(sample["scene_index"])
                 image_filename = sample["scene_filename"].replace('.wav', ".png")
                 image_filename = os.path.join(which_set, image_filename)
 
