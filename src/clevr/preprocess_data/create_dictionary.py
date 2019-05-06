@@ -1,4 +1,5 @@
-from nltk.tokenize import TweetTokenizer
+from nltk.tokenize import RegexpTokenizer
+import re
 import io
 import json
 import collections
@@ -31,10 +32,24 @@ if __name__ == '__main__':
 
 
     # Input words
-    tknzr = TweetTokenizer(preserve_case=False)
+    tokenizerPatterns = r"""
+        (?:[^\W\d_](?:[^\W\d_]|['\-_])+[^\W\d_]) # Words with apostrophes or dashes.
+        |
+        (?:[+\-]?\d+[,/.:-]\d+[+\-]?)  # Numbers, including fractions, decimals.
+        |
+        (?:[a-z]\#)                     # Notes (Ex : D#, F#)
+        |
+        (?:[\w_]+)                     # Words without apostrophes or dashes.
+        |
+        (?:\.(?:\s*\.){1,})            # Ellipsis dots.
+        |
+        (?:\S)                         # Everything else that isn't whitespace.
+        """
+
+    tokenizer = RegexpTokenizer(tokenizerPatterns, flags=re.VERBOSE | re.I | re.UNICODE)
 
     for game in games:
-        input_tokens = tknzr.tokenize(game.question)
+        input_tokens = tokenizer.tokenize(game.question)
         for tok in input_tokens:
             word2occ[tok] += 1
 

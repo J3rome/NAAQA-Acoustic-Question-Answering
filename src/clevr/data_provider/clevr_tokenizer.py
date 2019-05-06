@@ -1,14 +1,29 @@
-from nltk.tokenize import TweetTokenizer
+from nltk.tokenize import RegexpTokenizer
 import json
 import re
 
 # Note that this is a copy/past of VQATokenizer
 
+# FIXME : Rename this to AQATokenizer
 class CLEVRTokenizer:
     """ """
     def __init__(self, dictionary_file):
 
-        self.tokenizer = TweetTokenizer(preserve_case=False)
+        tokenizer_patterns = r"""
+                (?:[^\W\d_](?:[^\W\d_]|['\-_])+[^\W\d_]) # Words with apostrophes or dashes.
+                |
+                (?:[+\-]?\d+[,/.:-]\d+[+\-]?)  # Numbers, including fractions, decimals.
+                |
+                (?:[a-z]\#)                    # Musical Notes (Ex : D#, F#)
+                |
+                (?:[\w_]+)                     # Words without apostrophes or dashes.
+                |
+                (?:\.(?:\s*\.){1,})            # Ellipsis dots.
+                |
+                (?:\S)                         # Everything else that isn't whitespace.
+                """
+
+        self.tokenizer = RegexpTokenizer(tokenizer_patterns, flags=re.VERBOSE | re.I | re.UNICODE)
         with open(dictionary_file, 'r') as f:
             data = json.load(f)
             self.word2i = data['word2i']
