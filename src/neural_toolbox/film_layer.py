@@ -16,13 +16,13 @@ def film_layer(ft, context, reuse=False):
     width = int(ft.get_shape()[2])
     feature_size = int(ft.get_shape()[3])
 
-    film_params = slim.fully_connected(context,
+    film_params_vector = slim.fully_connected(context,
                                        num_outputs=2 * feature_size,
                                        activation_fn=None,
                                        reuse=reuse,
                                        scope="film_projection")
 
-    film_params = tf.expand_dims(film_params, axis=[1])
+    film_params = tf.expand_dims(film_params_vector, axis=[1])
     film_params = tf.expand_dims(film_params, axis=[1])
     film_params = tf.tile(film_params, [1, height, width, 1])
 
@@ -31,7 +31,7 @@ def film_layer(ft, context, reuse=False):
 
     output = (1 + gammas) * ft + betas
 
-    return output
+    return output, film_params_vector
 
 
 class FiLMResblock(object):
@@ -75,7 +75,7 @@ class FiLMResblock(object):
 
         # Apply FILM layer Residual connection
         with tf.variable_scope("FiLM", reuse=reuse):
-            self.conv2_film = film_layer_fct(self.conv2_bn, context, reuse=reuse)
+            self.conv2_film, self.gamma_beta = film_layer_fct(self.conv2_bn, context, reuse=reuse)
 
         # Apply ReLU
         self.conv2_out = tf.nn.relu(self.conv2_film)
