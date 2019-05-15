@@ -102,3 +102,9 @@ ENV/
 
 # Pycharm stuff
 .idea/
+
+/tensorboard/
+/Vis_*/
+
+/data
+/out/
