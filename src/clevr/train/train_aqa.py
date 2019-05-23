@@ -182,7 +182,7 @@ with tf.Session(config=tf.ConfigProto(gpu_options=gpu_options, allow_soft_placem
 
         save_training_stats(save_path.format('stats.json'), step, train_accuracy, train_loss, valid_accuracy, valid_loss)
 
-        saver.save(sess, save_path.format('film-checkpoint'), global_step=step)
+        saver.save(sess, save_path.format('film-checkpoint.ckpt'), global_step=step)
         logger.info("checkpoint saved...")
 
         if valid_accuracy >= best_val_acc:
