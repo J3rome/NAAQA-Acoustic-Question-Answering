@@ -25,7 +25,8 @@ def extract_features(
 
     # CPU/GPU option
     cpu_pool = Pool(no_threads, maxtasksperchild=1000)
-    gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=gpu_ratio)
+    #gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=gpu_ratio)
+    gpu_options = tf.GPUOptions(allow_growth=True)
 
 
 

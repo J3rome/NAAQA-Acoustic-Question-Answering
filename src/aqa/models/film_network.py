@@ -2,15 +2,15 @@ import tensorflow as tf
 import tensorflow.contrib.layers as tfc_layers
 import tensorflow.contrib.rnn as tfc_rnn
 
-from generic.tf_utils.abstract_network import ResnetModel
+from aqa.models.abstract_network import ResnetModel
 
-import neural_toolbox.film_layer as film
-import neural_toolbox.ft_utils as ft_utils
+import aqa.models.film_layer as film
+import aqa.models.ft_utils as ft_utils
 
 
-class FiLM_CLEVRNetwork(ResnetModel):
-    def __init__(self, config, no_words, no_answers, reuse=False, device=''):
-        ResnetModel.__init__(self, "clevr", device=device)
+class FiLM_Network(ResnetModel):
+    def __init__(self, config, no_words, no_answers, input_image_tensor = None, reuse=False, device=''):
+        ResnetModel.__init__(self, "clear", device=device)
 
         with tf.variable_scope(self.scope_name, reuse=reuse):
 
@@ -53,13 +53,13 @@ class FiLM_CLEVRNetwork(ResnetModel):
             #   IMAGES
             #####################
 
-            self._image = tf.placeholder(tf.float32, [self.batch_size] + config['image']["dim"], name='image')
+            if input_image_tensor is None:
+                self._image = tf.placeholder(tf.float32, [self.batch_size] + config['image']["dim"], name='image')
+            else:
+                self._image = input_image_tensor        # FIXME : Make sure we have the correct scope
+
             assert len(self._image.get_shape()) == 4, \
                 "Incorrect image input and/or attention mechanism (should be none)"
-
-            #tf.summary.image(name='Input Image', tensor=self._image)
-
-            #tf.summary.image(self._image.name, self._image)
 
             #####################
             #   STEM
@@ -156,62 +156,10 @@ class FiLM_CLEVRNetwork(ResnetModel):
 
             tf.summary.scalar('accuracy', self.accuracy)
 
-            print('Model... build!')
+            print('FiLM Model... built!')
 
     def get_loss(self):
         return self.loss
 
     def get_accuracy(self):
         return self.accuracy
-
-
-if __name__ == "__main__":
-    FiLM_CLEVRNetwork({
-
-    "name" : "CLEVR with FiLM",
-
-    "image":
-    {
-      "image_input": "conv",
-      "dim": [14, 14, 1024],
-      "normalize": False,
-
-      "resnet_out": "block3/unit_22/bottleneck_v1",
-      "resnet_version" : 101,
-      "attention" : {
-        "mode": "none"
-      }
-
-    },
-
-    "question": {
-      "word_embedding_dim": 200,
-      "rnn_cell": "lstm",
-      "layer_norm": False,
-      "rnn_state_size": 4096
-    },
-
-    "stem" : {
-      "spatial_location" : True,
-      "conv_out": 128,
-      "conv_kernel": [3,3]
-    },
-
-    "resblock" : {
-      "no_resblock" : 4,
-      "spatial_location" : True,
-      "kernel1" : [1, 1],
-      "kernel2" : [3,3]
-    },
-
-    "classifier" : {
-      "spatial_location" : True,
-      "conv_out": 512,
-      "conv_kernel": [1,1],
-      "no_mlp_units": 1024
-    },
-
-    "dropout_keep_prob" : 0.6
-
-  }
-    , no_words=354, no_answers=11)
