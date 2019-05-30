@@ -72,6 +72,18 @@ if __name__ == "__main__":
         resnet_saver = tf.train.Saver(var_list=resnet_variables)
         resnet_saver.restore(sess, resnet_ckpt_path)
         print("FatKid")
+
+        # TODO : Restore pretrained FiLM network
+        # TODO : Train only FiLM part
+        # TODO : Extract Beta And Gamma Parameters + T-SNE
+        # TODO : Feed RAW image directly to the FiLM network
+        # TODO : Options for preprocessing (Feature Exctraction) to minimize training time ? ( Quantify the increase in training time)
+        # TODO : See how using the full resnet + FiLM impact batch size (More parameters than with preprocessing)
+        # TODO : Resize images ? Do we absolutely need 224x224 for the resnet preprocessing ?
+        #        Since we extract a layer in resnet, we can feed any size, its fully convolutional up to that point
+        #        When feeding directly to FiLM, we can use original size ?
+        # TODO : What is the optimal size for our spectrograms ?
+        # TODO : Train with different amount of residual blocks. Other modifications to the architecture ?
     #
     #     for one_set in set_type:
     #
