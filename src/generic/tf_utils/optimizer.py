@@ -97,7 +97,6 @@ def create_multi_gpu_optimizer(networks, config, finetune=list(), optim_cst=tf.t
     return optimize, [avg_loss, avg_accuracy]
 
 
-
 def clip_gradient(gvs, clip_val):
     clipped_gvs = [(tf.clip_by_norm(grad, clip_val), var) for grad, var in gvs]
     return clipped_gvs

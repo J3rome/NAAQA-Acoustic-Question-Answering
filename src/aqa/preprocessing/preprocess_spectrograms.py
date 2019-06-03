@@ -8,7 +8,7 @@ from generic.preprocess_data.extract_img_raw import extract_raw
 from generic.data_provider.image_loader import RawImageBuilder
 
 # FIXME : Extract from generic code
-from aqa.data_interface.CLEAR_dataset import CLEARDataset
+from aqa.data_interfaces.CLEAR_dataset import CLEARDataset
 
 from clevr.data_provider.clevr_batchifier import CLEVRBatchifier
 

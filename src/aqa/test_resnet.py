@@ -4,7 +4,10 @@ import tensorflow.contrib.slim.python.slim.nets.resnet_v1 as resnet_v1
 import tensorflow.contrib.slim.python.slim.nets.resnet_utils as slim_utils
 
 from aqa.models.film_network import FiLM_Network
-from aqa.data_interface.CLEAR_tokenizer import CLEARTokenizer
+from aqa.data_interfaces.CLEAR_tokenizer import CLEARTokenizer
+from aqa.model_handlers.optimizer import create_optimizer
+
+
 
 
 if __name__ == "__main__":
@@ -58,6 +61,14 @@ if __name__ == "__main__":
     tokenizer = CLEARTokenizer(dict_path)
     network = FiLM_Network(film_model_config, input_image_tensor=resnet_chosen_layer, no_words=tokenizer.no_words, no_answers=tokenizer.no_answers, device=0)  # FIXME : Not sure that device 0 is appropriate for CPU
 
+    # Setup optimizer
+    optimizer_config = {
+        "learning_rate": 3e-4,
+        "clip_val": 0.0,
+        "weight_decay": 1e-5
+    }
+    optimizer = create_optimizer(network, optimizer_config, var_list=None)  # TODO : Var_List should contain only film variables
+    #TODO : Checkout the apply_update_ops. Was always done with the multi_gpu_optimizer
 
     # GPU Options
     gpu_options = tf.GPUOptions(allow_growth=True)
@@ -71,6 +82,15 @@ if __name__ == "__main__":
         resnet_variables = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope="resnet_v1_101")
         resnet_saver = tf.train.Saver(var_list=resnet_variables)
         resnet_saver.restore(sess, resnet_ckpt_path)
+
+        # Restore pretrained weight for FiLM network
+        film_variables = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope="clevr")
+
+
+        all_variables = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES)
+        all_variables_name = [v.name for v in all_variables]
+        resnet_variables_name = [v.name for v in resnet_variables]
+        film_variables_name = [v.name for v in film_variables]
         print("FatKid")
 
         # TODO : Restore pretrained FiLM network

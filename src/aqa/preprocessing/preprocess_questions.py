@@ -5,7 +5,7 @@ import json
 import collections
 import argparse
 
-from aqa.data_interface.CLEAR_dataset import CLEARDataset
+from aqa.data_interfaces.CLEAR_dataset import CLEARDataset
 
 if __name__ == '__main__':
 

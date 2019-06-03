@@ -10,7 +10,7 @@ import aqa.models.ft_utils as ft_utils
 
 class FiLM_Network(ResnetModel):
     def __init__(self, config, no_words, no_answers, input_image_tensor = None, reuse=False, device=''):
-        ResnetModel.__init__(self, "clear", device=device)
+        ResnetModel.__init__(self, "clevr", device=device)      # TODO : Change scope to clear
 
         with tf.variable_scope(self.scope_name, reuse=reuse):
 
