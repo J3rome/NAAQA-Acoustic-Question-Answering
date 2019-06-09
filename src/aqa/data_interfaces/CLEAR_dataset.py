@@ -4,8 +4,11 @@ import random
 import collections
 import numpy as np
 from multiprocessing import Semaphore
+from multiprocessing.pool import ThreadPool
+from multiprocessing import Pool
 import os
 
+from aqa.data_interfaces.CLEAR_tokenizer import CLEARTokenizer
 from src.aqa.data_interfaces.CLEAR_image_loader import CLEARImage
 
 class Game(object):
@@ -23,11 +26,16 @@ class Game(object):
 class CLEARDataset(object):
     """Loads the CLEAR dataset."""
 
-    def __init__(self, folder, which_set, image_builder, tokenizer):
+    def __init__(self, folder, which_set, batch_size, image_builder, dict_file_path=None):
 
         question_file_path = '{}/questions/CLEAR_{}_questions.json'.format(folder, which_set)
 
-        self.tokenizer = tokenizer
+        if dict_file_path is None:
+            dict_file_path = '{}/preprocessed/dict.json'.format(folder)
+
+        # TODO : Create the split in here directly (Train, val, test)
+
+        self.tokenizer = CLEARTokenizer(dict_file_path)
         self.games = []
         self.question_family_index = collections.Counter()
         self.answer_counter = collections.Counter()
@@ -62,6 +70,8 @@ class CLEARDataset(object):
                 self.question_family_index[question_family_index] += 1
                 self.answer_counter[answer] += 1
 
+        self.batchifier = CLEARBatchifier(self.games, batch_size, self.tokenizer)
+
         print("Successfully Loaded CLEAR v{} ({}) - {} games loaded.".format(info["version"], which_set, len(self.games)))
 
     def get_data(self, indices=[]):
@@ -73,14 +83,22 @@ class CLEARDataset(object):
     def __len__(self):
         return len(self.games)
 
+
 class CLEARBatchifier(object):
     """Provides an generic multithreaded iterator over the dataset."""
 
-    def __init__(self, dataset, batch_size, pool, tokenizer,
+    def __init__(self, games, batch_size, tokenizer, nb_thread=3,   # FIXME : Make nb_thread param pop up
                  shuffle= True, no_semaphore= 20):
 
-        # Filtered games
-        games = dataset.get_data()
+        # Define CPU pool
+        # CPU/GPU option
+        # h5 requires a Tread pool while raw images requires to create new process
+
+        #if image_builder.is_raw_image():
+        #    cpu_pool = Pool(nb_thread, maxtasksperchild=1000)
+        pool = ThreadPool(nb_thread)
+        pool._maxtasksperchild = 1000
+
         self.tokenizer = tokenizer
 
         if shuffle:
@@ -100,7 +118,7 @@ class CLEARBatchifier(object):
             batches.append(games[i:end])
             i += batch_size
 
-        # Multi_proc
+        # Multi_proc iterator
         def create_semaphore_iterator(obj_list, semaphores):
             for obj in obj_list:
                 semaphores.acquire()

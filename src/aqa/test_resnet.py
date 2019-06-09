@@ -1,8 +1,6 @@
 import tensorflow as tf
 from tqdm import tqdm
 import numpy as np
-from multiprocessing.pool import ThreadPool
-from multiprocessing import Pool
 from collections import defaultdict
 
 from tensorflow.python import debug as tf_debug
@@ -166,23 +164,9 @@ if __name__ == "__main__":
     image_builder = get_img_builder(film_model_config['image'], experiment_path, bufferize=None)    # TODO : Figure out buffersize
 
     # TODO : Combine all all datasets in 1 data structure
-    train_data = CLEARDataset(experiment_path, which_set="train", image_builder=image_builder, tokenizer=tokenizer)
-    val_data = CLEARDataset(experiment_path, which_set="val", image_builder=image_builder, tokenizer=tokenizer)
+    train_data = CLEARDataset(experiment_path, which_set="train", image_builder=image_builder, batch_size=batch_size)
+    val_data = CLEARDataset(experiment_path, which_set="val", image_builder=image_builder, batch_size=batch_size)
     #test_data = CLEARDataset(experiment_path, which_set="test", image_builder=image_builder, tokenizer=tokenizer)
-
-    # Define CPU pool
-    # CPU/GPU option
-    # h5 requires a Tread pool while raw images requires to create new process
-
-    if image_builder.is_raw_image() and False:
-        cpu_pool = Pool(nb_thread, maxtasksperchild=1000)
-    else:
-        cpu_pool = ThreadPool(nb_thread)
-        cpu_pool._maxtasksperchild = 1000
-
-    train_batchifier = CLEARBatchifier(train_data, batch_size, cpu_pool, tokenizer)
-    val_batchifier = CLEARBatchifier(val_data, batch_size, cpu_pool, tokenizer)
-    #test_batchifier = CLEARBatchifier(test_data, batch_size, cpu_pool)
 
     # GPU Options
     gpu_options = tf.GPUOptions(allow_growth=True)
@@ -212,7 +196,7 @@ if __name__ == "__main__":
 
         for epoch in range(nb_epoch):
             print("Epoch %d" % epoch)
-            train_loss, train_accuracy = do_one_epoch(sess, train_batchifier, [loss, accuracy, optimize_step], network, images)
+            train_loss, train_accuracy = do_one_epoch(sess, train_data.batchifier, [loss, accuracy, optimize_step], network, images)
 
             # TODO : Save checkpoint & statistics
             # TODO : Export Gamma & Beta
