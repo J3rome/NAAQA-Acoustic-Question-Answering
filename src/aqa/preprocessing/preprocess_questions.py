@@ -1,4 +1,5 @@
 from nltk.tokenize import RegexpTokenizer
+import os
 import re
 import io
 import json
@@ -6,6 +7,7 @@ import collections
 import argparse
 
 from aqa.data_interfaces.CLEAR_dataset import CLEARDataset
+from aqa.data_interfaces.CLEAR_tokenizer import CLEARTokenizer
 
 if __name__ == '__main__':
 
@@ -16,8 +18,10 @@ if __name__ == '__main__':
     parser.add_argument("-min_occ", type=int, default=1, help='Minimum number of occurences to add word to dictionary (for Human Clevr)')
     args = parser.parse_args()
 
-    dataset = CLEARDataset(args.data_dir, which_set="train")
-    games = dataset.games
+    dataset = CLEARDataset(args.data_dir, {'type': 'raw', 'dim': [224, 224, 3]}, 32, sets=['train'], tokenize_text=False)
+
+    # FIXME : Should we use the whole dataset to create the dictionary ?
+    games = dataset.games['train']
 
     word2i = {'<padding>': 0,
               '<unk>': 1
@@ -27,26 +31,10 @@ if __name__ == '__main__':
                 '<unk>': 1
                 }
 
-    answer2occ = dataset.answer_counter
+    answer2occ = dataset.answer_counter['train']
     word2occ = collections.defaultdict(int)
 
-
-    # Input words
-    tokenizerPatterns = r"""
-        (?:[^\W\d_](?:[^\W\d_]|['\-_])+[^\W\d_]) # Words with apostrophes or dashes.
-        |
-        (?:[+\-]?\d+[,/.:-]\d+[+\-]?)  # Numbers, including fractions, decimals.
-        |
-        (?:[a-z]\#)                     # Notes (Ex : D#, F#)
-        |
-        (?:[\w_]+)                     # Words without apostrophes or dashes.
-        |
-        (?:\.(?:\s*\.){1,})            # Ellipsis dots.
-        |
-        (?:\S)                         # Everything else that isn't whitespace.
-        """
-
-    tokenizer = RegexpTokenizer(tokenizerPatterns, flags=re.VERBOSE | re.I | re.UNICODE)
+    tokenizer = CLEARTokenizer.get_tokenizer_inst()
 
     for game in games:
         input_tokens = tokenizer.tokenize(game.question)
@@ -65,6 +53,12 @@ if __name__ == '__main__':
     print("Number of words): {}".format(len(word2i)))
     print("Number of answers: {}".format(len(answer2i)))
 
-    with io.open(args.dict_file, 'w', encoding='utf8') as f_out:
+    preprocessed_folder_path = os.path.join(args.data_dir, 'preprocessed')
+    dict_file_path = os.path.join(preprocessed_folder_path, 'dict.json')
+
+    if not os.path.isdir(preprocessed_folder_path):
+        os.mkdir(preprocessed_folder_path)
+
+    with io.open(dict_file_path, 'w', encoding='utf8') as f_out:
        data = json.dumps({'word2i': word2i, 'answer2i': answer2i})
        f_out.write(data)
