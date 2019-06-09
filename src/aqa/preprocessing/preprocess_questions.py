@@ -62,3 +62,5 @@ if __name__ == '__main__':
     with io.open(dict_file_path, 'w', encoding='utf8') as f_out:
        data = json.dumps({'word2i': word2i, 'answer2i': answer2i})
        f_out.write(data)
+
+    print("done")
