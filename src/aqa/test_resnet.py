@@ -104,11 +104,17 @@ def do_one_epoch(sess, batchifier, outputs_var, network, image_var):
 
     for var in aggregated_outputs.keys():
         if is_scalar(var):
-            aggregated_outputs[var] = np.mean(aggregated_outputs[var])
+            aggregated_outputs[var] = np.mean(aggregated_outputs[var]).item()
 
     return list(aggregated_outputs.values())
 
 
+def create_folder_if_necessary(folder_path, overwrite_folder=False):
+    if not os.path.isdir(folder_path):
+        os.mkdir(folder_path)
+    elif overwrite_folder:
+        os.rmdir(folder_path)
+        os.mkdir(folder_path)
 
 
 if __name__ == "__main__":
@@ -130,11 +136,17 @@ if __name__ == "__main__":
 
     output_root_folder = "output"
     output_task_folder = "%s/%s" % (output_root_folder, task)
-    now = datetime.now()
     output_experiment_folder = "%s/%s" %(output_task_folder, experiment_name)
+    now = datetime.now()
     output_dated_folder = now.strftime("%Y-%m-%d_%H:%M")
     stats_file_path = "%s/stats.json" % output_dated_folder
     checkpoint_save_path = "%s/checkpoint.ckpt" % output_dated_folder
+
+    # Creating output folders
+    create_folder_if_necessary(output_root_folder)
+    create_folder_if_necessary(output_task_folder)
+    create_folder_if_necessary(output_experiment_folder)
+    create_folder_if_necessary(output_dated_folder)
 
 
     film_model_config = {
@@ -225,6 +237,11 @@ if __name__ == "__main__":
             train_loss, train_accuracy = do_one_epoch(sess, dataset.get_batches('train'),
                                                       [loss, accuracy, optimize_step], network, images)
 
+            print("Training :")
+            print("    Loss : %f  - Accuracy : %f" % (train_loss, train_accuracy))
+
+            print("Train epoch done")
+
             val_loss, val_accuracy = do_one_epoch(sess, dataset.get_batches('val'),
                                                       [loss, accuracy, optimize_step], network, images)
 
@@ -236,8 +253,7 @@ if __name__ == "__main__":
             # TODO : Export Gamma & Beta
             # TODO : Export visualizations
 
-            print("Training :")
-            print("    Loss : %f  - Accuracy : %f" % (train_loss, train_accuracy))
+
 
         print("All Done")
 
