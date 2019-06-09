@@ -138,7 +138,7 @@ if __name__ == "__main__":
     output_task_folder = "%s/%s" % (output_root_folder, task)
     output_experiment_folder = "%s/%s" %(output_task_folder, experiment_name)
     now = datetime.now()
-    output_dated_folder = now.strftime("%Y-%m-%d_%H:%M")
+    output_dated_folder = "%s/%s" % (output_experiment_folder, now.strftime("%Y-%m-%d_%H:%M"))
     stats_file_path = "%s/stats.json" % output_dated_folder
     checkpoint_save_path = "%s/checkpoint.ckpt" % output_dated_folder
 
