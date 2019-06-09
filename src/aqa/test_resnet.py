@@ -2,6 +2,10 @@ import tensorflow as tf
 from tqdm import tqdm
 import numpy as np
 from collections import defaultdict
+from _datetime import datetime
+import json
+import os
+from collections import OrderedDict
 
 from tensorflow.python import debug as tf_debug
 
@@ -55,6 +59,29 @@ def is_scalar(x):
 def is_list_int(x):
     return isinstance(x, tf.Tensor) and x.dtype is tf.int64 and len(x.shape) == 1
 
+def save_training_stats(stats_output_file, epoch_nb, train_accuracy, train_loss, val_accuracy, val_loss):
+  """
+  Will read the stats file from disk and append new epoch stats (Will create the file if not present)
+  """
+  if os.path.isfile(stats_output_file):
+    with open(stats_output_file, 'r') as f:
+      stats = json.load(f)
+  else:
+    stats = []
+
+  stats.append({
+    'epoch': "epoch_%.3d" % (epoch_nb + 1),
+    'train_acc': train_accuracy,
+    'train_loss': train_loss,
+    'val_accuracy': val_accuracy,
+    'val_loss': val_loss
+  })
+
+  stats = sorted(stats, key=lambda e: e['val_loss'])
+
+  with open(stats_output_file, 'w') as f:
+    json.dump(stats, f, indent=2, sort_keys=True)
+
 def do_one_epoch(sess, batchifier, outputs_var, network, image_var):
     # check for optimizer to define training/eval mode
     is_training = any([is_optimizer(x) for x in outputs_var])
@@ -86,7 +113,7 @@ def do_one_epoch(sess, batchifier, outputs_var, network, image_var):
 
 if __name__ == "__main__":
 
-    mode = "training"
+    task = "train"
 
     # Parameters
     nb_epoch = 3
@@ -100,7 +127,15 @@ if __name__ == "__main__":
     resnet_ckpt_path = "%s/resnet/resnet_v1_101.ckpt" % root_folder
     resnet_chosen_layer = "block3/unit_22/bottleneck_v1"
     dict_path = "%s/preprocessed/dict.json" % experiment_path
-    images_path = "%s/images" % experiment_path
+
+    output_root_folder = "output"
+    output_task_folder = "%s/%s" % (output_root_folder, task)
+    now = datetime.now()
+    output_experiment_folder = "%s/%s" %(output_task_folder, experiment_name)
+    output_dated_folder = now.strftime("%Y-%m-%d_%H:%M")
+    stats_file_path = "%s/stats.json" % output_dated_folder
+    checkpoint_save_path = "%s/checkpoint.ckpt" % output_dated_folder
+
 
     film_model_config = {
         "image": {
@@ -176,6 +211,7 @@ if __name__ == "__main__":
 
         # Restore pretrained weight for FiLM network
         film_variables = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope="clear")    # TODO : Change scope
+        film_saver = tf.train.Saver(max_to_keep=None, pad_step_number=3, var_list=film_variables)
 
 
         all_variables = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES)
@@ -186,9 +222,17 @@ if __name__ == "__main__":
         # Training Loop
         for epoch in range(nb_epoch):
             print("Epoch %d" % epoch)
-            train_loss, train_accuracy = do_one_epoch(sess, dataset.get_batches('train'), [loss, accuracy, optimize_step], network, images)
+            train_loss, train_accuracy = do_one_epoch(sess, dataset.get_batches('train'),
+                                                      [loss, accuracy, optimize_step], network, images)
 
-            # TODO : Save checkpoint & statistics
+            val_loss, val_accuracy = do_one_epoch(sess, dataset.get_batches('val'),
+                                                      [loss, accuracy, optimize_step], network, images)
+
+            save_training_stats(stats_file_path, epoch, train_accuracy, train_loss, val_accuracy,
+                                val_loss)
+
+            film_saver.save(sess, checkpoint_save_path, global_step=epoch)
+
             # TODO : Export Gamma & Beta
             # TODO : Export visualizations
 
