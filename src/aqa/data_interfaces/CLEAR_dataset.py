@@ -97,7 +97,7 @@ class CLEARBatchifier(object):
     """Provides an generic multithreaded iterator over the dataset."""
 
     def __init__(self, games, batch_size, tokenizer, nb_thread=3,   # FIXME : Make nb_thread param pop up
-                 shuffle= True, no_semaphore= 3):
+                 shuffle= True, no_semaphore= 3, pad_batches=True):
 
         # Define CPU pool
         # CPU/GPU option
@@ -126,6 +126,15 @@ class CLEARBatchifier(object):
             end = min(i + batch_size, len(games))
             batches.append(games[i:end])
             i += batch_size
+
+        # FIXME : Do we really need this ?
+        if pad_batches:
+            # Pad last batch if needed
+            last_batch_len = len(batches[-1])
+            if last_batch_len < batch_size:
+                no_missing = batch_size - last_batch_len
+                batches[-1] += batches[0][:no_missing]
+
 
         # Multi_proc iterator
         def create_semaphore_iterator(obj_list, semaphores):
