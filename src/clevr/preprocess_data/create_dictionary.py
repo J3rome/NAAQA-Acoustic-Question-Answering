@@ -1,4 +1,5 @@
 from nltk.tokenize import RegexpTokenizer
+import os
 import re
 import io
 import json
@@ -65,6 +66,12 @@ if __name__ == '__main__':
     print("Number of words): {}".format(len(word2i)))
     print("Number of answers: {}".format(len(answer2i)))
 
-    with io.open(args.dict_file, 'w', encoding='utf8') as f_out:
+    preprocessed_folder_path = os.path.join(args.data_dir, 'preprocessed')
+    dict_file_path = os.path.join(preprocessed_folder_path, 'dict.json')
+
+    if not os.path.isdir(preprocessed_folder_path):
+        os.mkdir(preprocessed_folder_path)
+
+    with io.open(dict_file_path, 'w', encoding='utf8') as f_out:
        data = json.dumps({'word2i': word2i, 'answer2i': answer2i})
        f_out.write(data)

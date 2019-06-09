@@ -34,13 +34,9 @@ def create_optimizer(network, config, finetune=list(),
     if clip_val > 0:
         grad = clip_gradient(grad, clip_val=clip_val)
 
-    # FIXME : In multiGPU, update_ops is always called
     # add update ops (such as batch norm) to the optimizer call
-    if apply_update_ops:
-        update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
-        with tf.control_dependencies(update_ops):
-            optimize = optimizer.apply_gradients(grad)
-    else:
+    update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
+    with tf.control_dependencies(update_ops):
         optimize = optimizer.apply_gradients(grad)
 
     accuracy = network.get_accuracy()

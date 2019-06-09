@@ -105,6 +105,8 @@ ENV/
 
 /tensorboard/
 /Vis_*/
+/*logs/
+/*checkpoints/
 
 /data
 /out/
