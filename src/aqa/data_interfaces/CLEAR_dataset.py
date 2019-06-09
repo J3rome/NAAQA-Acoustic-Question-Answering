@@ -178,7 +178,7 @@ class CLEARBatchifier(object):
         return self
 
     def __next__(self):
-        if self.batch_index > self.n_batches:
+        if self.batch_index >= self.n_batches:
             raise StopIteration()
 
         to_return = self.load_batch(self.batches[self.batch_index])
