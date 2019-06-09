@@ -39,6 +39,7 @@ class CLEARDataset(object):
         else:
             self.tokenizer = None
 
+        self.batch_size = batch_size
         self.image_builder = get_img_builder(image_config, folder, bufferize=None)    # TODO : Figure out buffersize
 
         self.games = {}
@@ -76,11 +77,10 @@ class CLEARDataset(object):
 
                     self.answer_counter[set][answer] += 1
 
-            self.batchifiers[set] = CLEARBatchifier(self.games[set], batch_size, self.tokenizer)
-
         print("Successfully Loaded CLEAR v{} ({}) - {} games loaded.".format(info["version"], ",".join(self.sets), len(self.games)))
 
     def get_batches(self, set):
+        self.batchifiers[set] = CLEARBatchifier(self.games[set], self.batch_size, self.tokenizer)
         return self.batchifiers[set]
 
     def get_data(self, indices=[]):
@@ -105,8 +105,8 @@ class CLEARBatchifier(object):
 
         #if image_builder.is_raw_image():
         #    cpu_pool = Pool(nb_thread, maxtasksperchild=1000)
-        pool = ThreadPool(nb_thread)
-        pool._maxtasksperchild = 1000
+        #pool = ThreadPool(nb_thread)
+        #pool._maxtasksperchild = 1000
 
         self.tokenizer = tokenizer
 
@@ -135,16 +135,17 @@ class CLEARBatchifier(object):
                 no_missing = batch_size - last_batch_len
                 batches[-1] += batches[0][:no_missing]
 
+        self.batches = batches
+        self.batch_index = 0
+
 
         # Multi_proc iterator
-        def create_semaphore_iterator(obj_list, semaphores):
-            for obj in obj_list:
-                semaphores.acquire()
-                yield obj
 
-        self.semaphores = Semaphore(no_semaphore)
-        batches = create_semaphore_iterator(batches, self.semaphores)
-        self.process_iterator = pool.imap(self.load_batch, batches)
+
+        #with ThreadPool(nb_thread) as pool:
+        #    self.semaphores = Semaphore(no_semaphore)
+        #    batches = create_semaphore_iterator(batches, self.semaphores)
+        #    self.process_iterator = pool.imap(self.load_batch, batches)
 
     def load_batch(self, games):
 
@@ -177,9 +178,12 @@ class CLEARBatchifier(object):
         return self
 
     def __next__(self):
-        ret_val = self.process_iterator.next()
-        self.semaphores.release()
-        return ret_val
+        if self.batch_index > self.n_batches:
+            raise StopIteration()
+
+        to_return = self.load_batch(self.batches[self.batch_index])
+        self.batch_index += 1
+        return to_return
 
     # trick for python 2.X
     def next(self):
