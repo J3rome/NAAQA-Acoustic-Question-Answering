@@ -9,7 +9,7 @@ from multiprocessing import Pool
 import os
 
 from aqa.data_interfaces.CLEAR_tokenizer import CLEARTokenizer
-from src.aqa.data_interfaces.CLEAR_image_loader import CLEARImage
+from aqa.data_interfaces.CLEAR_image_loader import CLEARImage, get_img_builder
 
 class Game(object):
     def __init__(self, id, image, question, answer):
@@ -25,7 +25,7 @@ class Game(object):
 class CLEARDataset(object):
     """Loads the CLEAR dataset."""
 
-    def __init__(self, folder, batch_size, image_builder, sets=None, dict_file_path=None):
+    def __init__(self, folder, image_config, batch_size, sets=None, dict_file_path=None):
         if sets is None:
             self.sets = ['train', 'val', 'test']
         else:
@@ -35,6 +35,7 @@ class CLEARDataset(object):
             dict_file_path = '{}/preprocessed/dict.json'.format(folder)
 
         self.tokenizer = CLEARTokenizer(dict_file_path)
+        self.image_builder = get_img_builder(image_config, folder, bufferize=None)    # TODO : Figure out buffersize
 
         self.games = {}
         self.answer_counter = {}
@@ -65,7 +66,7 @@ class CLEARDataset(object):
                     image_filename = sample["scene_filename"].replace('.wav', ".png")       # The clear dataset specify the filename to the scene wav file
 
                     self.games[set].append(Game(id=question_id,
-                                      image=CLEARImage(image_id, image_filename, image_builder, set),
+                                      image=CLEARImage(image_id, image_filename, self.image_builder, set),
                                       question=question,
                                       answer=answer))
 

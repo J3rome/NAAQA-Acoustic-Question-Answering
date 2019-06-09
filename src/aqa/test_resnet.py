@@ -10,7 +10,7 @@ from aqa.data_interfaces.CLEAR_tokenizer import CLEARTokenizer
 from aqa.data_interfaces.CLEAR_dataset import CLEARDataset, CLEARBatchifier
 from aqa.model_handlers.optimizer import create_optimizer
 from aqa.models.resnet import create_resnet
-from aqa.data_interfaces.CLEAR_image_loader import get_img_builder
+
 
 
 
@@ -139,10 +139,7 @@ if __name__ == "__main__":
     ########################################################
     ################### Data Loading #######################
     ########################################################
-    # FIXME : Kinda redundant that we need to specify the images_path
-    image_builder = get_img_builder(film_model_config['image'], experiment_path, bufferize=None)    # TODO : Figure out buffersize
-
-    dataset = CLEARDataset(experiment_path, batch_size=batch_size, image_builder=image_builder)
+    dataset = CLEARDataset(experiment_path, film_model_config['image'], batch_size=batch_size)
 
     ########################################################
     ################## Network Setup #######################
@@ -161,7 +158,6 @@ if __name__ == "__main__":
 
     # Setup optimizer (For training)
     optimize_step, [loss, accuracy] = create_optimizer(network, optimizer_config, var_list=None)  # TODO : Var_List should contain only film variables
-    #TODO : Checkout the apply_update_ops. Was always done with the multi_gpu_optimizer
 
     # GPU Options
     gpu_options = tf.GPUOptions(allow_growth=True)
@@ -172,8 +168,6 @@ if __name__ == "__main__":
         tensorboard_writer = tf.summary.FileWriter('test_resnet_logs', sess.graph)
 
         sess.run(tf.global_variables_initializer())
-
-        trainable_variables = tf.trainable_variables()
 
         # Restore the pretrained weight of resnet
         resnet_variables = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope="resnet_v1_101")
@@ -189,6 +183,7 @@ if __name__ == "__main__":
         resnet_variables_name = [v.name for v in resnet_variables]
         film_variables_name = [v.name for v in film_variables]
 
+        # Training Loop
         for epoch in range(nb_epoch):
             print("Epoch %d" % epoch)
             train_loss, train_accuracy = do_one_epoch(sess, dataset.get_batches('train'), [loss, accuracy, optimize_step], network, images)
