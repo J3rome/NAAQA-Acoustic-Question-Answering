@@ -240,10 +240,11 @@ if __name__ == "__main__":
             print("Training :")
             print("    Loss : %f  - Accuracy : %f" % (train_loss, train_accuracy))
 
-            print("Train epoch done")
-
             val_loss, val_accuracy = do_one_epoch(sess, dataset.get_batches('val'),
                                                       [loss, accuracy, optimize_step], network, images)
+
+            print("Validation :")
+            print("    Loss : %f  - Accuracy : %f" % (val_loss, val_accuracy))
 
             save_training_stats(stats_file_path, epoch, train_accuracy, train_loss, val_accuracy,
                                 val_loss)
