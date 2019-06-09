@@ -8,21 +8,8 @@ class CLEARTokenizer:
     """ """
     def __init__(self, dictionary_file):
 
-        tokenizer_patterns = r"""
-                (?:[^\W\d_](?:[^\W\d_]|['\-_])+[^\W\d_]) # Words with apostrophes or dashes.
-                |
-                (?:[+\-]?\d+[,/.:-]\d+[+\-]?)  # Numbers, including fractions, decimals.
-                |
-                (?:[a-z]\#)                    # Musical Notes (Ex : D#, F#)
-                |
-                (?:[\w_]+)                     # Words without apostrophes or dashes.
-                |
-                (?:\.(?:\s*\.){1,})            # Ellipsis dots.
-                |
-                (?:\S)                         # Everything else that isn't whitespace.
-                """
+        self.tokenizer = CLEARTokenizer.get_tokenizer_inst()
 
-        self.tokenizer = RegexpTokenizer(tokenizer_patterns, flags=re.VERBOSE | re.I | re.UNICODE)
         with open(dictionary_file, 'r') as f:
             data = json.load(f)
             self.word2i = data['word2i']
@@ -48,7 +35,23 @@ class CLEARTokenizer:
         self.padding_answer = self.answer2i["<padding>"]
         self.unknown_answer = self.answer2i["<unk>"]
 
+    @staticmethod
+    def get_tokenizer_inst():
+        tokenizer_patterns = r"""
+                        (?:[^\W\d_](?:[^\W\d_]|['\-_])+[^\W\d_]) # Words with apostrophes or dashes.
+                        |
+                        (?:[+\-]?\d+[,/.:-]\d+[+\-]?)  # Numbers, including fractions, decimals.
+                        |
+                        (?:[a-z]\#)                    # Musical Notes (Ex : D#, F#)
+                        |
+                        (?:[\w_]+)                     # Words without apostrophes or dashes.
+                        |
+                        (?:\.(?:\s*\.){1,})            # Ellipsis dots.
+                        |
+                        (?:\S)                         # Everything else that isn't whitespace.
+                        """
 
+        return RegexpTokenizer(tokenizer_patterns, flags=re.VERBOSE | re.I | re.UNICODE)
 
     """
     Input: String

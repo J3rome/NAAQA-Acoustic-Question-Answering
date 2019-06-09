@@ -25,16 +25,20 @@ class Game(object):
 class CLEARDataset(object):
     """Loads the CLEAR dataset."""
 
-    def __init__(self, folder, image_config, batch_size, sets=None, dict_file_path=None):
+    def __init__(self, folder, image_config, batch_size, sets=None, dict_file_path=None, tokenize_text=True):
         if sets is None:
             self.sets = ['train', 'val', 'test']
         else:
             self.sets = sets
 
-        if dict_file_path is None:
-            dict_file_path = '{}/preprocessed/dict.json'.format(folder)
+        if tokenize_text:
+            if dict_file_path is None:
+                dict_file_path = '{}/preprocessed/dict.json'.format(folder)
 
-        self.tokenizer = CLEARTokenizer(dict_file_path)
+            self.tokenizer = CLEARTokenizer(dict_file_path)
+        else:
+            self.tokenizer = None
+
         self.image_builder = get_img_builder(image_config, folder, bufferize=None)    # TODO : Figure out buffersize
 
         self.games = {}
@@ -55,11 +59,11 @@ class CLEARDataset(object):
                 for sample in samples:
 
                     question_id = int(sample["question_index"])
-                    question = self.tokenizer.encode_question(sample["question"])
+                    question = self.tokenizer.encode_question(sample["question"]) if tokenize_text else sample['question']
 
                     answer = sample.get("answer", None)  # None for test set
                     if answer is not None:
-                        answer = self.tokenizer.encode_answer(answer)
+                        answer = self.tokenizer.encode_answer(answer) if tokenize_text else answer
 
 
                     image_id = int(sample["scene_index"])
@@ -75,7 +79,6 @@ class CLEARDataset(object):
             self.batchifiers[set] = CLEARBatchifier(self.games[set], batch_size, self.tokenizer)
 
         print("Successfully Loaded CLEAR v{} ({}) - {} games loaded.".format(info["version"], ",".join(self.sets), len(self.games)))
-
 
     def get_batches(self, set):
         return self.batchifiers[set]
@@ -94,7 +97,7 @@ class CLEARBatchifier(object):
     """Provides an generic multithreaded iterator over the dataset."""
 
     def __init__(self, games, batch_size, tokenizer, nb_thread=3,   # FIXME : Make nb_thread param pop up
-                 shuffle= True, no_semaphore= 20):
+                 shuffle= True, no_semaphore= 3):
 
         # Define CPU pool
         # CPU/GPU option
