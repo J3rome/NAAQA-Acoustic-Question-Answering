@@ -177,8 +177,10 @@ class CLEARBatchifier(object):
         return self
 
     def __next__(self):
+        self.semaphores.acquire()
+        ret_val = self.process_iterator.next()
         self.semaphores.release()
-        return self.process_iterator.next()
+        return ret_val
 
     # trick for python 2.X
     def next(self):
