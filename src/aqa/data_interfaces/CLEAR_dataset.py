@@ -97,7 +97,7 @@ class CLEARBatchifier(object):
     """Provides an generic multithreaded iterator over the dataset."""
 
     def __init__(self, games, batch_size, tokenizer, nb_thread=3,   # FIXME : Make nb_thread param pop up
-                 shuffle= True, no_semaphore= 40, pad_batches=True):         # FIXME :No semaphore seem to be the same as batch size
+                 shuffle= True, no_semaphore= 20, pad_batches=True):         # FIXME :No semaphore seem to be the same as batch size
 
         # Define CPU pool
         # CPU/GPU option
@@ -177,7 +177,6 @@ class CLEARBatchifier(object):
         return self
 
     def __next__(self):
-        self.semaphores.acquire()
         ret_val = self.process_iterator.next()
         self.semaphores.release()
         return ret_val
