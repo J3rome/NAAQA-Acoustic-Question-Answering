@@ -12,67 +12,72 @@ from aqa.data_interfaces.CLEAR_tokenizer import CLEARTokenizer
 from src.aqa.data_interfaces.CLEAR_image_loader import CLEARImage
 
 class Game(object):
-    def __init__(self, id, image, question, answer, question_family_index):
+    def __init__(self, id, image, question, answer):
         self.id = id
         self.image = image
         self.question = question
         self.answer = answer
-        self.question_family_index = question_family_index
 
     def __str__(self):
-        return "[#q:{}, #p:{}] {} - {} ({})".format(self.id, self.image.id, self.question, self.answer, self.question_family_index)
+        return "[#q:{}, #p:{}] {} - {}".format(self.id, self.image.id, self.question, self.answer)
 
 
 class CLEARDataset(object):
     """Loads the CLEAR dataset."""
 
-    def __init__(self, folder, which_set, batch_size, image_builder, dict_file_path=None):
-
-        question_file_path = '{}/questions/CLEAR_{}_questions.json'.format(folder, which_set)
+    def __init__(self, folder, batch_size, image_builder, sets=None, dict_file_path=None):
+        if sets is None:
+            self.sets = ['train', 'val', 'test']
+        else:
+            self.sets = sets
 
         if dict_file_path is None:
             dict_file_path = '{}/preprocessed/dict.json'.format(folder)
 
-        # TODO : Create the split in here directly (Train, val, test)
-
         self.tokenizer = CLEARTokenizer(dict_file_path)
-        self.games = []
-        self.question_family_index = collections.Counter()
-        self.answer_counter = collections.Counter()
 
-        with open(question_file_path) as question_file:
-            data = json.load(question_file)
-            info = data["info"]
-            samples = data["questions"]
+        self.games = {}
+        self.answer_counter = {}
+        self.batchifiers = {}
 
-            assert info["set_type"] == which_set
+        for set in self.sets:
+            self.games[set] = []
 
-            for sample in samples:
+            question_file_path = '{}/questions/CLEAR_{}_questions.json'.format(folder, set)
 
-                question_id = int(sample["question_index"])
-                question = self.tokenizer.encode_question(sample["question"])
+            self.answer_counter[set] = collections.Counter()
+            with open(question_file_path) as question_file:
+                data = json.load(question_file)
+                info = data["info"]
+                samples = data["questions"]
 
-                answer = sample.get("answer", None)  # None for test set
-                if answer is not None:
-                    answer = self.tokenizer.encode_answer(answer)
+                for sample in samples:
 
-                question_family_index = sample.get("question_family_index", -1)  # -1 for test set      # FIXME : What is this even used for ?
+                    question_id = int(sample["question_index"])
+                    question = self.tokenizer.encode_question(sample["question"])
 
-                image_id = int(sample["scene_index"])
-                image_filename = sample["scene_filename"].replace('.wav', ".png")       # The clear dataset specify the filename to the scene wav file
+                    answer = sample.get("answer", None)  # None for test set
+                    if answer is not None:
+                        answer = self.tokenizer.encode_answer(answer)
 
-                self.games.append(Game(id=question_id,
-                                  image=CLEARImage(image_id, image_filename, image_builder, which_set),
-                                  question=question,
-                                  answer=answer,
-                                  question_family_index=question_family_index))
 
-                self.question_family_index[question_family_index] += 1
-                self.answer_counter[answer] += 1
+                    image_id = int(sample["scene_index"])
+                    image_filename = sample["scene_filename"].replace('.wav', ".png")       # The clear dataset specify the filename to the scene wav file
 
-        self.batchifier = CLEARBatchifier(self.games, batch_size, self.tokenizer)
+                    self.games[set].append(Game(id=question_id,
+                                      image=CLEARImage(image_id, image_filename, image_builder, set),
+                                      question=question,
+                                      answer=answer))
 
-        print("Successfully Loaded CLEAR v{} ({}) - {} games loaded.".format(info["version"], which_set, len(self.games)))
+                    self.answer_counter[set][answer] += 1
+
+            self.batchifiers[set] = CLEARBatchifier(self.games[set], batch_size, self.tokenizer)
+
+        print("Successfully Loaded CLEAR v{} ({}) - {} games loaded.".format(info["version"], ",".join(self.sets), len(self.games)))
+
+
+    def get_batches(self, set):
+        return self.batchifiers[set]
 
     def get_data(self, indices=[]):
         if len(indices) > 0:

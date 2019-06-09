@@ -94,7 +94,7 @@ class FiLMResblock(object):
 class FiLM_Network(ResnetModel):
 
     def __init__(self, config, no_words, no_answers, input_image_tensor = None, reuse=False, device=''):
-        ResnetModel.__init__(self, "clevr", device=device)      # TODO : Change scope to clear
+        ResnetModel.__init__(self, "clear", device=device)      # TODO : Change scope to clear
 
         with tf.variable_scope(self.scope_name, reuse=reuse):
 
@@ -242,6 +242,7 @@ class FiLM_Network(ResnetModel):
 
             print('FiLM Model... built!')
 
+    # FIXME : This is kinda ugly, should be able to reference by scope (string). No need to keep all those references..
     def get_feed_dict(self, image_var,  is_training, question, answer, image, seq_length):
         return {
             self._is_training : is_training,

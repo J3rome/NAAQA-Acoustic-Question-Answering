@@ -137,36 +137,31 @@ if __name__ == "__main__":
     }
 
     ########################################################
+    ################### Data Loading #######################
+    ########################################################
+    # FIXME : Kinda redundant that we need to specify the images_path
+    image_builder = get_img_builder(film_model_config['image'], experiment_path, bufferize=None)    # TODO : Figure out buffersize
+
+    dataset = CLEARDataset(experiment_path, batch_size=batch_size, image_builder=image_builder)
+
+    ########################################################
     ################## Network Setup #######################
     ########################################################
     # TODO : There should be 2 Image placeholder : One for Raw Image, One for extracted features
     # Input Image
-    images = tf.placeholder(tf.float32, [None, 224, 224, 3], name='image')      # FIXME : would it be better to use a fixed batch_size instead of None ?
+    images = tf.placeholder(tf.float32, [None, 224, 224, 3], name='clear/image')      # FIXME : would it be better to use a fixed batch_size instead of None ?
 
     # Feature extractor (Resnet 101)
     feature_extractor_chosen_layer = create_resnet(images, resnet_version=101,
                                                    chosen_layer=resnet_chosen_layer, is_training=False)
 
     # Adding the FiLM network after the chosen resnet layer
-    tokenizer = CLEARTokenizer(dict_path)
     network = FiLM_Network(film_model_config, input_image_tensor=feature_extractor_chosen_layer,
-                           no_words=tokenizer.no_words, no_answers=tokenizer.no_answers, device=0)  # FIXME : Not sure that device 0 is appropriate for CPU
+                           no_words=dataset.tokenizer.no_words, no_answers=dataset.tokenizer.no_answers, device=0)  # FIXME : Not sure that device 0 is appropriate for CPU
 
     # Setup optimizer (For training)
     optimize_step, [loss, accuracy] = create_optimizer(network, optimizer_config, var_list=None)  # TODO : Var_List should contain only film variables
     #TODO : Checkout the apply_update_ops. Was always done with the multi_gpu_optimizer
-
-    ########################################################
-    ################### Data Loading #######################
-    ########################################################
-
-    # FIXME : Kinda redundant that we need to specify the images_path
-    image_builder = get_img_builder(film_model_config['image'], experiment_path, bufferize=None)    # TODO : Figure out buffersize
-
-    # TODO : Combine all all datasets in 1 data structure
-    train_data = CLEARDataset(experiment_path, which_set="train", image_builder=image_builder, batch_size=batch_size)
-    val_data = CLEARDataset(experiment_path, which_set="val", image_builder=image_builder, batch_size=batch_size)
-    #test_data = CLEARDataset(experiment_path, which_set="test", image_builder=image_builder, tokenizer=tokenizer)
 
     # GPU Options
     gpu_options = tf.GPUOptions(allow_growth=True)
@@ -186,7 +181,7 @@ if __name__ == "__main__":
         resnet_saver.restore(sess, resnet_ckpt_path)
 
         # Restore pretrained weight for FiLM network
-        film_variables = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope="clevr")    # TODO : Change scope
+        film_variables = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope="clear")    # TODO : Change scope
 
 
         all_variables = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES)
@@ -196,7 +191,7 @@ if __name__ == "__main__":
 
         for epoch in range(nb_epoch):
             print("Epoch %d" % epoch)
-            train_loss, train_accuracy = do_one_epoch(sess, train_data.batchifier, [loss, accuracy, optimize_step], network, images)
+            train_loss, train_accuracy = do_one_epoch(sess, dataset.get_batches('train'), [loss, accuracy, optimize_step], network, images)
 
             # TODO : Save checkpoint & statistics
             # TODO : Export Gamma & Beta
