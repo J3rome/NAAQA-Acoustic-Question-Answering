@@ -59,28 +59,29 @@ def is_scalar(x):
 def is_list_int(x):
     return isinstance(x, tf.Tensor) and x.dtype is tf.int64 and len(x.shape) == 1
 
+
 def save_training_stats(stats_output_file, epoch_nb, train_accuracy, train_loss, val_accuracy, val_loss):
-  """
-  Will read the stats file from disk and append new epoch stats (Will create the file if not present)
-  """
-  if os.path.isfile(stats_output_file):
-    with open(stats_output_file, 'r') as f:
-      stats = json.load(f)
-  else:
-    stats = []
+    """
+    Will read the stats file from disk and append new epoch stats (Will create the file if not present)
+    """
+    if os.path.isfile(stats_output_file):
+        with open(stats_output_file, 'r') as f:
+            stats = json.load(f)
+    else:
+        stats = []
 
-  stats.append({
-    'epoch': "epoch_%.3d" % (epoch_nb + 1),
-    'train_acc': train_accuracy,
-    'train_loss': train_loss,
-    'val_accuracy': val_accuracy,
-    'val_loss': val_loss
-  })
+    stats.append({
+        'epoch': "epoch_%.3d" % (epoch_nb + 1),
+        'train_acc': train_accuracy,
+        'train_loss': train_loss,
+        'val_accuracy': val_accuracy,
+        'val_loss': val_loss
+    })
 
-  stats = sorted(stats, key=lambda e: e['val_loss'])
+    stats = sorted(stats, key=lambda e: e['val_loss'])
 
-  with open(stats_output_file, 'w') as f:
-    json.dump(stats, f, indent=2, sort_keys=True)
+    with open(stats_output_file, 'w') as f:
+        json.dump(stats, f, indent=2, sort_keys=True)
 
 def do_one_epoch(sess, batchifier, outputs_var, network, image_var):
     # check for optimizer to define training/eval mode
@@ -140,7 +141,7 @@ if __name__ == "__main__":
     now = datetime.now()
     output_dated_folder = "%s/%s" % (output_experiment_folder, now.strftime("%Y-%m-%d_%H:%M"))
     stats_file_path = "%s/stats.json" % output_dated_folder
-    checkpoint_save_path = "%s/checkpoint.ckpt" % output_dated_folder
+    checkpoint_filename = "checkpoint.ckpt"
 
     # Creating output folders
     create_folder_if_necessary(output_root_folder)
@@ -233,6 +234,9 @@ if __name__ == "__main__":
 
         # Training Loop
         for epoch in range(nb_epoch):
+            epoch_output_folder_path = "%s/%.2d" % (output_dated_folder, epoch)
+            create_folder_if_necessary(epoch_output_folder_path)
+
             print("Epoch %d" % epoch)
             train_loss, train_accuracy = do_one_epoch(sess, dataset.get_batches('train'),
                                                       [loss, accuracy, optimize_step], network, images)
@@ -249,7 +253,9 @@ if __name__ == "__main__":
             save_training_stats(stats_file_path, epoch, train_accuracy, train_loss, val_accuracy,
                                 val_loss)
 
-            film_saver.save(sess, checkpoint_save_path, global_step=epoch)
+            checkpoint_filepath = "%s/%s" % (epoch_output_folder_path, checkpoint_filename)
+            film_saver.save(sess, checkpoint_filepath, global_step=epoch)   # FIXME : Not sur global_step is required anymore
+                                                                            # FIXME : Does splitting in folder make it so that we loose the ability to keep only the last X
 
             # TODO : Export Gamma & Beta
             # TODO : Export visualizations
