@@ -123,7 +123,7 @@ if __name__ == "__main__":
     task = "train"
 
     # Parameters
-    nb_epoch = 3
+    nb_epoch = 5
     nb_thread = 2
     batch_size = 32
 
@@ -139,7 +139,7 @@ if __name__ == "__main__":
     output_task_folder = "%s/%s" % (output_root_folder, task)
     output_experiment_folder = "%s/%s" %(output_task_folder, experiment_name)
     now = datetime.now()
-    output_dated_folder = "%s/%s" % (output_experiment_folder, now.strftime("%Y-%m-%d_%H:%M"))
+    output_dated_folder = "%s/%s" % (output_experiment_folder, now.strftime("%Y-%m-%d_%H-%M"))
     stats_file_path = "%s/stats.json" % output_dated_folder
     checkpoint_filename = "checkpoint.ckpt"
 
@@ -234,7 +234,7 @@ if __name__ == "__main__":
 
         # Training Loop
         for epoch in range(nb_epoch):
-            epoch_output_folder_path = "%s/%.2d" % (output_dated_folder, epoch)
+            epoch_output_folder_path = "%s/Epoch_%.2d" % (output_dated_folder, epoch)
             create_folder_if_necessary(epoch_output_folder_path)
 
             print("Epoch %d" % epoch)
@@ -254,7 +254,7 @@ if __name__ == "__main__":
                                 val_loss)
 
             checkpoint_filepath = "%s/%s" % (epoch_output_folder_path, checkpoint_filename)
-            film_saver.save(sess, checkpoint_filepath, global_step=epoch)   # FIXME : Not sur global_step is required anymore
+            film_saver.save(sess, checkpoint_filepath)   # FIXME : Not sur global_step is required anymore
                                                                             # FIXME : Does splitting in folder make it so that we loose the ability to keep only the last X
 
             # TODO : Export Gamma & Beta
