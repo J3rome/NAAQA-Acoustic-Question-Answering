@@ -263,3 +263,6 @@ class FiLM_Network(ResnetModel):
 
     def get_input(self):
         return self._image
+
+    def get_prediction(self):
+        return self.prediction
