@@ -187,7 +187,7 @@ def do_test_inference(sess, dataset, network_wrapper, output_folder):
                 'correct': result == batch['raw'][i].answer
             })
 
-    nb_correct = sum(r for r in processed_results if r['correct'])
+    nb_correct = sum(1 for r in processed_results if r['correct'])
     nb_results = len(processed_results)
     accuracy = nb_correct/nb_results
 
