@@ -156,7 +156,7 @@ def do_film_training(sess, dataset, network_wrapper, optimizer_config, nb_epoch,
             'val_accuracy' : val_accuracy
         })
 
-        network_wrapper.save_film_checkpoint("%s/checkpoint.ckpt" % epoch_output_folder_path)
+        network_wrapper.save_film_checkpoint(sess, "%s/checkpoint.ckpt" % epoch_output_folder_path)
 
     # Create a symlink to best epoch output folder
     best_epoch = sorted(stats, key=lambda s: s['val_accuracy'], reverse=True)[0]['epoch']
