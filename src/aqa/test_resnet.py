@@ -160,7 +160,7 @@ def do_film_training(sess, dataset, network_wrapper, optimizer_config, nb_epoch,
 
     # Create a symlink to best epoch output folder
     best_epoch = sorted(stats, key=lambda s: s['val_accuracy'], reverse=True)[0]['epoch']
-    subprocess.run("cd %s | ln -s Epoch_%.2d best" % (output_folder, best_epoch))
+    subprocess.run("cd %s && ln -s Epoch_%.2d best" % (output_folder, best_epoch), shell=True)
 
 
 
