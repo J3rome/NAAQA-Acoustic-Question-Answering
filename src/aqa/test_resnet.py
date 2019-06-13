@@ -166,15 +166,16 @@ def save_inference_results(results, output_folder):
     with open("%s/results.json" % output_folder, 'w') as f:
         json.dump(results, f, indent=2)
 
-def do_test_inference(sess, dataset, network_wrapper, output_folder):
-    test_batches = dataset.get_batches('test')
+def do_test_inference(sess, dataset, network_wrapper, output_folder, set_name="test"):
+    test_batches = dataset.get_batches(set_name)
 
     sess.run(tf.global_variables_initializer())
 
     processed_results = []
 
     for batch in tqdm(test_batches):
-        feed_dict = network_wrapper.get_feed_dict(False, batch['question'], batch['answer'], batch['image'], batch['seq_length'])
+        feed_dict = network_wrapper.get_feed_dict(False, batch['question'], batch['answer'],
+                                                  batch['image'], batch['seq_length'])
 
         results = sess.run(network_wrapper.get_network_prediction(), feed_dict=feed_dict)
 
