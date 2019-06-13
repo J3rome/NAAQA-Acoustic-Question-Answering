@@ -162,10 +162,38 @@ def do_film_training(sess, dataset, network_wrapper, optimizer_config, nb_epoch,
     best_epoch = sorted(stats, key=lambda s: s['val_accuracy'], reverse=True)[0]['epoch']
     subprocess.run("cd %s && ln -s Epoch_%.2d best" % (output_folder, best_epoch), shell=True)
 
+def save_inference_results(results, output_folder):
+    with open("%s/results.json" % output_folder, 'w') as f:
+        json.dump(f, results, indent=2)
 
+def do_test_inference(sess, dataset, network_wrapper, output_folder):
+    test_batches = dataset.get_batches('test')
 
-def do_inference():
-    return 1
+    sess.run(tf.global_variables_initializer())
+
+    processed_results = []
+
+    for batch in tqdm(test_batches):
+        feed_dict = network_wrapper.get_feed_dict(False, batch['question'], batch['answer'], batch['image'], batch['seq_length'])
+
+        results = sess.run(network_wrapper.get_network_prediction(), feed_dict=feed_dict)
+
+        for i, result in enumerate(results):
+            processed_results.append({
+                'question_id' : batch['raw'][i].id,
+                'scene_id': batch['raw'][i].image.id,
+                'answer': dataset.tokenizer.decode_answer(result),
+                'ground_truth': dataset.tokenizer.decode_answer(batch['raw'][i].answer),
+                'correct': result == batch['raw'][i].answer
+            })
+
+    nb_correct = sum(r for r in processed_results if r['correct'])
+    nb_results = len(processed_results)
+    accuracy = nb_correct/nb_results
+
+    save_inference_results(processed_results, output_folder)
+
+    print("Test set accuracy : %f" % accuracy)
 
 
 def do_visualization():
@@ -177,7 +205,8 @@ def extract_features():
 
 
 def main():
-    task = "train_film"
+    #task = "train_film"
+    task = "test_inference"
 
     restore_feature_extractor_weights = True if task == "train_film" or "inference" in task else False
     restore_film_weights = True if "inference" in task else False
@@ -199,7 +228,7 @@ def main():
     now = datetime.now()
     output_dated_folder = "%s/%s" % (output_experiment_folder, now.strftime("%Y-%m-%d_%Hh%M"))
 
-    experiment_date = "2019-06-12_23h30"
+    experiment_date = "2019-06-13_02h46"
     film_ckpt_path = "%s/%s/best/checkpoint.ckpt" % (output_experiment_folder, experiment_date)
 
     # TODO : See if this is optimal file structure
