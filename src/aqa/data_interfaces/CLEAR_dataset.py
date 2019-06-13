@@ -97,8 +97,8 @@ class CLEARDataset(object):
             return self.games
 
     def keep_1_game_per_scene(self):
-        id_list = collections.defaultdict(lambda: False)
         for set_type in self.sets:
+            id_list = collections.defaultdict(lambda: False)
             unique_scene_games = []
             for game in self.games[set_type]:
                 if not id_list[game.image.id]:

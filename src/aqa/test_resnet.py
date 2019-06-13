@@ -292,10 +292,6 @@ def main():
     #task = "test_inference"
     task = "preextract_features"
 
-    restore_feature_extractor_weights = True if task == "train_film" or "inference" in task else False
-    restore_film_weights = True if "inference" in task else False
-    create_output_folder = True if not 'pre' in task else False
-
     # Parameters
     nb_epoch = 5
     nb_thread = 2
@@ -315,15 +311,6 @@ def main():
 
     experiment_date = "2019-06-13_02h46"
     film_ckpt_path = "%s/train_film/%s/%s/best/checkpoint.ckpt" % (output_root_folder, experiment_name, experiment_date)
-
-    if create_output_folder:
-        # TODO : See if this is optimal file structure
-        # Creating output folders       # TODO : Might not want to creat all the folders all the time
-        create_folder_if_necessary(output_root_folder)
-        create_folder_if_necessary(output_task_folder)
-        create_folder_if_necessary(output_experiment_folder)
-        create_folder_if_necessary(output_dated_folder)
-
 
     # TODO : Output folder should contains info about the config used
     # TODO : Read config from file
@@ -367,6 +354,18 @@ def main():
         "clip_val": 0.0,
         "weight_decay": 1e-5
     }
+
+    restore_feature_extractor_weights = True if (task == "train_film" and film_model_config['input']['type'] == 'raw') or "inference" in task else False
+    restore_film_weights = True if "inference" in task else False
+    create_output_folder = True if not 'pre' in task else False
+
+    if create_output_folder:
+        # TODO : See if this is optimal file structure
+        # Creating output folders       # TODO : Might not want to creat all the folders all the time
+        create_folder_if_necessary(output_root_folder)
+        create_folder_if_necessary(output_task_folder)
+        create_folder_if_necessary(output_experiment_folder)
+        create_folder_if_necessary(output_dated_folder)
 
     ########################################################
     ################### Data Loading #######################
