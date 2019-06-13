@@ -183,9 +183,9 @@ def main():
     restore_film_weights = True if "inference" in task else False
 
     # Parameters
-    nb_epoch = 2
+    nb_epoch = 5
     nb_thread = 2
-    batch_size = 3
+    batch_size = 32
 
     # Paths
     root_folder = "data"
