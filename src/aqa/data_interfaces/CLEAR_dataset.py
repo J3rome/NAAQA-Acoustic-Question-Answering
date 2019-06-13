@@ -100,16 +100,20 @@ class CLEARDataset(object):
         else:
             return self.games
 
-    def keep_1_instance_per_scene(self):
+    def keep_1_game_per_scene(self):
         id_list = collections.defaultdict(lambda: False)
         for set_type in self.sets:
-            new_games = []
+            unique_scene_games = []
             for game in self.games[set_type]:
                 if not id_list[game.image.id]:
-                    new_games.append(game)
+                    unique_scene_games.append(game)
                     id_list[game.image.id] = True
 
-            self.games[set_type] = new_games
+            self.games[set_type] = unique_scene_games
+
+            # FIXME : Temporary fix.. FIX H5PY
+            nb_to_remove = len(self.games[set_type]) % self.batch_size
+            self.games[set_type] = self.games[set_type][:-nb_to_remove]
 
     def is_raw_img(self):
         return self.image_builder.is_raw_image()

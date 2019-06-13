@@ -249,7 +249,7 @@ def preextract_features(sess, dataset, network_wrapper, sets=['train', 'val', 't
     create_folder_if_necessary(output_folder)
 
     # We want to process each scene only one time (Keep only game per scene)
-    dataset.keep_1_instance_per_scene()
+    dataset.keep_1_game_per_scene()
 
     sess.run(tf.global_variables_initializer())
 
