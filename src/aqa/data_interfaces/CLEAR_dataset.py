@@ -84,6 +84,10 @@ class CLEARDataset(object):
 
                     self.answer_counter[set][answer] += 1
 
+            # FIXME : We should not drop uneven batches
+            nb_to_remove = len(self.games[set]) % self.batch_size
+            self.games[set] = self.games[set][:-nb_to_remove]
+
         print("Successfully Loaded CLEAR v{} ({}) - {} games loaded.".format(info["version"], ",".join(self.sets), len(self.games)))
 
     def get_batches(self, set):
