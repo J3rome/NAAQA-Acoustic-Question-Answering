@@ -53,12 +53,12 @@ class CLEARDataset(object):
         self.answer_counter = {}
         self.batchifiers = {}
 
-        for set in self.sets:
-            self.games[set] = []
+        for set_type in self.sets:
+            self.games[set_type] = []
 
-            question_file_path = '{}/questions/CLEAR_{}_questions.json'.format(folder, set)
+            question_file_path = '{}/questions/CLEAR_{}_questions.json'.format(folder, set_type)
 
-            self.answer_counter[set] = collections.Counter()
+            self.answer_counter[set_type] = collections.Counter()
             with open(question_file_path) as question_file:
                 data = json.load(question_file)
                 info = data["info"]
@@ -77,22 +77,22 @@ class CLEARDataset(object):
                     image_id = int(sample["scene_index"])
                     image_filename = sample["scene_filename"].replace('.wav', ".png")       # The clear dataset specify the filename to the scene wav file
 
-                    self.games[set].append(Game(id=question_id,
-                                      image=CLEARImage(image_id, image_filename, self.image_builder, set),
+                    self.games[set_type].append(Game(id=question_id,
+                                      image=CLEARImage(image_id, image_filename, self.image_builder, set_type),
                                       question=question,
                                       answer=answer))
 
-                    self.answer_counter[set][answer] += 1
+                    self.answer_counter[set_type][answer] += 1
 
             # FIXME : We should not drop uneven batches
-            nb_to_remove = len(self.games[set]) % self.batch_size
-            self.games[set] = self.games[set][:-nb_to_remove]
+            nb_to_remove = len(self.games[set_type]) % self.batch_size
+            self.games[set_type] = self.games[set_type][:-nb_to_remove]
 
         print("Successfully Loaded CLEAR v{} ({}) - {} games loaded.".format(info["version"], ",".join(self.sets), len(self.games)))
 
-    def get_batches(self, set):
-        self.batchifiers[set] = CLEARBatchifier(self.games[set], self.batch_size, self.tokenizer)
-        return self.batchifiers[set]
+    def get_batches(self, set_type):
+        self.batchifiers[set_type] = CLEARBatchifier(self.games[set_type], self.batch_size, self.tokenizer)
+        return self.batchifiers[set_type]
 
     def get_data(self, indices=[]):
         if len(indices) > 0:
@@ -102,14 +102,14 @@ class CLEARDataset(object):
 
     def keep_1_instance_per_scene(self):
         id_list = collections.defaultdict(lambda: False)
-        for set in self.sets:
+        for set_type in self.sets:
             new_games = []
-            for game in self.games[set]:
+            for game in self.games[set_type]:
                 if not id_list[game.image.id]:
                     new_games.append(game)
                     id_list[game.image.id] = True
 
-            self.games[set] = new_games
+            self.games[set_type] = new_games
 
     def is_raw_img(self):
         return self.image_builder.is_raw_image()

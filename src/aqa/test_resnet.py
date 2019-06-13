@@ -253,10 +253,10 @@ def preextract_features(sess, dataset, network_wrapper, sets=['train', 'val', 't
 
     sess.run(tf.global_variables_initializer())
 
-    for set in sets:
-        batches = dataset.get_batches(set)
+    for set_type in sets:
+        batches = dataset.get_batches(set_type)
         nb_games = len(batches.games)
-        output_filepath = "%s/%s_features.h5" % (output_folder, set)
+        output_filepath = "%s/%s_features.h5" % (output_folder, set_type)
         batch_size = batches.batch_size
 
         # TODO : Add check to see if file already exist
@@ -278,7 +278,7 @@ def preextract_features(sess, dataset, network_wrapper, sets=['train', 'val', 't
 
                 h5_idx += batch_size
 
-        print("%s set features extracted to '%s'." % (set, output_filepath))
+        print("%s set features extracted to '%s'." % (set_type, output_filepath))
 
     with open('%s/feature_shape.json' % output_folder, 'w') as f:
         json.dump({
