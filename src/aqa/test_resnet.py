@@ -287,8 +287,10 @@ def preextract_features(sess, dataset, network_wrapper, sets=['train', 'val', 't
 
 
 def main():
-    #task = "train_film"
-    task = "test_inference"
+    # TODO : Seed management
+    task = "train_film"
+    #task = "test_inference"
+    #task = "preextract_features"
 
     restore_feature_extractor_weights = True if task == "train_film" or "inference" in task else False
     restore_film_weights = True if "inference" in task else False
