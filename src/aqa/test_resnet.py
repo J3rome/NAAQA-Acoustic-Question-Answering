@@ -229,7 +229,7 @@ def main():
     output_dated_folder = "%s/%s" % (output_experiment_folder, now.strftime("%Y-%m-%d_%Hh%M"))
 
     experiment_date = "2019-06-13_02h46"
-    film_ckpt_path = "%s/%s/best/checkpoint.ckpt" % (output_experiment_folder, experiment_date)
+    film_ckpt_path = "%s/train_film/%s/%s/best/checkpoint.ckpt" % (output_root_folder, experiment_name, experiment_date)
 
     # TODO : See if this is optimal file structure
     # Creating output folders       # TODO : Might not want to creat all the folders all the time
