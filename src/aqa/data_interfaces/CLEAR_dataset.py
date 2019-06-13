@@ -113,6 +113,7 @@ class CLEARBatchifier(object):
         if shuffle:
             random.shuffle(games)
 
+        self.games = games
         self.n_examples = len(games)
         self.batch_size = batch_size
 

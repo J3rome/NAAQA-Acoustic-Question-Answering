@@ -1,6 +1,7 @@
 import tensorflow as tf
 from tqdm import tqdm
 import numpy as np
+import h5py
 from collections import defaultdict
 from _datetime import datetime
 import json
@@ -61,6 +62,11 @@ def is_scalar(x):
 def is_list_int(x):
     return isinstance(x, tf.Tensor) and x.dtype is tf.int64 and len(x.shape) == 1
 
+
+def is_prediction(x):
+    return isinstance(x, tf.Tensor) and 'predicted_answer' in x.name
+
+
 def create_folder_if_necessary(folder_path, overwrite_folder=False):
     if not os.path.isdir(folder_path):
         os.mkdir(folder_path)
@@ -93,11 +99,12 @@ def save_training_stats(stats_output_file, epoch_nb, train_accuracy, train_loss,
         json.dump(stats, f, indent=2, sort_keys=True)
 
 
-def do_one_epoch(sess, batchifier, outputs_var, network_wrapper):
+def do_one_epoch(sess, batchifier, network_wrapper, outputs_var, keep_results=False):
     # check for optimizer to define training/eval mode
     is_training = any([is_optimizer(x) for x in outputs_var])
 
     aggregated_outputs = defaultdict(lambda : [])
+    processed_predictions = []
 
     for batch in tqdm(batchifier):
 
@@ -109,22 +116,41 @@ def do_one_epoch(sess, batchifier, outputs_var, network_wrapper):
             if is_scalar(var) and var in outputs_var:
                 aggregated_outputs[var].append(result)
 
-            elif is_list_int(var):
-                # Inference mode (Answer tokens)
-                aggregated_outputs[var] += result
+            elif is_prediction(var) and keep_results:
+
+                aggregated_outputs[var] = True
+
+                for i, res, game in zip(range(len(result)), result, batch['raw']):
+                    processed_predictions.append({
+                        'question_id': batch['raw'][i].id,
+                        'scene_id': batch['raw'][i].image.id,
+                        'answer': batchifier.tokenizer.decode_answer(res),
+                        'ground_truth': batchifier.tokenizer.decode_answer(batch['raw'][i].answer),
+                        'correct': bool(res == batch['raw'][i].answer)
+                    })
 
     for var in aggregated_outputs.keys():
         if is_scalar(var):
             aggregated_outputs[var] = np.mean(aggregated_outputs[var]).item()
+        elif is_prediction(var):
+            aggregated_outputs[var] = processed_predictions
 
-    return list(aggregated_outputs.values())
+    to_return = list(aggregated_outputs.values())
+
+    if len(to_return) < 3:
+        # This method should always return 3 results (Because of the way we unpack it)
+        to_return += []
+
+    return to_return
 
 
-def do_film_training(sess, dataset, network_wrapper, optimizer_config, nb_epoch, output_folder):
+def do_film_training(sess, dataset, network_wrapper, optimizer_config, nb_epoch, output_folder, keep_results=True):
     stats_file_path = "%s/stats.json" % output_folder
 
     # Setup optimizer (For training)
     optimize_step, [loss, accuracy] = create_optimizer(network_wrapper.get_network(), optimizer_config, var_list=None)  # TODO : Var_List should contain only film variables
+
+    prediction = network_wrapper.get_network_prediction()
 
     sess.run(tf.global_variables_initializer())
 
@@ -136,17 +162,26 @@ def do_film_training(sess, dataset, network_wrapper, optimizer_config, nb_epoch,
         create_folder_if_necessary(epoch_output_folder_path)
 
         print("Epoch %d" % epoch)
-        train_loss, train_accuracy = do_one_epoch(sess, dataset.get_batches('train'), [loss, accuracy, optimize_step], network_wrapper)
+        train_loss, train_accuracy, train_predictions = do_one_epoch(sess, dataset.get_batches('train'),
+                                                                     network_wrapper,
+                                                                     [loss, accuracy, prediction, optimize_step],
+                                                                     keep_results=keep_results)
 
         print("Training :")
         print("    Loss : %f  - Accuracy : %f" % (train_loss, train_accuracy))
 
-        val_loss, val_accuracy = do_one_epoch(sess, dataset.get_batches('val'), [loss, accuracy], network_wrapper)
+        val_loss, val_accuracy, val_predictions = do_one_epoch(sess, dataset.get_batches('val'),
+                                                               network_wrapper, [loss, accuracy, prediction],
+                                                               keep_results=keep_results)
 
         print("Validation :")
         print("    Loss : %f  - Accuracy : %f" % (val_loss, val_accuracy))
 
         save_training_stats(stats_file_path, epoch, train_accuracy, train_loss, val_accuracy, val_loss)
+
+        if keep_results:
+            save_inference_results(train_predictions, epoch_output_folder_path, filename="train_inferences.json")
+            save_inference_results(val_predictions, epoch_output_folder_path, filename="val_inferences.json")
 
         stats.append({
             'epoch' : epoch,
@@ -162,8 +197,8 @@ def do_film_training(sess, dataset, network_wrapper, optimizer_config, nb_epoch,
     best_epoch = sorted(stats, key=lambda s: s['val_accuracy'], reverse=True)[0]['epoch']
     subprocess.run("cd %s && ln -s Epoch_%.2d best" % (output_folder, best_epoch), shell=True)
 
-def save_inference_results(results, output_folder):
-    with open("%s/results.json" % output_folder, 'w') as f:
+def save_inference_results(results, output_folder, filename="results.json"):
+    with open("%s/%s" % (output_folder, filename), 'w') as f:
         json.dump(results, f, indent=2)
 
 def do_test_inference(sess, dataset, network_wrapper, output_folder, set_name="test"):
@@ -232,19 +267,23 @@ def main():
     experiment_date = "2019-06-13_02h46"
     film_ckpt_path = "%s/train_film/%s/%s/best/checkpoint.ckpt" % (output_root_folder, experiment_name, experiment_date)
 
-    # TODO : See if this is optimal file structure
-    # Creating output folders       # TODO : Might not want to creat all the folders all the time
-    create_folder_if_necessary(output_root_folder)
-    create_folder_if_necessary(output_task_folder)
-    create_folder_if_necessary(output_experiment_folder)
-    create_folder_if_necessary(output_dated_folder)
+    if create_output_folder:
+        # TODO : See if this is optimal file structure
+        # Creating output folders       # TODO : Might not want to creat all the folders all the time
+        create_folder_if_necessary(output_root_folder)
+        create_folder_if_necessary(output_task_folder)
+        create_folder_if_necessary(output_experiment_folder)
+        create_folder_if_necessary(output_dated_folder)
 
 
+    # TODO : Output folder should contains info about the config used
     # TODO : Read config from file
     film_model_config = {
         "input": {
             "type": "raw",
             "dim": [224, 224, 3],
+            #"type": "conv",
+            #"dim": [224, 224, 3],   # TODO : Those should be infered from the shape of input tensor
         },
         "feature_extractor": {
             "type": "resnet",
