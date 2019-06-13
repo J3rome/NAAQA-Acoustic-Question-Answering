@@ -5,6 +5,7 @@ from collections import defaultdict
 from _datetime import datetime
 import json
 import os
+import subprocess
 from collections import OrderedDict
 
 from tensorflow.python import debug as tf_debug
@@ -119,13 +120,15 @@ def do_one_epoch(sess, batchifier, outputs_var, network_wrapper):
     return list(aggregated_outputs.values())
 
 
-def do_training(sess, dataset, network_wrapper, optimizer_config, nb_epoch, output_folder):
+def do_film_training(sess, dataset, network_wrapper, optimizer_config, nb_epoch, output_folder):
     stats_file_path = "%s/stats.json" % output_folder
 
     # Setup optimizer (For training)
     optimize_step, [loss, accuracy] = create_optimizer(network_wrapper.get_network(), optimizer_config, var_list=None)  # TODO : Var_List should contain only film variables
 
     sess.run(tf.global_variables_initializer())
+
+    stats = []
 
     # Training Loop
     for epoch in range(nb_epoch):
@@ -145,7 +148,20 @@ def do_training(sess, dataset, network_wrapper, optimizer_config, nb_epoch, outp
 
         save_training_stats(stats_file_path, epoch, train_accuracy, train_loss, val_accuracy, val_loss)
 
+        stats.append({
+            'epoch' : epoch,
+            'train_loss' : train_loss,
+            'train_accuracy': train_accuracy,
+            'val_loss' : val_loss,
+            'val_accuracy' : val_accuracy
+        })
+
         network_wrapper.save_film_checkpoint("%s/checkpoint.ckpt" % epoch_output_folder_path)
+
+    # Create a symlink to best epoch output folder
+    best_epoch = sorted(stats, key=lambda s: s['val_accuracy'], reverse=True)[0]['epoch']
+    subprocess.run("cd %s | ln -s Epoch_%.2d best" % (output_folder, best_epoch))
+
 
 
 def do_inference():
@@ -161,7 +177,10 @@ def extract_features():
 
 
 def main():
-    task = "train"
+    task = "train_film"
+
+    restore_feature_extractor_weights = True if task == "train_film" or "inference" in task else False
+    restore_film_weights = True if "inference" in task else False
 
     # Parameters
     nb_epoch = 2
@@ -173,22 +192,25 @@ def main():
     experiment_name = "v2.0.0_1k_scenes_1_inst_per_scene"
     experiment_path = "%s/%s" % (root_folder, experiment_name)
     resnet_ckpt_path = "%s/resnet/resnet_v1_101.ckpt" % root_folder
-    resnet_chosen_layer = "block3/unit_22/bottleneck_v1"
-    dict_path = "%s/preprocessed/dict.json" % experiment_path
 
     output_root_folder = "output"
     output_task_folder = "%s/%s" % (output_root_folder, task)
     output_experiment_folder = "%s/%s" %(output_task_folder, experiment_name)
     now = datetime.now()
-    output_dated_folder = "%s/%s" % (output_experiment_folder, now.strftime("%Y-%m-%d_%H-%M"))
+    output_dated_folder = "%s/%s" % (output_experiment_folder, now.strftime("%Y-%m-%d_%Hh%M"))
 
-    # Creating output folders
+    experiment_date = "2019-06-12_23h30"
+    film_ckpt_path = "%s/%s/best/checkpoint.ckpt" % (output_experiment_folder, experiment_date)
+
+    # TODO : See if this is optimal file structure
+    # Creating output folders       # TODO : Might not want to creat all the folders all the time
     create_folder_if_necessary(output_root_folder)
     create_folder_if_necessary(output_task_folder)
     create_folder_if_necessary(output_experiment_folder)
     create_folder_if_necessary(output_dated_folder)
 
 
+    # TODO : Read config from file
     film_model_config = {
         "input": {
             "type": "raw",
@@ -246,13 +268,19 @@ def main():
         #sess = tf_debug.TensorBoardDebugWrapperSession(sess, "T480s:8076")
         tensorboard_writer = tf.summary.FileWriter('test_resnet_logs', sess.graph)
 
-        network_wrapper.restore_feature_extractor_weights(sess, resnet_ckpt_path)
-        #network_wrapper.restore_film_network_weights(sess, film_ckpt_path)
+        if restore_feature_extractor_weights:
+            network_wrapper.restore_feature_extractor_weights(sess, resnet_ckpt_path)
 
-        do_training(sess, dataset, network_wrapper, optimizer_config, nb_epoch, output_dated_folder)
+        if restore_film_weights:
+            network_wrapper.restore_film_network_weights(sess, film_ckpt_path)
 
-            # TODO : Export Gamma & Beta
-            # TODO : Export visualizations
+        if task == "train_film":
+            do_film_training(sess, dataset, network_wrapper, optimizer_config, nb_epoch, output_dated_folder)
+        elif task == "test_inference":
+            do_test_inference(sess, dataset, network_wrapper,output_dated_folder)
+
+        # TODO : Export Gamma & Beta
+        # TODO : Export visualizations
 
 
 
@@ -264,7 +292,6 @@ if __name__ == "__main__":
 
 
         # TODO : Restore pretrained FiLM network
-        # TODO : Train only FiLM part
         # TODO : Extract Beta And Gamma Parameters + T-SNE
         # TODO : Feed RAW image directly to the FiLM network
         # TODO : Options for preprocessing (Feature Exctraction) to minimize training time ? ( Quantify the increase in training time)
