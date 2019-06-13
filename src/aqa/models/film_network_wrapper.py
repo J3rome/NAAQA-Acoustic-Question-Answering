@@ -8,20 +8,29 @@ class FiLM_Network_Wrapper():
         self.config = config
         self.dataset = dataset
 
-        self.input_image = tf.placeholder(tf.float32, [None] + self.config['input']['dim'], name='clear/image')  # FIXME : would it be better to use a fixed batch_size instead of None ?
+        if self.config['input']['type'] == 'raw':
+            self.input_image = tf.placeholder(tf.float32, [dataset.batch_size] + self.config['input']['dim'], name='clear/image')  # FIXME : would it be better to use a fixed batch_size instead of None ?
 
-        if "resnet" in self.config['feature_extractor']['type'].lower():
-            # Feature extractor (Resnet 101)
-            self.feature_extractor, feature_extractor_variables = create_resnet(self.input_image, resnet_version=self.config['feature_extractor']['version'],
-                                                           chosen_layer=self.config['feature_extractor']['output_layer'], is_training=False)
+            if "resnet" in self.config['feature_extractor']['type'].lower():
+                # Feature extractor (Resnet 101)
+                self.feature_extractor, feature_extractor_variables = create_resnet(self.input_image, resnet_version=self.config['feature_extractor']['version'],
+                                                               chosen_layer=self.config['feature_extractor']['output_layer'], is_training=False)
+
+                self.feature_extractor_saver = tf.train.Saver(var_list=feature_extractor_variables)
+
+                film_input_tensor = self.feature_extractor
+            else:
+                print("[ERROR] Only Resnet feature extractor is implemented.")
+                exit(1)
+        elif self.config['input']['type'] == 'conv':
+            self.input_image = tf.placeholder(tf.float32, [dataset.batch_size] + dataset.input_shape, name='clear/image')  # FIXME : would it be better to use a fixed batch_size instead of None ?
+            film_input_tensor = self.input_image
         else:
-            print("[ERROR] Only Resnet feature extractor is implemented.")
+            print("[ERROR] input type '%s' not implemented." % self.config['input']['type'])
             exit(1)
 
-        self.feature_extractor_saver = tf.train.Saver(var_list=feature_extractor_variables)
-
         # Adding the FiLM network after the chosen resnet layer
-        self.film_network = FiLM_Network(config, input_image_tensor=self.feature_extractor,
+        self.film_network = FiLM_Network(config, input_image_tensor=film_input_tensor,
                                no_words=dataset.tokenizer.no_words, no_answers=dataset.tokenizer.no_answers,
                                device=0)  # FIXME : Not sure that device 0 is appropriate for CPU
 

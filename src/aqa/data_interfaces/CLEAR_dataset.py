@@ -39,8 +39,15 @@ class CLEARDataset(object):
         else:
             self.tokenizer = None
 
+        self.root_folder_path = folder
         self.batch_size = batch_size
         self.image_builder = get_img_builder(image_config, folder, bufferize=None)    # TODO : Figure out buffersize
+
+        if self.image_builder.is_raw_image():
+            self.input_shape = image_config['dim']
+        else:
+            with open("{}/preprocessed/feature_shape.json".format(folder)) as f:
+                self.input_shape = json.load(f)['extracted_feature_shape']
 
         self.games = {}
         self.answer_counter = {}
@@ -64,8 +71,8 @@ class CLEARDataset(object):
 
                     answer = sample.get("answer", None)  # None for test set
                     if answer is not None:
+                        answer = str(answer) if type(answer) == int else answer
                         answer = self.tokenizer.encode_answer(answer) if tokenize_text else answer
-
 
                     image_id = int(sample["scene_index"])
                     image_filename = sample["scene_filename"].replace('.wav', ".png")       # The clear dataset specify the filename to the scene wav file
@@ -88,6 +95,20 @@ class CLEARDataset(object):
             return [self.games[i] for i in indices]
         else:
             return self.games
+
+    def keep_1_instance_per_scene(self):
+        id_list = collections.defaultdict(lambda: False)
+        for set in self.sets:
+            new_games = []
+            for game in self.games[set]:
+                if not id_list[game.image.id]:
+                    new_games.append(game)
+                    id_list[game.image.id] = True
+
+            self.games[set] = new_games
+
+    def is_raw_img(self):
+        return self.image_builder.is_raw_image()
 
     def __len__(self):
         return len(self.games)
@@ -117,7 +138,7 @@ class CLEARBatchifier(object):
         self.n_examples = len(games)
         self.batch_size = batch_size
 
-        self.n_batches = int(math.ceil(1. * self.n_examples / self.batch_size))
+        self.n_batches = int(math.ceil(self.n_examples / self.batch_size))
 
         # Split batches
         i = 0
@@ -134,7 +155,7 @@ class CLEARBatchifier(object):
             last_batch_len = len(batches[-1])
             if last_batch_len < batch_size:
                 no_missing = batch_size - last_batch_len
-                batches[-1] += batches[0][:no_missing]
+                #batches[-1] += batches[0][:no_missing]
 
         self.batches = batches
         self.batch_index = 0
