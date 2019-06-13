@@ -184,7 +184,7 @@ def do_test_inference(sess, dataset, network_wrapper, output_folder):
                 'scene_id': batch['raw'][i].image.id,
                 'answer': dataset.tokenizer.decode_answer(result),
                 'ground_truth': dataset.tokenizer.decode_answer(batch['raw'][i].answer),
-                'correct': result == batch['raw'][i].answer
+                'correct': bool(result == batch['raw'][i].answer)
             })
 
     nb_correct = sum(1 for r in processed_results if r['correct'])
