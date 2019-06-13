@@ -164,7 +164,7 @@ def do_film_training(sess, dataset, network_wrapper, optimizer_config, nb_epoch,
 
 def save_inference_results(results, output_folder):
     with open("%s/results.json" % output_folder, 'w') as f:
-        json.dump(f, results, indent=2)
+        json.dump(results, f, indent=2)
 
 def do_test_inference(sess, dataset, network_wrapper, output_folder):
     test_batches = dataset.get_batches('test')
