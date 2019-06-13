@@ -156,7 +156,7 @@ class CLEARBatchifier(object):
 
         for i, game in enumerate(games):
 
-            #batch["raw"].append(game)
+            batch["raw"].append(game)
 
             batch['question'].append(game.question)
             batch['answer'].append(game.answer)
