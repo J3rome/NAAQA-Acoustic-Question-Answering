@@ -39,4 +39,6 @@ def create_resnet(image_input, is_training, scope="", chosen_layer="block4", res
     # FIXME : Shouldn't have a significant performance impact since the floating nodes won't be executed
     chosen_resnet_layer = end_points[scope + resnet_scope]
 
-    return chosen_resnet_layer
+    resnet_variables = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope=resnet_scope)
+
+    return chosen_resnet_layer, resnet_variables

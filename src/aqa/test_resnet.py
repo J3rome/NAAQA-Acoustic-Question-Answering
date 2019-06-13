@@ -11,6 +11,7 @@ from tensorflow.python import debug as tf_debug
 
 from aqa.models.film_network import FiLM_Network
 from aqa.data_interfaces.CLEAR_tokenizer import CLEARTokenizer
+from aqa.models.film_network_wrapper import FiLM_Network_Wrapper
 from aqa.data_interfaces.CLEAR_dataset import CLEARDataset, CLEARBatchifier
 from aqa.model_handlers.optimizer import create_optimizer
 from aqa.models.resnet import create_resnet
@@ -59,6 +60,13 @@ def is_scalar(x):
 def is_list_int(x):
     return isinstance(x, tf.Tensor) and x.dtype is tf.int64 and len(x.shape) == 1
 
+def create_folder_if_necessary(folder_path, overwrite_folder=False):
+    if not os.path.isdir(folder_path):
+        os.mkdir(folder_path)
+    elif overwrite_folder:
+        os.rmdir(folder_path)
+        os.mkdir(folder_path)
+
 
 def save_training_stats(stats_output_file, epoch_nb, train_accuracy, train_loss, val_accuracy, val_loss):
     """
@@ -83,7 +91,8 @@ def save_training_stats(stats_output_file, epoch_nb, train_accuracy, train_loss,
     with open(stats_output_file, 'w') as f:
         json.dump(stats, f, indent=2, sort_keys=True)
 
-def do_one_epoch(sess, batchifier, outputs_var, network, image_var):
+
+def do_one_epoch(sess, batchifier, outputs_var, network_wrapper):
     # check for optimizer to define training/eval mode
     is_training = any([is_optimizer(x) for x in outputs_var])
 
@@ -91,7 +100,7 @@ def do_one_epoch(sess, batchifier, outputs_var, network, image_var):
 
     for batch in tqdm(batchifier):
 
-        feed_dict = network.get_feed_dict(image_var, is_training, batch['question'], batch['answer'], batch['image'], batch['seq_length'])
+        feed_dict = network_wrapper.get_feed_dict(is_training, batch['question'], batch['answer'], batch['image'], batch['seq_length'])
 
         results = sess.run(outputs_var, feed_dict=feed_dict)
 
@@ -110,22 +119,54 @@ def do_one_epoch(sess, batchifier, outputs_var, network, image_var):
     return list(aggregated_outputs.values())
 
 
-def create_folder_if_necessary(folder_path, overwrite_folder=False):
-    if not os.path.isdir(folder_path):
-        os.mkdir(folder_path)
-    elif overwrite_folder:
-        os.rmdir(folder_path)
-        os.mkdir(folder_path)
+def do_training(sess, dataset, network_wrapper, optimizer_config, nb_epoch, output_folder):
+    stats_file_path = "%s/stats.json" % output_folder
+
+    # Setup optimizer (For training)
+    optimize_step, [loss, accuracy] = create_optimizer(network_wrapper.get_network(), optimizer_config, var_list=None)  # TODO : Var_List should contain only film variables
+
+    sess.run(tf.global_variables_initializer())
+
+    # Training Loop
+    for epoch in range(nb_epoch):
+        epoch_output_folder_path = "%s/Epoch_%.2d" % (output_folder, epoch)
+        create_folder_if_necessary(epoch_output_folder_path)
+
+        print("Epoch %d" % epoch)
+        train_loss, train_accuracy = do_one_epoch(sess, dataset.get_batches('train'), [loss, accuracy, optimize_step], network_wrapper)
+
+        print("Training :")
+        print("    Loss : %f  - Accuracy : %f" % (train_loss, train_accuracy))
+
+        val_loss, val_accuracy = do_one_epoch(sess, dataset.get_batches('val'), [loss, accuracy, optimize_step], network_wrapper)
+
+        print("Validation :")
+        print("    Loss : %f  - Accuracy : %f" % (val_loss, val_accuracy))
+
+        save_training_stats(stats_file_path, epoch, train_accuracy, train_loss, val_accuracy, val_loss)
+
+        network_wrapper.save_film_checkpoint("%s/checkpoint.ckpt" % epoch_output_folder_path)
 
 
-if __name__ == "__main__":
+def do_inference():
+    return 1
 
+
+def do_visualization():
+    return 1
+
+
+def extract_features():
+    return 1
+
+
+def main():
     task = "train"
 
     # Parameters
-    nb_epoch = 5
+    nb_epoch = 2
     nb_thread = 2
-    batch_size = 32
+    batch_size = 3
 
     # Paths
     root_folder = "data"
@@ -140,8 +181,6 @@ if __name__ == "__main__":
     output_experiment_folder = "%s/%s" %(output_task_folder, experiment_name)
     now = datetime.now()
     output_dated_folder = "%s/%s" % (output_experiment_folder, now.strftime("%Y-%m-%d_%H-%M"))
-    stats_file_path = "%s/stats.json" % output_dated_folder
-    checkpoint_filename = "checkpoint.ckpt"
 
     # Creating output folders
     create_folder_if_necessary(output_root_folder)
@@ -151,9 +190,14 @@ if __name__ == "__main__":
 
 
     film_model_config = {
-        "image": {
+        "input": {
             "type": "raw",
             "dim": [224, 224, 3],
+        },
+        "feature_extractor": {
+            "type": "resnet",
+            "version": 101,
+            "output_layer": "block3/unit_22/bottleneck_v1"
         },
         "question": {
             "word_embedding_dim": 200,
@@ -187,75 +231,25 @@ if __name__ == "__main__":
     ########################################################
     ################### Data Loading #######################
     ########################################################
-    dataset = CLEARDataset(experiment_path, film_model_config['image'], batch_size=batch_size)
+    dataset = CLEARDataset(experiment_path, film_model_config['input'], batch_size=batch_size)
 
     ########################################################
     ################## Network Setup #######################
     ########################################################
-    # TODO : There should be 2 Image placeholder : One for Raw Image, One for extracted features
-    # Input Image
-    images = tf.placeholder(tf.float32, [None, 224, 224, 3], name='clear/image')      # FIXME : would it be better to use a fixed batch_size instead of None ?
-
-    # Feature extractor (Resnet 101)
-    feature_extractor_chosen_layer = create_resnet(images, resnet_version=101,
-                                                   chosen_layer=resnet_chosen_layer, is_training=False)
-
-    # Adding the FiLM network after the chosen resnet layer
-    network = FiLM_Network(film_model_config, input_image_tensor=feature_extractor_chosen_layer,
-                           no_words=dataset.tokenizer.no_words, no_answers=dataset.tokenizer.no_answers, device=0)  # FIXME : Not sure that device 0 is appropriate for CPU
-
-    # Setup optimizer (For training)
-    optimize_step, [loss, accuracy] = create_optimizer(network, optimizer_config, var_list=None)  # TODO : Var_List should contain only film variables
+    network_wrapper = FiLM_Network_Wrapper(film_model_config, dataset)
 
     # GPU Options
     gpu_options = tf.GPUOptions(allow_growth=True)
 
     with tf.Session(config=tf.ConfigProto(gpu_options=gpu_options, allow_soft_placement=True)) as sess:
+        # Debugging Tools
         #sess = tf_debug.TensorBoardDebugWrapperSession(sess, "T480s:8076")
-
         tensorboard_writer = tf.summary.FileWriter('test_resnet_logs', sess.graph)
 
-        sess.run(tf.global_variables_initializer())
+        network_wrapper.restore_feature_extractor_weights(sess, resnet_ckpt_path)
+        #network_wrapper.restore_film_network_weights(sess, film_ckpt_path)
 
-        # Restore the pretrained weight of resnet
-        resnet_variables = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope="resnet_v1_101")
-        resnet_saver = tf.train.Saver(var_list=resnet_variables)
-        resnet_saver.restore(sess, resnet_ckpt_path)
-
-        # Restore pretrained weight for FiLM network
-        film_variables = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope="clear")    # TODO : Change scope
-        film_saver = tf.train.Saver(max_to_keep=None, pad_step_number=3, var_list=film_variables)
-
-
-        all_variables = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES)
-        all_variables_name = [v.name for v in all_variables]
-        resnet_variables_name = [v.name for v in resnet_variables]
-        film_variables_name = [v.name for v in film_variables]
-
-        # Training Loop
-        for epoch in range(nb_epoch):
-            epoch_output_folder_path = "%s/Epoch_%.2d" % (output_dated_folder, epoch)
-            create_folder_if_necessary(epoch_output_folder_path)
-
-            print("Epoch %d" % epoch)
-            train_loss, train_accuracy = do_one_epoch(sess, dataset.get_batches('train'),
-                                                      [loss, accuracy, optimize_step], network, images)
-
-            print("Training :")
-            print("    Loss : %f  - Accuracy : %f" % (train_loss, train_accuracy))
-
-            val_loss, val_accuracy = do_one_epoch(sess, dataset.get_batches('val'),
-                                                      [loss, accuracy, optimize_step], network, images)
-
-            print("Validation :")
-            print("    Loss : %f  - Accuracy : %f" % (val_loss, val_accuracy))
-
-            save_training_stats(stats_file_path, epoch, train_accuracy, train_loss, val_accuracy,
-                                val_loss)
-
-            checkpoint_filepath = "%s/%s" % (epoch_output_folder_path, checkpoint_filename)
-            film_saver.save(sess, checkpoint_filepath)   # FIXME : Not sur global_step is required anymore
-                                                                            # FIXME : Does splitting in folder make it so that we loose the ability to keep only the last X
+        do_training(sess, dataset, network_wrapper, optimizer_config, nb_epoch, output_dated_folder)
 
             # TODO : Export Gamma & Beta
             # TODO : Export visualizations
@@ -264,6 +258,8 @@ if __name__ == "__main__":
 
         print("All Done")
 
+if __name__ == "__main__":
+    main()
 
 
 
@@ -332,4 +328,5 @@ if __name__ == "__main__":
     #                 pt_hd5 += batch_size
     #             print("Start dumping file: {}".format(filepath))
     #         print("Finished dumping file: {}".format(filepath))
+
 

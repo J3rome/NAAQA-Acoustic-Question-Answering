@@ -138,7 +138,7 @@ class FiLM_Network(ResnetModel):
             #####################
 
             if input_image_tensor is None:
-                self._image = tf.placeholder(tf.float32, [self.batch_size] + config['image']["dim"], name='image')
+                self._image = tf.placeholder(tf.float32, [self.batch_size] + config['input']["dim"], name='image')
             else:
                 self._image = input_image_tensor        # FIXME : Make sure we have the correct scope
 
@@ -243,12 +243,14 @@ class FiLM_Network(ResnetModel):
             print('FiLM Model... built!')
 
     # FIXME : This is kinda ugly, should be able to reference by scope (string). No need to keep all those references..
-    def get_feed_dict(self, image_var,  is_training, question, answer, image, seq_length):
+    def get_feed_dict(self, is_training, question, answer, image, seq_length, image_var=None):
+        if image_var is None:
+            image_var = self._image
+
         return {
             self._is_training : is_training,
             self._question : question,
             self._answer : answer,
-            #self._image : image,
             image_var: image,
             self._seq_length : seq_length
         }
@@ -258,3 +260,6 @@ class FiLM_Network(ResnetModel):
 
     def get_accuracy(self):
         return self.accuracy
+
+    def get_input(self):
+        return self._image
