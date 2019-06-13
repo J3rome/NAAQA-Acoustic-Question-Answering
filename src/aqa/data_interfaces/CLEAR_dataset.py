@@ -84,10 +84,6 @@ class CLEARDataset(object):
 
                     self.answer_counter[set_type][answer] += 1
 
-            # FIXME : We should not drop uneven batches
-            nb_to_remove = len(self.games[set_type]) % self.batch_size
-            self.games[set_type] = self.games[set_type][:-nb_to_remove]
-
         print("Successfully Loaded CLEAR v{} ({}) - {} games loaded.".format(info["version"], ",".join(self.sets), len(self.games)))
 
     def get_batches(self, set_type):
@@ -110,10 +106,6 @@ class CLEARDataset(object):
                     id_list[game.image.id] = True
 
             self.games[set_type] = unique_scene_games
-
-            # FIXME : Temporary fix.. FIX H5PY
-            nb_to_remove = len(self.games[set_type]) % self.batch_size
-            self.games[set_type] = self.games[set_type][:-nb_to_remove]
 
     def is_raw_img(self):
         return self.image_builder.is_raw_image()
@@ -163,7 +155,7 @@ class CLEARBatchifier(object):
             last_batch_len = len(batches[-1])
             if last_batch_len < batch_size:
                 no_missing = batch_size - last_batch_len
-                #batches[-1] += batches[0][:no_missing]
+                batches[-1] += batches[0][:no_missing]
 
         self.batches = batches
         self.batch_index = 0
@@ -176,6 +168,10 @@ class CLEARBatchifier(object):
         #    self.semaphores = Semaphore(no_semaphore)
         #    batches = create_semaphore_iterator(batches, self.semaphores)
         #    self.process_iterator = pool.imap(self.load_batch, batches)
+
+
+    def get_nb_games(self):
+        return sum([len(b) for b in self.batches])
 
     def load_batch(self, games):
 

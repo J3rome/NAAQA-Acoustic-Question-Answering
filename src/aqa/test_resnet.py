@@ -255,7 +255,7 @@ def preextract_features(sess, dataset, network_wrapper, sets=['train', 'val', 't
 
     for set_type in sets:
         batches = dataset.get_batches(set_type)
-        nb_games = len(batches.games)
+        nb_games = batches.get_nb_games()
         output_filepath = "%s/%s_features.h5" % (output_folder, set_type)
         batch_size = batches.batch_size
 
@@ -288,9 +288,9 @@ def preextract_features(sess, dataset, network_wrapper, sets=['train', 'val', 't
 
 def main():
     # TODO : Seed management
-    task = "train_film"
+    #task = "train_film"
     #task = "test_inference"
-    #task = "preextract_features"
+    task = "preextract_features"
 
     restore_feature_extractor_weights = True if task == "train_film" or "inference" in task else False
     restore_film_weights = True if "inference" in task else False
