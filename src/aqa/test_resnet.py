@@ -246,6 +246,7 @@ def main():
 
     restore_feature_extractor_weights = True if task == "train_film" or "inference" in task else False
     restore_film_weights = True if "inference" in task else False
+    create_output_folder = True if not 'pre' in task else False
 
     # Parameters
     nb_epoch = 5
