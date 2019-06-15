@@ -354,14 +354,15 @@ def main():
             "conv_out": 512,
             "conv_kernel": [1, 1],
             "no_mlp_units": 1024
+        },
+        'optimizer' : {
+            "learning_rate": 3e-4,
+            "clip_val": 0.0,
+            "weight_decay": 1e-5
         }
     }
 
-    optimizer_config = {
-        "learning_rate": 3e-4,
-        "clip_val": 0.0,
-        "weight_decay": 1e-5
-    }
+
 
     restore_feature_extractor_weights = True if (task == "train_film" and film_model_config['input']['type'] == 'raw') or "inference" in task else False
     restore_film_weights = True if "inference" in task else False
@@ -403,7 +404,7 @@ def main():
             network_wrapper.restore_film_network_weights(sess, film_ckpt_path)
 
         if task == "train_film":
-            do_film_training(sess, dataset, network_wrapper, optimizer_config, nb_epoch, output_dated_folder)
+            do_film_training(sess, dataset, network_wrapper, film_model_config['optimizer'], nb_epoch, output_dated_folder)
         elif task == "test_inference":
             do_test_inference(sess, dataset, network_wrapper,output_dated_folder)
         elif task == "preextract_features":
@@ -412,7 +413,9 @@ def main():
         # TODO : Export Gamma & Beta
         # TODO : Export visualizations
 
-
+    if create_output_folder:
+        with open('%s/config_%s.json' % (output_dated_folder, film_model_config['input']['type']), 'w') as f:
+            json.dump(film_model_config, f, indent=2)
 
         print("All Done")
 
