@@ -7,6 +7,7 @@ from _datetime import datetime
 import json
 import os
 import subprocess
+import random
 from collections import OrderedDict
 
 from tensorflow.python import debug as tf_debug
@@ -41,6 +42,12 @@ from aqa.models.resnet import create_resnet
 #       tensorboard_log_dir (If None, no logging)
 #       Output Path (Trained models, visualization, etc)
 #
+
+def set_random_seed(seed):
+    random.seed(seed)
+    np.random.seed(seed)
+    tf.random.set_random_seed(seed)
+
 
 # TODO : Move some place else
 # TODO check if optimizers are always ops? Maybe there is a better check
@@ -296,6 +303,7 @@ def main():
     nb_epoch = 5
     nb_thread = 2
     batch_size = 32
+    seed = 667
 
     # Paths
     root_folder = "data"
@@ -358,6 +366,9 @@ def main():
     restore_feature_extractor_weights = True if (task == "train_film" and film_model_config['input']['type'] == 'raw') or "inference" in task else False
     restore_film_weights = True if "inference" in task else False
     create_output_folder = True if not 'pre' in task else False
+
+    if seed is not None:
+        set_random_seed(seed)
 
     if create_output_folder:
         # TODO : See if this is optimal file structure
