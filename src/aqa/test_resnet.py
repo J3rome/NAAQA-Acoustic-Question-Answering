@@ -363,8 +363,7 @@ def main():
     }
 
 
-
-    restore_feature_extractor_weights = True if (task == "train_film" and film_model_config['input']['type'] == 'raw') or "inference" in task else False
+    restore_feature_extractor_weights = True if film_model_config['input']['type'] != 'conv' else False  # FIXME :
     restore_film_weights = True if "inference" in task else False
     create_output_folder = True if not 'pre' in task else False
 
