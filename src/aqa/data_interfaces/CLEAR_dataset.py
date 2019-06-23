@@ -86,8 +86,8 @@ class CLEARDataset(object):
 
         print("Successfully Loaded CLEAR v{} ({}) - {} games loaded.".format(info["version"], ",".join(self.sets), len(self.games)))
 
-    def get_batches(self, set_type):
-        self.batchifiers[set_type] = CLEARBatchifier(self.games[set_type], self.batch_size, self.tokenizer)
+    def get_batches(self, set_type, shuffled=True):
+        self.batchifiers[set_type] = CLEARBatchifier(self.games[set_type], self.batch_size, self.tokenizer, shuffle=shuffled)
         return self.batchifiers[set_type]
 
     def get_data(self, indices=[]):

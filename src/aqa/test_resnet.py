@@ -209,7 +209,7 @@ def save_inference_results(results, output_folder, filename="results.json"):
         json.dump(results, f, indent=2)
 
 def do_test_inference(sess, dataset, network_wrapper, output_folder, set_name="test"):
-    test_batches = dataset.get_batches(set_name)
+    test_batches = dataset.get_batches(set_name, shuffled=False)
 
     sess.run(tf.global_variables_initializer())
 
