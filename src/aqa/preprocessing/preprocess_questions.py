@@ -27,8 +27,8 @@ if __name__ == '__main__':
               '<unk>': 1
               }
 
-    answer2i = {'<padding>': 0,
-                '<unk>': 1
+    answer2i = {#'<padding>': 0,        # FIXME : Why would we need padding in the answers ?
+                '<unk>': 0
                 }
 
     answer2occ = dataset.answer_counter['train']
