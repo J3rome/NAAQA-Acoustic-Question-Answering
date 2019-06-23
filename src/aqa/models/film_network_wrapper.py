@@ -50,6 +50,9 @@ class FiLM_Network_Wrapper():
     def get_network_prediction(self):
         return self.film_network.get_prediction()
 
+    def get_network_accuracy(self):
+        return self.film_network.get_accuracy()
+
     def restore_feature_extractor_weights(self, sess, ckpt_path):
         self.feature_extractor_saver.restore(sess, ckpt_path)
 
