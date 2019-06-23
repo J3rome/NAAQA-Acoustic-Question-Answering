@@ -172,11 +172,14 @@ def get_img_builder(config, data_dir, bufferize=None):
     # FIXME: Figure out why there is the fc8 and fc7 cases with inversed buffersize logic
     if input_type in ["fc8", "fc7"]:
         bufferize = bufferize if bufferize is not None else True
+        # TODO : Make the 'preprocessed' path parametrable
         loader = h5FeatureBuilder(os.path.join(data_dir, 'preprocessed'), bufferize=bufferize)
     elif input_type in ["conv", "raw_h5"]:
         bufferize = bufferize if bufferize is not None else False
+        # TODO : Make the 'preprocessed' path parametrable
         loader = h5FeatureBuilder(os.path.join(data_dir, 'preprocessed'), bufferize=bufferize)
     elif input_type == "raw":
+        # TODO : Make the 'images' path parametrable
         loader = RawImageBuilder(os.path.join(data_dir, 'images'),
                                 height=config["dim"][0],
                                 width=config["dim"][1],
