@@ -25,13 +25,13 @@ class Game(object):
 class CLEARDataset(object):
     """Loads the CLEAR dataset."""
 
-    def __init__(self, folder, image_config, batch_size, sets=None, dict_file_path=None, tokenize_text=True):
+    def __init__(self, folder, image_config, batch_size, sets=None, dict_file_path=None, preprocessing=False):
         if sets is None:
             self.sets = ['train', 'val', 'test']
         else:
             self.sets = sets
 
-        if tokenize_text:
+        if not preprocessing:
             if dict_file_path is None:
                 dict_file_path = '{}/preprocessed/dict.json'.format(folder)
 
@@ -45,7 +45,7 @@ class CLEARDataset(object):
 
         if self.image_builder.is_raw_image():
             self.input_shape = image_config['dim']
-        else:
+        elif not preprocessing:
             with open("{}/preprocessed/feature_shape.json".format(folder)) as f:
                 self.input_shape = json.load(f)['extracted_feature_shape']
 
@@ -67,12 +67,12 @@ class CLEARDataset(object):
                 for sample in samples:
 
                     question_id = int(sample["question_index"])
-                    question = self.tokenizer.encode_question(sample["question"]) if tokenize_text else sample['question']
+                    question = self.tokenizer.encode_question(sample["question"]) if not preprocessing else sample['question']
 
                     answer = sample.get("answer", None)  # None for test set
                     if answer is not None:
                         answer = str(answer) if type(answer) == int else answer
-                        answer = self.tokenizer.encode_answer(answer) if tokenize_text else answer
+                        answer = self.tokenizer.encode_answer(answer) if not preprocessing else answer
 
                     image_id = int(sample["scene_index"])
                     image_filename = sample["scene_filename"].replace('.wav', ".png")       # The clear dataset specify the filename to the scene wav file

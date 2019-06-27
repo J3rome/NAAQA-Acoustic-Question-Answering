@@ -405,6 +405,7 @@ def main():
     restore_feature_extractor_weights = True if film_model_config['input']['type'] != 'conv' else False
     restore_film_weights = True if "inference" in task else False
     create_output_folder = True if not 'pre' in task else False
+    is_preprocessing_task = True if 'pre' in task else False
 
     if seed is not None:
         set_random_seed(seed)
@@ -420,7 +421,7 @@ def main():
     ########################################################
     ################### Data Loading #######################
     ########################################################
-    dataset = CLEARDataset(experiment_path, film_model_config['input'], batch_size=batch_size)
+    dataset = CLEARDataset(experiment_path, film_model_config['input'], batch_size=batch_size, preprocessing=is_preprocessing_task)
 
     ########################################################
     ################## Network Setup #######################
