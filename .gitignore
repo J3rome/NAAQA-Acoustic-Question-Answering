@@ -112,3 +112,5 @@ ENV/
 /out/
 .idea/
 /output
+/activate-venv
+/*.json
