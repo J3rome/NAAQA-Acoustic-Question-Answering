@@ -18,7 +18,7 @@ if __name__ == '__main__':
     parser.add_argument("-min_occ", type=int, default=1, help='Minimum number of occurences to add word to dictionary (for Human Clevr)')
     args = parser.parse_args()
 
-    dataset = CLEARDataset(args.data_dir, {'type': 'raw', 'dim': [224, 224, 3]}, 32, sets=['train'], tokenize_text=False)
+    dataset = CLEARDataset(args.data_dir, {'type': 'raw', 'dim': [224, 224, 3]}, 32, sets=['train'], tokenize_text=False, preprocessing=True)
 
     # FIXME : Should we use the whole dataset to create the dictionary ?
     games = dataset.games['train']
