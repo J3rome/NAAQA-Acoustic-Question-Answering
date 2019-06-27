@@ -168,6 +168,21 @@ def preextract_features(sess, dataset, network_wrapper, resnet_ckpt_path, sets=[
         }, f, indent=2)
 
 
+def process_predictions(tokenizer, predictions, raw_batch):
+    processed_results = []
+    for i, result in enumerate(predictions):
+        processed_results.append({
+            'question_id': raw_batch[i].id,
+            'scene_id': raw_batch[i].image.id,
+            'answer': tokenizer.decode_answer(result),
+            'ground_truth': tokenizer.decode_answer(raw_batch[i].answer),
+            'correct': bool(result == raw_batch[i].answer)
+            # TODO : Add "same_answer_family" attribute. True if answer is from correct category (Should add answer_family & ground_truth_family + bool so we can do further confusioon analysis)
+        })
+
+    return processed_results
+
+
 def do_one_epoch(sess, batchifier, network_wrapper, outputs_var, keep_results=False):
     # check for optimizer to define training/eval mode
     is_training = any([is_optimizer(x) for x in outputs_var])
@@ -189,14 +204,7 @@ def do_one_epoch(sess, batchifier, network_wrapper, outputs_var, keep_results=Fa
 
                 aggregated_outputs[var] = True
 
-                for i, res, game in zip(range(len(result)), result, batch['raw']):
-                    processed_predictions.append({
-                        'question_id': batch['raw'][i].id,
-                        'scene_id': batch['raw'][i].image.id,
-                        'answer': batchifier.tokenizer.decode_answer(res),
-                        'ground_truth': batchifier.tokenizer.decode_answer(batch['raw'][i].answer),
-                        'correct': bool(res == batch['raw'][i].answer)
-                    })
+                processed_predictions += process_predictions(batchifier.tokenizer, result, batch['raw'])
 
     for var in aggregated_outputs.keys():
         if is_scalar(var):
@@ -303,14 +311,7 @@ def do_test_inference(sess, dataset, network_wrapper, output_folder, film_ckpt_p
 
         results = sess.run(network_wrapper.get_network_prediction(), feed_dict=feed_dict)
 
-        for i, result in enumerate(results):
-            processed_results.append({
-                'question_id' : batch['raw'][i].id,
-                'scene_id': batch['raw'][i].image.id,
-                'answer': dataset.tokenizer.decode_answer(result),
-                'ground_truth': dataset.tokenizer.decode_answer(batch['raw'][i].answer),
-                'correct': bool(result == batch['raw'][i].answer)
-            })
+        processed_results += process_predictions(dataset.tokenizer, results, batch['raw'])
 
     # Batches are required to have always the same size.
     # We don't want the batch padding to interfere with the test accuracy.
