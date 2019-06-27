@@ -160,7 +160,7 @@ def do_one_epoch(sess, batchifier, network_wrapper, outputs_var, keep_results=Fa
     return to_return
 
 
-def do_film_training(sess, dataset, network_wrapper, optimizer_config, nb_epoch, output_folder, keep_results=True):
+def do_film_training(sess, dataset, network_wrapper, optimizer_config, resnet_ckpt_path, nb_epoch, output_folder, keep_results=True):
     stats_file_path = "%s/stats.json" % output_folder
 
     # Setup optimizer (For training)
@@ -168,8 +168,18 @@ def do_film_training(sess, dataset, network_wrapper, optimizer_config, nb_epoch,
 
     prediction = network_wrapper.get_network_prediction()
 
-    sess.run(tf.global_variables_initializer())
+    # FIXME : This should be wrapped inside the wrapper (Maybe a initializer function ?)
+    # We update the film variables because the adam variables weren't there when we first defined them
+    network_wrapper.film_variables = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope="clear")
+    optimizer_variables = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope="beta")
 
+    sess.run(tf.variables_initializer(network_wrapper.film_variables))
+    sess.run(tf.variables_initializer(optimizer_variables))
+    #sess.run(tf.global_variables_initializer())
+
+    if dataset.is_raw_img():
+        sess.run(tf.variables_initializer(network_wrapper.feature_extractor_variables))
+        network_wrapper.restore_feature_extractor_weights(sess, resnet_ckpt_path)
     stats = []
 
     # Training Loop
@@ -186,7 +196,10 @@ def do_film_training(sess, dataset, network_wrapper, optimizer_config, nb_epoch,
         print("Training :")
         print("    Loss : %f  - Accuracy : %f" % (train_loss, train_accuracy))
 
-        val_loss, val_accuracy, val_predictions = do_one_epoch(sess, dataset.get_batches('val'),
+        # FIXME : Inference of validation set doesn't yield same result.
+        # FIXME : Should val batches be shuffled ?
+        # FIXME : Validation accuracy is skewed by the batch padding. We could recalculate accuracy from the prediction (After removing padded ones)
+        val_loss, val_accuracy, val_predictions = do_one_epoch(sess, dataset.get_batches('val', shuffled=False),
                                                                network_wrapper, [loss, accuracy, prediction],
                                                                keep_results=keep_results)
 
@@ -217,10 +230,17 @@ def save_inference_results(results, output_folder, filename="results.json"):
     with open("%s/%s" % (output_folder, filename), 'w') as f:
         json.dump(results, f, indent=2)
 
-def do_test_inference(sess, dataset, network_wrapper, output_folder, set_name="test"):
+def do_test_inference(sess, dataset, network_wrapper, output_folder, film_ckpt_path, resnet_ckpt_path, set_name="test"):
     test_batches = dataset.get_batches(set_name, shuffled=False)
 
-    sess.run(tf.global_variables_initializer())
+    sess.run(tf.variables_initializer(network_wrapper.film_variables))
+    #sess.run(tf.global_variables_initializer())
+
+    if dataset.is_raw_img():
+        sess.run(tf.variables_initializer(network_wrapper.feature_extractor_variables))
+        network_wrapper.restore_feature_extractor_weights(sess, resnet_ckpt_path)
+
+    network_wrapper.restore_film_network_weights(sess, film_ckpt_path)
 
     processed_results = []
 
@@ -258,7 +278,7 @@ def do_visualization():
     return 1
 
 
-def preextract_features(sess, dataset, network_wrapper, sets=['train', 'val', 'test'], output_folder_name="preprocessed"):
+def preextract_features(sess, dataset, network_wrapper, resnet_ckpt_path, sets=['train', 'val', 'test'], output_folder_name="preprocessed"):
 
     # FIXME: Config should be set automatically to raw when this option is used
     assert dataset.is_raw_img(), "Config must be set to raw image"
@@ -275,7 +295,10 @@ def preextract_features(sess, dataset, network_wrapper, sets=['train', 'val', 't
 
     sess.run(tf.global_variables_initializer())
 
+    network_wrapper.restore_feature_extractor_weights(sess, resnet_ckpt_path)
+
     for set_type in sets:
+        print("Extracting feature for set '%s'" % set_type)
         batches = dataset.get_batches(set_type)
         nb_games = batches.get_nb_games()
         output_filepath = "%s/%s_features.h5" % (output_folder, set_type)
@@ -412,18 +435,16 @@ def main():
         #sess = tf_debug.TensorBoardDebugWrapperSession(sess, "T480s:8076")
         tensorboard_writer = tf.summary.FileWriter('test_resnet_logs', sess.graph)
 
-        if restore_feature_extractor_weights:
-            network_wrapper.restore_feature_extractor_weights(sess, resnet_ckpt_path)
-
-        if restore_film_weights:
-            network_wrapper.restore_film_network_weights(sess, film_ckpt_path)
-
         if task == "train_film":
-            do_film_training(sess, dataset, network_wrapper, film_model_config['optimizer'], nb_epoch, output_dated_folder)
+            do_film_training(sess, dataset, network_wrapper, film_model_config['optimizer'], resnet_ckpt_path, nb_epoch, output_dated_folder)
         elif task == "test_inference":
-            do_test_inference(sess, dataset, network_wrapper,output_dated_folder)
+            do_test_inference(sess, dataset, network_wrapper, output_dated_folder, film_ckpt_path, resnet_ckpt_path)
         elif task == "preextract_features":
-            preextract_features(sess, dataset, network_wrapper)
+            preextract_features(sess, dataset, network_wrapper, resnet_ckpt_path)
+
+        time_elapsed = str(datetime.now() - current_datetime)
+
+        print("Execution took %s" % time_elapsed)
 
         # TODO : Export Gamma & Beta
         # TODO : Export visualizations
@@ -432,6 +453,9 @@ def main():
         with open('%s/config_%s.json' % (output_dated_folder, film_model_config['input']['type']), 'w') as f:
             json.dump(film_model_config, f, indent=2)
 
+        with open('%s/timing.json' % output_dated_folder, 'w') as f:
+            json.dump({'time_elapsed': time_elapsed}, f, indent=2)
+
         print("All Done")
 
 if __name__ == "__main__":
@@ -439,8 +463,7 @@ if __name__ == "__main__":
 
         # TODO : Extract Beta And Gamma Parameters + T-SNE
         # TODO : Feed RAW image directly to the FiLM network
-        # TODO : Options for preprocessing (Feature Exctraction) to minimize training time ? ( Quantify the increase in training time)
-        # TODO : MAKE SURE WE GET THE SAME OUTPUT WHEN USING PREPROCESSED FEATURES AND RAW IMAGES
+        # TODO : Quantify time cost of using raw images vs preprocessed conv features
         # TODO : See how using the full resnet + FiLM impact batch size (More parameters than with preprocessing)
         # TODO : Resize images ? Do we absolutely need 224x224 for the resnet preprocessing ?
         #        Since we extract a layer in resnet, we can feed any size, its fully convolutional up to that point
