@@ -42,6 +42,9 @@ class FiLM_Network_Wrapper():
         self.film_variables = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope="clear")
         self.film_network_saver = tf.train.Saver(max_to_keep=None, var_list=self.film_variables)
 
+    def get_dataset(self):
+        return self.dataset
+
     def get_input_image(self):
         return self.input_image
 

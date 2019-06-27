@@ -49,6 +49,17 @@ class CLEARDataset(object):
             with open("{}/preprocessed/feature_shape.json".format(folder)) as f:
                 self.input_shape = json.load(f)['extracted_feature_shape']
 
+        with open("{}/attributes.json".format(folder)) as f:
+            attributes = json.load(f)
+
+        self.answer_to_family = {}
+
+        for family, answers in attributes.items():
+            for answer in answers:
+                # If there is duplicated answers, they will be assigned to the first occurring family
+                if answer not in self.answer_to_family:
+                    self.answer_to_family[answer] = family
+
         self.games = {}
         self.answer_counter = {}
         self.batchifiers = {}

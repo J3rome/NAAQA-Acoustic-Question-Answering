@@ -168,16 +168,22 @@ def preextract_features(sess, dataset, network_wrapper, resnet_ckpt_path, sets=[
         }, f, indent=2)
 
 
-def process_predictions(tokenizer, predictions, raw_batch):
+def process_predictions(dataset, predictions, raw_batch):
     processed_results = []
     for i, result in enumerate(predictions):
+        decoded_prediction = dataset.tokenizer.decode_answer(result)
+        decoded_ground_truth = dataset.tokenizer.decode_answer(raw_batch[i].answer)
+        prediction_answer_family = dataset.answer_to_family[decoded_prediction]
+        ground_truth_answer_family = dataset.answer_to_family[decoded_ground_truth]
         processed_results.append({
             'question_id': raw_batch[i].id,
             'scene_id': raw_batch[i].image.id,
-            'answer': tokenizer.decode_answer(result),
-            'ground_truth': tokenizer.decode_answer(raw_batch[i].answer),
-            'correct': bool(result == raw_batch[i].answer)
-            # TODO : Add "same_answer_family" attribute. True if answer is from correct category (Should add answer_family & ground_truth_family + bool so we can do further confusioon analysis)
+            'correct': bool(result == raw_batch[i].answer),
+            'correct_answer_family': bool(prediction_answer_family == ground_truth_answer_family),
+            'prediction': decoded_prediction,
+            'ground_truth': decoded_ground_truth,
+            'prediction_answer_family': prediction_answer_family,
+            'ground_truth_answer_family': ground_truth_answer_family
         })
 
     return processed_results
@@ -204,7 +210,7 @@ def do_one_epoch(sess, batchifier, network_wrapper, outputs_var, keep_results=Fa
 
                 aggregated_outputs[var] = True
 
-                processed_predictions += process_predictions(batchifier.tokenizer, result, batch['raw'])
+                processed_predictions += process_predictions(network_wrapper.get_dataset(), result, batch['raw'])
 
     for var in aggregated_outputs.keys():
         if is_scalar(var):
@@ -311,7 +317,7 @@ def do_test_inference(sess, dataset, network_wrapper, output_folder, film_ckpt_p
 
         results = sess.run(network_wrapper.get_network_prediction(), feed_dict=feed_dict)
 
-        processed_results += process_predictions(dataset.tokenizer, results, batch['raw'])
+        processed_results += process_predictions(dataset, results, batch['raw'])
 
     # Batches are required to have always the same size.
     # We don't want the batch padding to interfere with the test accuracy.
