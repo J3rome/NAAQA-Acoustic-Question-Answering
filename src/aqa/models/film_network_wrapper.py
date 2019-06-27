@@ -13,10 +13,10 @@ class FiLM_Network_Wrapper():
 
             if "resnet" in self.config['feature_extractor']['type'].lower():
                 # Feature extractor (Resnet 101)
-                self.feature_extractor, feature_extractor_variables = create_resnet(self.input_image, resnet_version=self.config['feature_extractor']['version'],
+                self.feature_extractor, self.feature_extractor_variables = create_resnet(self.input_image, resnet_version=self.config['feature_extractor']['version'],
                                                                chosen_layer=self.config['feature_extractor']['output_layer'], is_training=False)
 
-                self.feature_extractor_saver = tf.train.Saver(var_list=feature_extractor_variables)
+                self.feature_extractor_saver = tf.train.Saver(var_list=self.feature_extractor_variables)
 
                 film_input_tensor = self.feature_extractor
             else:
@@ -25,6 +25,10 @@ class FiLM_Network_Wrapper():
         elif self.config['input']['type'] == 'conv':
             self.input_image = tf.placeholder(tf.float32, [dataset.batch_size] + dataset.input_shape, name='clear/image')  # FIXME : would it be better to use a fixed batch_size instead of None ?
             film_input_tensor = self.input_image
+
+            self.feature_extractor = None
+            self.feature_extractor_variables = []
+            self.feature_extractor_saver = None
         else:
             print("[ERROR] input type '%s' not implemented." % self.config['input']['type'])
             exit(1)
@@ -35,8 +39,8 @@ class FiLM_Network_Wrapper():
                                device=0)  # FIXME : Not sure that device 0 is appropriate for CPU
 
         #self.network.get_parameters()      # FIXME : network.get_parameters() doesn't return the moving_mean
-        film_variables = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope="clear")
-        self.film_network_saver = tf.train.Saver(max_to_keep=None, var_list=film_variables)
+        self.film_variables = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope="clear")
+        self.film_network_saver = tf.train.Saver(max_to_keep=None, var_list=self.film_variables)
 
     def get_input_image(self):
         return self.input_image
