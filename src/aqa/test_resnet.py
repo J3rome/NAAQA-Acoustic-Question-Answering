@@ -115,6 +115,59 @@ def save_training_stats(stats_output_file, epoch_nb, train_accuracy, train_loss,
         json.dump(stats, f, indent=2, sort_keys=True)
 
 
+def preextract_features(sess, dataset, network_wrapper, resnet_ckpt_path, sets=['train', 'val', 'test'], output_folder_name="preprocessed"):
+
+    # FIXME: Config should be set automatically to raw when this option is used
+    assert dataset.is_raw_img(), "Config must be set to raw image"
+
+    input_image = network_wrapper.get_input_image()
+    feature_extractor = network_wrapper.get_feature_extractor()
+    feature_extractor_output_shape = [int(dim) for dim in feature_extractor.get_shape()[1:]]
+    output_folder = "%s/%s" % (dataset.root_folder_path, output_folder_name)
+
+    create_folder_if_necessary(output_folder)
+
+    # We want to process each scene only one time (Keep only game per scene)
+    dataset.keep_1_game_per_scene()
+
+    sess.run(tf.global_variables_initializer())
+
+    network_wrapper.restore_feature_extractor_weights(sess, resnet_ckpt_path)
+
+    for set_type in sets:
+        print("Extracting feature for set '%s'" % set_type)
+        batches = dataset.get_batches(set_type)
+        nb_games = batches.get_nb_games()
+        output_filepath = "%s/%s_features.h5" % (output_folder, set_type)
+        batch_size = batches.batch_size
+
+        # TODO : Add check to see if file already exist
+        with h5py.File(output_filepath, 'w') as f:
+            h5_dataset = f.create_dataset('features', shape=[nb_games] + feature_extractor_output_shape, dtype=np.float32)
+            h5_idx2img = f.create_dataset('idx2img', shape=[nb_games], dtype=np.int32)
+            h5_idx = 0
+
+            for batch in tqdm(batches):
+                feed_dict = {
+                    input_image: np.array(batch['image'])
+                }
+                features = sess.run(feature_extractor, feed_dict=feed_dict)
+
+                h5_dataset[h5_idx: h5_idx + batch_size] = features
+
+                for i, game in enumerate(batch['raw']):
+                    h5_idx2img[h5_idx + i] = game.image.id
+
+                h5_idx += batch_size
+
+        print("%s set features extracted to '%s'." % (set_type, output_filepath))
+
+    with open('%s/feature_shape.json' % output_folder, 'w') as f:
+        json.dump({
+            "extracted_feature_shape" : feature_extractor_output_shape
+        }, f, indent=2)
+
+
 def do_one_epoch(sess, batchifier, network_wrapper, outputs_var, keep_results=False):
     # check for optimizer to define training/eval mode
     is_training = any([is_optimizer(x) for x in outputs_var])
@@ -276,59 +329,6 @@ def do_test_inference(sess, dataset, network_wrapper, output_folder, film_ckpt_p
 
 def do_visualization():
     return 1
-
-
-def preextract_features(sess, dataset, network_wrapper, resnet_ckpt_path, sets=['train', 'val', 'test'], output_folder_name="preprocessed"):
-
-    # FIXME: Config should be set automatically to raw when this option is used
-    assert dataset.is_raw_img(), "Config must be set to raw image"
-
-    input_image = network_wrapper.get_input_image()
-    feature_extractor = network_wrapper.get_feature_extractor()
-    feature_extractor_output_shape = [int(dim) for dim in feature_extractor.get_shape()[1:]]
-    output_folder = "%s/%s" % (dataset.root_folder_path, output_folder_name)
-
-    create_folder_if_necessary(output_folder)
-
-    # We want to process each scene only one time (Keep only game per scene)
-    dataset.keep_1_game_per_scene()
-
-    sess.run(tf.global_variables_initializer())
-
-    network_wrapper.restore_feature_extractor_weights(sess, resnet_ckpt_path)
-
-    for set_type in sets:
-        print("Extracting feature for set '%s'" % set_type)
-        batches = dataset.get_batches(set_type)
-        nb_games = batches.get_nb_games()
-        output_filepath = "%s/%s_features.h5" % (output_folder, set_type)
-        batch_size = batches.batch_size
-
-        # TODO : Add check to see if file already exist
-        with h5py.File(output_filepath, 'w') as f:
-            h5_dataset = f.create_dataset('features', shape=[nb_games] + feature_extractor_output_shape, dtype=np.float32)
-            h5_idx2img = f.create_dataset('idx2img', shape=[nb_games], dtype=np.int32)
-            h5_idx = 0
-
-            for batch in tqdm(batches):
-                feed_dict = {
-                    input_image: np.array(batch['image'])
-                }
-                features = sess.run(feature_extractor, feed_dict=feed_dict)
-
-                h5_dataset[h5_idx: h5_idx + batch_size] = features
-
-                for i, game in enumerate(batch['raw']):
-                    h5_idx2img[h5_idx + i] = game.image.id
-
-                h5_idx += batch_size
-
-        print("%s set features extracted to '%s'." % (set_type, output_filepath))
-
-    with open('%s/feature_shape.json' % output_folder, 'w') as f:
-        json.dump({
-            "extracted_feature_shape" : feature_extractor_output_shape
-        }, f, indent=2)
 
 
 def main():
