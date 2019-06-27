@@ -82,6 +82,15 @@ def create_folder_if_necessary(folder_path, overwrite_folder=False):
         os.mkdir(folder_path)
 
 
+def create_symlink_to_latest_folder(experiment_folder, dated_folder_name, symlink_name='latest'):
+    symlink_path = "%s/%s" % (experiment_folder, symlink_name)
+    if os.path.isdir(symlink_path):
+        # Remove the previous symlink before creating a new one
+        os.remove(symlink_path)
+
+    subprocess.run('cd %s && ln -s %s %s' % (experiment_folder, dated_folder_name, symlink_name), shell=True)
+
+
 def save_training_stats(stats_output_file, epoch_nb, train_accuracy, train_loss, val_accuracy, val_loss):
     """
     Will read the stats file from disk and append new epoch stats (Will create the file if not present)
@@ -320,8 +329,9 @@ def main():
     output_root_folder = "output"
     output_task_folder = "%s/%s" % (output_root_folder, task)
     output_experiment_folder = "%s/%s" %(output_task_folder, experiment_name)
-    now = datetime.now()
-    output_dated_folder = "%s/%s" % (output_experiment_folder, now.strftime("%Y-%m-%d_%Hh%M"))
+    current_datetime = datetime.now()
+    current_datetime_str = current_datetime.strftime("%Y-%m-%d_%Hh%M")
+    output_dated_folder = "%s/%s" % (output_experiment_folder, current_datetime_str)
 
     experiment_date = "2019-06-13_02h46"
     film_ckpt_path = "%s/train_film/%s/%s/best/checkpoint.ckpt" % (output_root_folder, experiment_name, experiment_date)
@@ -369,7 +379,7 @@ def main():
     }
 
 
-    restore_feature_extractor_weights = True if film_model_config['input']['type'] != 'conv' else False  # FIXME :
+    restore_feature_extractor_weights = True if film_model_config['input']['type'] != 'conv' else False
     restore_film_weights = True if "inference" in task else False
     create_output_folder = True if not 'pre' in task else False
 
@@ -378,11 +388,11 @@ def main():
 
     if create_output_folder:
         # TODO : See if this is optimal file structure
-        # Creating output folders       # TODO : Might not want to creat all the folders all the time
         create_folder_if_necessary(output_root_folder)
         create_folder_if_necessary(output_task_folder)
         create_folder_if_necessary(output_experiment_folder)
         create_folder_if_necessary(output_dated_folder)
+        create_symlink_to_latest_folder(output_experiment_folder, current_datetime_str)
 
     ########################################################
     ################### Data Loading #######################
