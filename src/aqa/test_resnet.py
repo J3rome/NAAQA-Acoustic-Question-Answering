@@ -230,6 +230,12 @@ def do_test_inference(sess, dataset, network_wrapper, output_folder, set_name="t
                 'correct': bool(result == batch['raw'][i].answer)
             })
 
+    # Batches are required to have always the same size.
+    # We don't want the batch padding to interfere with the test accuracy.
+    # We removed the padded (duplicated) examples
+    if test_batches.nb_padded_in_last_batch > 0:
+        processed_results = processed_results[:-test_batches.nb_padded_in_last_batch]
+
     nb_correct = sum(1 for r in processed_results if r['correct'])
     nb_results = len(processed_results)
     accuracy = nb_correct/nb_results

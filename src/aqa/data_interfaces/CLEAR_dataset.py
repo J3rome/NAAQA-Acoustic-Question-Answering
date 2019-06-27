@@ -150,12 +150,14 @@ class CLEARBatchifier(object):
             i += batch_size
 
         # FIXME : Do we really need this ?
+        self.nb_padded_in_last_batch = 0
         if pad_batches:
             # Pad last batch if needed
             last_batch_len = len(batches[-1])
             if last_batch_len < batch_size:
                 no_missing = batch_size - last_batch_len
                 batches[-1] += batches[0][:no_missing]
+                self.nb_padded_in_last_batch = no_missing
 
         self.batches = batches
         self.batch_index = 0
