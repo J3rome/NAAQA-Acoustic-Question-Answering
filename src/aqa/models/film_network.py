@@ -20,11 +20,11 @@ def film_layer(ft, context, reuse=False):
     width = int(ft.get_shape()[2])
     feature_size = int(ft.get_shape()[3])
 
-    film_params_vector = slim.fully_connected(context,
-                                       num_outputs=2 * feature_size,
-                                       activation_fn=None,
-                                       reuse=reuse,
-                                       scope="film_projection")
+    film_params_vector = tfc_layers.fully_connected(context,
+                                         num_outputs=2 * feature_size,
+                                         activation_fn=None,
+                                         reuse=reuse,
+                                         scope="film_projection")
 
     film_params = tf.expand_dims(film_params_vector, axis=[1])
     film_params = tf.expand_dims(film_params, axis=[1])
@@ -53,29 +53,30 @@ class FiLMResblock(object):
             features = model_utils.append_spatial_location(features)
 
         # First convolution
-        self.conv1_out = slim.conv2d(features,
-                                 num_outputs=feature_size,
-                                 kernel_size=kernel1,
-                                 activation_fn=tf.nn.relu,
-                                 scope='conv1',
-                                 reuse=reuse)
+        self.conv1_out = tfc_layers.conv2d(features,
+                          num_outputs=feature_size,
+                          kernel_size=kernel1,
+                          activation_fn=tf.nn.relu,
+                          scope='conv1',
+                          reuse=reuse)
 
         # Second convolution
-        self.conv2 = slim.conv2d(self.conv1_out,
-                                 num_outputs=feature_size,
-                                 kernel_size=kernel2,
-                                 activation_fn=None,
-                                 scope='conv2',
-                                 reuse=reuse)
+        self.conv2 = tfc_layers.conv2d(self.conv1_out,
+                          num_outputs=feature_size,
+                          kernel_size=kernel2,
+                          activation_fn=None,
+                          scope='conv2',
+                          reuse=reuse)
 
-        # Center/reduce output (Batch Normalization with no training parameters)
-        self.conv2_bn = slim.batch_norm(self.conv2,
-                                        center=False,
-                                        scale=False,
-                                        scope='conv2_bn',
-                                        decay=0.9,
-                                        is_training=is_training,
-                                        reuse=reuse)
+        with tf.variable_scope("conv2", reuse=reuse):
+            # Center/reduce output (Batch Normalization with no training parameters)
+            self.conv2_bn = tfc_layers.batch_norm(self.conv2,
+                                  center=False,
+                                  scale=False,
+                                  scope='bn',
+                                  decay=0.9,
+                                  is_training=is_training,
+                                  reuse=reuse)
 
         # Apply FILM layer Residual connection
         with tf.variable_scope("FiLM", reuse=reuse):
@@ -100,6 +101,9 @@ class FiLM_Network(ResnetModel):
 
             self.batch_size = None
             self._is_training = tf.placeholder(tf.bool, name="is_training")
+
+            self._is_training_batch_norm = tf.placeholder(tf.bool, name="is_training_batch_norm")
+            batch_norm_config = {"is_training": self._is_training_batch_norm, "scale" : True, 'reuse' : reuse, "scope": "bn", 'decay': 0.9}
 
             dropout_keep_scalar = float(config.get("dropout_keep_prob", 1.0))
             dropout_keep = tf.cond(self._is_training,
@@ -158,8 +162,8 @@ class FiLM_Network(ResnetModel):
                 self.stem_conv = tfc_layers.conv2d(stem_features,
                                                    num_outputs=config["stem"]["conv_out"],
                                                    kernel_size=config["stem"]["conv_kernel"],
-                                                   normalizer_fn=tf.layers.batch_normalization,
-                                                   normalizer_params={"training": self._is_training, "reuse": reuse},
+                                                   normalizer_fn=tfc_layers.batch_norm,
+                                                   normalizer_params=batch_norm_config,
                                                    activation_fn=tf.nn.relu,
                                                    reuse=reuse,
                                                    scope="stem_conv")
@@ -182,7 +186,7 @@ class FiLM_Network(ResnetModel):
                                                  kernel1=config["resblock"]["kernel1"],
                                                  kernel2=config["resblock"]["kernel2"],
                                                  spatial_location=config["resblock"]["spatial_location"],
-                                                 is_training=self._is_training,
+                                                 is_training=self._is_training_batch_norm,
                                                  reuse=reuse)
 
                         self.resblocks.append(resblock)
@@ -202,8 +206,8 @@ class FiLM_Network(ResnetModel):
                 self.classif_conv = tfc_layers.conv2d(classif_features,
                                                       num_outputs=config["classifier"]["conv_out"],
                                                       kernel_size=config["classifier"]["conv_kernel"],
-                                                      normalizer_fn=tf.layers.batch_normalization,
-                                                      normalizer_params={"training": self._is_training, "reuse": reuse},
+                                                      normalizer_fn=tfc_layers.batch_norm,
+                                                      normalizer_params=batch_norm_config,
                                                       activation_fn=tf.nn.relu,
                                                       reuse=reuse,
                                                       scope="classifier_conv")
@@ -212,8 +216,8 @@ class FiLM_Network(ResnetModel):
 
                 self.hidden_state = tfc_layers.fully_connected(self.max_pool,
                                                                num_outputs=config["classifier"]["no_mlp_units"],
-                                                               normalizer_fn=tf.layers.batch_normalization,
-                                                               normalizer_params= {"training": self._is_training, "reuse": reuse},
+                                                               normalizer_fn=tfc_layers.batch_norm,
+                                                               normalizer_params= batch_norm_config,
                                                                activation_fn=tf.nn.relu,
                                                                reuse=reuse,
                                                                scope="classifier_hidden_layer")
@@ -248,6 +252,7 @@ class FiLM_Network(ResnetModel):
             image_var = self._image
 
         return {
+            self._is_training_batch_norm: is_training,
             self._is_training : is_training,
             self._question : question,
             self._answer : answer,
