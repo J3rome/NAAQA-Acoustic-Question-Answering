@@ -26,7 +26,8 @@ def create_resnet(image_input, is_training, scope="", chosen_layer="block4", res
     else:
         raise ValueError("Unsupported resnet version")
 
-    resnet_scope = os.path.join('resnet_v1_{}/'.format(resnet_version), chosen_layer)
+    resnet_network_scope = 'resnet_v1_{}'.format(resnet_version)
+    resnet_scope = os.path.join(resnet_network_scope, chosen_layer)
 
     with slim.arg_scope(slim_utils.resnet_arg_scope()):
         net, end_points = resnet_network(image_input, 1000, is_training=is_training)  # 1000 is the number of softmax class
@@ -39,6 +40,6 @@ def create_resnet(image_input, is_training, scope="", chosen_layer="block4", res
     # FIXME : Shouldn't have a significant performance impact since the floating nodes won't be executed
     chosen_resnet_layer = end_points[scope + resnet_scope]
 
-    resnet_variables = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope=resnet_scope)
+    resnet_variables = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope=resnet_network_scope)
 
     return chosen_resnet_layer, resnet_variables
