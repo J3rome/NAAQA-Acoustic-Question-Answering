@@ -1,20 +1,22 @@
 import argparse
 from collections import defaultdict
 from _datetime import datetime
-import json
 import os
 import subprocess
-import random
 
 import tensorflow as tf
 from tqdm import tqdm
 import numpy as np
 import h5py
+import ujson
 
-from aqa.models.film_network_wrapper import FiLM_Network_Wrapper
-from aqa.data_interfaces.CLEAR_dataset import CLEARDataset
-from aqa.data_interfaces.CLEAR_tokenizer import CLEARTokenizer
-from aqa.model_handlers.optimizer import create_optimizer
+from utils import set_random_seed, create_folder_if_necessary, get_config
+from utils import create_symlink_to_latest_folder, save_training_stats, save_inference_results
+from utils import is_tensor_optimizer, is_tensor_prediction, is_tensor_scalar
+
+from models.film_network_wrapper import FiLM_Network_Wrapper
+from data_interfaces.CLEAR_dataset import CLEARDataset
+from data_interfaces.CLEAR_tokenizer import CLEARTokenizer
 
 parser = argparse.ArgumentParser('FiLM model for CLEAR Dataset (Acoustic Question Answering)', fromfile_prefix_chars='@')
 
@@ -52,88 +54,6 @@ parser.add_argument("--random_seed", type=int, default=None, help="Random seed u
 #       Run from Raw Images (Resnet With fixed weights)
 #       Run from Raw Images with VISUALIZATION
 #
-#   Parameters (USE THE CONFIG FILE, keep number of parameters down) :
-#       experiment_name
-#       resnet_cpkt
-#       resnet_chosen_layer
-#       dict_path
-#
-#       config_file_path
-#       mode (Task...train,run,visualization,etc)
-#       tensorboard_log_dir (If None, no logging)
-#       Output Path (Trained models, visualization, etc)
-#
-
-def set_random_seed(seed):
-    random.seed(seed)
-    np.random.seed(seed)
-    tf.random.set_random_seed(seed)
-
-
-# TODO : Move some place else
-# TODO check if optimizers are always ops? Maybe there is a better check
-def is_optimizer(x):
-    return hasattr(x, 'op_def')
-
-def is_summary(x):
-    return (isinstance(x, tf.Tensor) and x.dtype is tf.string)
-
-
-def is_float(x):
-    return isinstance(x, tf.Tensor) and x.dtype is tf.float32
-
-
-def is_scalar(x):
-    return isinstance(x, tf.Tensor) and x.dtype is tf.float32 and len(x.shape) == 0
-
-
-def is_list_int(x):
-    return isinstance(x, tf.Tensor) and x.dtype is tf.int64 and len(x.shape) == 1
-
-
-def is_prediction(x):
-    return isinstance(x, tf.Tensor) and 'predicted_answer' in x.name
-
-
-def create_folder_if_necessary(folder_path, overwrite_folder=False):
-    if not os.path.isdir(folder_path):
-        os.mkdir(folder_path)
-    elif overwrite_folder:
-        os.rmdir(folder_path)
-        os.mkdir(folder_path)
-
-
-def create_symlink_to_latest_folder(experiment_folder, dated_folder_name, symlink_name='latest'):
-    symlink_path = "%s/%s" % (experiment_folder, symlink_name)
-    if os.path.isdir(symlink_path) or (os.path.exists(symlink_path) and not os.path.exists(os.readlink(symlink_path))):
-        # Remove the previous symlink before creating a new one (We readlink to recover in case of broken symlink)
-        os.remove(symlink_path)
-
-    subprocess.run('cd %s && ln -s %s %s' % (experiment_folder, dated_folder_name, symlink_name), shell=True)
-
-
-def save_training_stats(stats_output_file, epoch_nb, train_accuracy, train_loss, val_accuracy, val_loss):
-    """
-    Will read the stats file from disk and append new epoch stats (Will create the file if not present)
-    """
-    if os.path.isfile(stats_output_file):
-        with open(stats_output_file, 'r') as f:
-            stats = json.load(f)
-    else:
-        stats = []
-
-    stats.append({
-        'epoch': "epoch_%.3d" % (epoch_nb + 1),
-        'train_acc': train_accuracy,
-        'train_loss': train_loss,
-        'val_accuracy': val_accuracy,
-        'val_loss': val_loss
-    })
-
-    stats = sorted(stats, key=lambda e: e['val_loss'])
-
-    with open(stats_output_file, 'w') as f:
-        json.dump(stats, f, indent=2, sort_keys=True)
 
 
 def preextract_features(sess, dataset, network_wrapper, resnet_ckpt_path, sets=['train', 'val', 'test'], output_folder_name="preprocessed"):
@@ -184,7 +104,7 @@ def preextract_features(sess, dataset, network_wrapper, resnet_ckpt_path, sets=[
         print("%s set features extracted to '%s'." % (set_type, output_filepath))
 
     with open('%s/feature_shape.json' % output_folder, 'w') as f:
-        json.dump({
+        ujson.dump({
             "extracted_feature_shape" : feature_extractor_output_shape
         }, f, indent=2)
 
@@ -212,7 +132,7 @@ def process_predictions(dataset, predictions, raw_batch):
 
 def do_one_epoch(sess, batchifier, network_wrapper, outputs_var, keep_results=False):
     # check for optimizer to define training/eval mode
-    is_training = any([is_optimizer(x) for x in outputs_var])
+    is_training = any([is_tensor_optimizer(x) for x in outputs_var])
 
     aggregated_outputs = defaultdict(lambda : [])
     processed_predictions = []
@@ -224,19 +144,19 @@ def do_one_epoch(sess, batchifier, network_wrapper, outputs_var, keep_results=Fa
         results = sess.run(outputs_var, feed_dict=feed_dict)
 
         for var, result in zip(outputs_var, results):
-            if is_scalar(var) and var in outputs_var:
+            if is_tensor_scalar(var) and var in outputs_var:
                 aggregated_outputs[var].append(result)
 
-            elif is_prediction(var) and keep_results:
+            elif is_tensor_prediction(var) and keep_results:
 
                 aggregated_outputs[var] = True
 
                 processed_predictions += process_predictions(network_wrapper.get_dataset(), result, batch['raw'])
 
     for var in aggregated_outputs.keys():
-        if is_scalar(var):
+        if is_tensor_scalar(var):
             aggregated_outputs[var] = np.mean(aggregated_outputs[var]).item()
-        elif is_prediction(var):
+        elif is_tensor_prediction(var):
             aggregated_outputs[var] = processed_predictions
 
     to_return = list(aggregated_outputs.values())
@@ -252,7 +172,7 @@ def do_film_training(sess, dataset, network_wrapper, optimizer_config, resnet_ck
     stats_file_path = "%s/stats.json" % output_folder
 
     # Setup optimizer (For training)
-    optimize_step, [loss, accuracy] = create_optimizer(network_wrapper.get_network(), optimizer_config, var_list=None)  # TODO : Var_List should contain only film variables
+    optimize_step, [loss, accuracy] = network_wrapper.create_optimizer(optimizer_config, var_list=None)  # TODO : Var_List should contain only film variables
 
     prediction = network_wrapper.get_network_prediction()
 
@@ -268,6 +188,21 @@ def do_film_training(sess, dataset, network_wrapper, optimizer_config, resnet_ck
     if dataset.is_raw_img():
         sess.run(tf.variables_initializer(network_wrapper.feature_extractor_variables))
         network_wrapper.restore_feature_extractor_weights(sess, resnet_ckpt_path)
+
+    ##################################
+    # TESTING
+    #stem_conv_weights = [v for v in tf.trainable_variables() if v.name == 'clear/stem/stem_conv/weights:0'][0]
+    #stem_conv_weights = sess.run(stem_conv_weights)
+    #stem_conv_weights = stem_conv_weights.tolist()
+
+    #with open('saved_stem_conv_weights_full4.json', 'w') as f:
+    #    json.dump(stem_conv_weights, f, indent=2)
+
+    #moving_parameters = [v for v in tf.global_variables() if ('moving' in v.name) and 'Adam' not in v.name]
+    #gamma_beta_parameters = [v for v in tf.global_variables() if ('gamma' in v.name or 'beta' in v.name) and 'Adam' not in v.name and 'power' not in v.name]
+
+    ##################################
+
     stats = []
 
     # Training Loop
@@ -314,9 +249,6 @@ def do_film_training(sess, dataset, network_wrapper, optimizer_config, resnet_ck
     best_epoch = sorted(stats, key=lambda s: s['val_accuracy'], reverse=True)[0]['epoch']
     subprocess.run("cd %s && ln -s Epoch_%.2d best" % (output_folder, best_epoch), shell=True)
 
-def save_inference_results(results, output_folder, filename="results.json"):
-    with open("%s/%s" % (output_folder, filename), 'w') as f:
-        json.dump(results, f, indent=2)
 
 def do_test_inference(sess, dataset, network_wrapper, output_folder, film_ckpt_path, resnet_ckpt_path, set_name="test"):
     test_batches = dataset.get_batches(set_name, shuffled=False)
@@ -396,19 +328,10 @@ def create_dict_from_questions(dataset, word_min_occurence=1, dict_filename='dic
         os.mkdir(preprocessed_folder_path)
 
     with open(dict_file_path, 'w') as f:
-        json.dump({
+        ujson.dump({
             'word2i': word2i,
             'answer2i': answer2i
         }, f, indent=2)
-
-
-def do_visualization():
-    return 1
-
-
-def get_config(config_path):
-    with open(config_path) as f:
-        return json.load(f)
 
 
 def main(args):
@@ -505,10 +428,10 @@ def main(args):
 
     if create_output_folder:
         with open('%s/config_%s.json' % (output_dated_folder, film_model_config['input']['type']), 'w') as f:
-            json.dump(film_model_config, f, indent=2)
+            ujson.dump(film_model_config, f, indent=2)
 
         with open('%s/timing.json' % output_dated_folder, 'w') as f:
-            json.dump({'time_elapsed': time_elapsed}, f, indent=2)
+            ujson.dump({'time_elapsed': time_elapsed}, f, indent=2)
 
         print("All Done")
 

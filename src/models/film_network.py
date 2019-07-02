@@ -1,11 +1,10 @@
 import tensorflow as tf
 import tensorflow.contrib.layers as tfc_layers
 import tensorflow.contrib.rnn as tfc_rnn
-import tensorflow.contrib.slim as slim
 
-from aqa.models.abstract_network import ResnetModel     # TODO : Verify, is this really usefull ?
+from models.abstract_network import ResnetModel     # TODO : Verify, is this really usefull ?
 
-import aqa.models.utils as model_utils
+import models.utils as model_utils
 
 def film_layer(ft, context, reuse=False):
     """
@@ -271,3 +270,41 @@ class FiLM_Network(ResnetModel):
 
     def get_prediction(self):
         return self.prediction
+
+    def create_optimizer(self, config, finetune=[], optimizer=tf.train.AdamOptimizer, var_list=None):
+
+        # Retrieve conf
+        lrt = config['learning_rate']
+        clip_val = config.get('clip_val', 0)
+        weight_decay = config.get('weight_decay', 0)
+
+        # create optimizer
+        optimizer = optimizer(learning_rate=lrt)
+
+        # Extract trainable variables if not provided
+        if var_list is None:
+            var_list = self.get_parameters(finetune=finetune)
+
+        # Apply weight decay
+        loss = self.get_loss()
+
+        # Apply weight decay
+        training_loss = loss
+        if weight_decay > 0:
+            training_loss = loss + model_utils.l2_regularization(var_list, weight_decay=weight_decay)
+
+        # compute gradient
+        grad = optimizer.compute_gradients(training_loss, var_list=var_list)
+
+        # apply gradient clipping
+        if clip_val > 0:
+            grad = model_utils.clip_gradient(grad, clip_val=clip_val)
+
+        # add update ops (such as batch norm) to the optimizer call
+        update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
+        with tf.control_dependencies(update_ops):
+            optimize = optimizer.apply_gradients(grad)
+
+        accuracy = self.get_accuracy()
+
+        return optimize, [loss, accuracy]

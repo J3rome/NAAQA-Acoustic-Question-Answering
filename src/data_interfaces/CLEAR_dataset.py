@@ -3,13 +3,12 @@ import math
 import random
 import collections
 import numpy as np
-from multiprocessing import Semaphore
-from multiprocessing.pool import ThreadPool
-from multiprocessing import Pool
+import time
+from tqdm import tqdm
 import os
 
-from aqa.data_interfaces.CLEAR_tokenizer import CLEARTokenizer
-from aqa.data_interfaces.CLEAR_image_loader import CLEARImage, get_img_builder
+from data_interfaces.CLEAR_tokenizer import CLEARTokenizer
+from data_interfaces.CLEAR_image_loader import CLEARImage, get_img_builder
 
 class Game(object):
     def __init__(self, id, image, question, answer):
@@ -25,7 +24,7 @@ class Game(object):
 class CLEARDataset(object):
     """Loads the CLEAR dataset."""
 
-    def __init__(self, folder, image_config, batch_size, sets=None, dict_file_path=None, preprocessing=False, tokenize_text=True):
+    def __init__(self, folder, image_config, batch_size, sets=None, dict_file_path=None, tokenize_text=True):
         if sets is None:
             self.sets = ['train', 'val', 'test']
         else:
@@ -43,10 +42,12 @@ class CLEARDataset(object):
         self.batch_size = batch_size
         self.image_builder = get_img_builder(image_config, folder, bufferize=None)    # TODO : Figure out buffersize
 
+        preprocessed_feature_shape_json_path = "{}/preprocessed/feature_shape.json".format(folder)
+
         if self.image_builder.is_raw_image():
             self.input_shape = image_config['dim']
-        elif not preprocessing:
-            with open("{}/preprocessed/feature_shape.json".format(folder)) as f:
+        elif os.path.isfile(preprocessed_feature_shape_json_path):
+            with open(preprocessed_feature_shape_json_path) as f:
                 self.input_shape = json.load(f)['extracted_feature_shape']
 
         with open("{}/attributes.json".format(folder)) as f:
@@ -73,7 +74,7 @@ class CLEARDataset(object):
             with open(question_file_path) as question_file:
                 data = json.load(question_file)
                 info = data["info"]
-                samples = data["questions"]
+                samples = data["questions"]#[:8*6]
 
                 for sample in samples:
 
@@ -125,20 +126,15 @@ class CLEARDataset(object):
         return len(self.games)
 
 
+def create_semaphore_iterator(obj_list, semaphores):
+    for obj in obj_list:
+        semaphores.acquire()
+        yield obj
+
 class CLEARBatchifier(object):
     """Provides an generic multithreaded iterator over the dataset."""
 
-    def __init__(self, games, batch_size, tokenizer, nb_thread=3,   # FIXME : Make nb_thread param pop up
-                 shuffle= True, no_semaphore= 20, pad_batches=True):         # FIXME :No semaphore seem to be the same as batch size
-
-        # Define CPU pool
-        # CPU/GPU option
-        # h5 requires a Tread pool while raw images requires to create new process
-
-        #if image_builder.is_raw_image():
-        #    cpu_pool = Pool(nb_thread, maxtasksperchild=1000)
-        #pool = ThreadPool(nb_thread)
-        #pool._maxtasksperchild = 1000
+    def __init__(self, games, batch_size, tokenizer, shuffle= True, pad_batches=True):
 
         self.tokenizer = tokenizer
 
@@ -173,20 +169,11 @@ class CLEARBatchifier(object):
         self.batches = batches
         self.batch_index = 0
 
-
-        # Multi_proc iterator
-
-
-        #with ThreadPool(nb_thread) as pool:
-        #    self.semaphores = Semaphore(no_semaphore)
-        #    batches = create_semaphore_iterator(batches, self.semaphores)
-        #    self.process_iterator = pool.imap(self.load_batch, batches)
-
-
     def get_nb_games(self):
         return sum([len(b) for b in self.batches])
 
     def load_batch(self, games):
+        start_time = time.time()
 
         batch = collections.defaultdict(list)
         batch_size = len(games)
@@ -200,13 +187,19 @@ class CLEARBatchifier(object):
             batch['question'].append(game.question)
             batch['answer'].append(game.answer)
 
+            img_load_start_time = time.time()
             # retrieve the image source type
             img = game.image.get_image()    # FIXME : This is the thing that should be parallelize in a CPU Pool..
             if "image" not in batch: # initialize an empty array for better memory consumption
                 batch["image"] = np.zeros((batch_size,) + img.shape, dtype=np.float32)
             batch["image"][i] = img
 
-        batch['question'], batch['seq_length'] = self.tokenizer.pad_tokens(batch['question'])
+            #tqdm.write("Image loaded in %f" % (time.time() - img_load_start_time))
+
+        if self.tokenizer:
+            batch['question'], batch['seq_length'] = self.tokenizer.pad_tokens(batch['question'])
+
+        tqdm.write("Batch loaded in %f" % (time.time() - start_time))
 
         return batch
 

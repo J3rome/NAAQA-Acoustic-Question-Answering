@@ -1,6 +1,6 @@
-
 import tensorflow as tf
 import numpy as np
+import tensorflow.contrib.layers as tfc_layers
 
 def append_spatial_location(features, min_max = list([-1,1])):
 
@@ -26,7 +26,6 @@ def append_spatial_location(features, min_max = list([-1,1])):
     return features
 
 
-
 def pooling_to_shape(feature_maps, shape, pooling=tf.nn.avg_pool):
     cur_h = int(feature_maps.get_shape()[1])
     cur_w = int(feature_maps.get_shape()[2])
@@ -40,3 +39,19 @@ def pooling_to_shape(feature_maps, shape, pooling=tf.nn.avg_pool):
     return reduce_fm
 
 
+def clip_gradient(gvs, clip_val):
+    clipped_gvs = [(tf.clip_by_norm(grad, clip_val), var) for grad, var in gvs]
+    return clipped_gvs
+
+
+def l2_regularization(params, weight_decay):
+    with tf.variable_scope("l2_normalization"):
+
+        # Old code (faster but handcrafted)
+        # l2_reg = [tf.nn.l2_loss(v) for v in params]
+        # l2_reg = weight_decay * tf.add_n(l2_reg)
+
+        weights_list = [v for v in params if v.name.endswith("weights:0")]
+        regularizer = tfc_layers.l2_regularizer(scale=weight_decay)
+
+        return tfc_layers.apply_regularization(regularizer, weights_list=weights_list)

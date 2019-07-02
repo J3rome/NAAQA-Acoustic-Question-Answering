@@ -1,9 +1,9 @@
 import tensorflow as tf
-from aqa.models.resnet import create_resnet
-from aqa.models.film_network import FiLM_Network
+from models.resnet import create_resnet
+from models.film_network import FiLM_Network
 
 class FiLM_Network_Wrapper():
-    def __init__(self, config, dataset):
+    def __init__(self, config, dataset, preprocessing=False):
 
         self.config = config
         self.dataset = dataset
@@ -33,14 +33,15 @@ class FiLM_Network_Wrapper():
             print("[ERROR] input type '%s' not implemented." % self.config['input']['type'])
             exit(1)
 
-        # Adding the FiLM network after the chosen resnet layer
-        self.film_network = FiLM_Network(config, input_image_tensor=film_input_tensor,
-                               no_words=dataset.tokenizer.no_words, no_answers=dataset.tokenizer.no_answers,
-                               device=0)  # FIXME : Not sure that device 0 is appropriate for CPU
+        if not preprocessing:
+            # Adding the FiLM network after the chosen resnet layer
+            self.film_network = FiLM_Network(config, input_image_tensor=film_input_tensor,
+                                    no_words=dataset.tokenizer.no_words, no_answers=dataset.tokenizer.no_answers,
+                                    device=0)  # FIXME : Not sure that device 0 is appropriate for CPU
 
         #self.network.get_parameters()      # FIXME : network.get_parameters() doesn't return the moving_mean
-        self.film_variables = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope="clear")
-        self.film_network_saver = tf.train.Saver(max_to_keep=None, var_list=self.film_variables)
+            self.film_variables = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope="clear")
+            self.film_network_saver = tf.train.Saver(max_to_keep=None, var_list=self.film_variables)
 
     def get_dataset(self):
         return self.dataset
@@ -73,3 +74,6 @@ class FiLM_Network_Wrapper():
 
     def get_feed_dict(self, is_training, question, answer, image, seq_length):
         return self.film_network.get_feed_dict(is_training, question, answer, image, seq_length, image_var=self.input_image)
+
+    def create_optimizer(self, config, var_list=None):
+        return self.film_network.create_optimizer(config, var_list=var_list)
