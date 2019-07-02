@@ -13,6 +13,7 @@ import h5py
 
 from aqa.models.film_network_wrapper import FiLM_Network_Wrapper
 from aqa.data_interfaces.CLEAR_dataset import CLEARDataset
+from aqa.data_interfaces.CLEAR_tokenizer import CLEARTokenizer
 from aqa.model_handlers.optimizer import create_optimizer
 
 parser = argparse.ArgumentParser('FiLM model for CLEAR Dataset (Acoustic Question Answering)', fromfile_prefix_chars='@')
@@ -21,6 +22,8 @@ parser.add_argument("--training", help="FiLM model training", action='store_true
 parser.add_argument("--inference", help="FiLM model inference", action='store_true')
 parser.add_argument("--preprocessing", help="Data preprocessing (Word tokenization & Feature Pre-Extraction",
                     action='store_true')
+parser.add_argument("--feature_extract", help="Feature Pre-Extraction", action='store_true')
+parser.add_argument("--create_dict", help="Create word dictionary (for tokenization)", action='store_true')
 
 # Input parameters
 parser.add_argument("--data_root_path", type=str, default='data', help="Directory with data")
@@ -352,6 +355,53 @@ def do_test_inference(sess, dataset, network_wrapper, output_folder, film_ckpt_p
     print("Test set accuracy : %f" % accuracy)
 
 
+def create_dict_from_questions(dataset, word_min_occurence=1, dict_filename='dict.json'):
+    # FIXME : Should we use the whole dataset to create the dictionary ?
+    games = dataset.games['train']
+
+    word2i = {'<padding>': 0,
+              '<unk>': 1
+              }
+
+    answer2i = {  # '<padding>': 0,        # FIXME : Why would we need padding in the answers ?
+        '<unk>': 0  # FIXME : We have no training example with unkonwn answer. Add Switch to remove unknown answer
+    }
+
+    answer2occ = dataset.answer_counter['train']
+    word2occ = defaultdict(int)
+
+    tokenizer = CLEARTokenizer.get_tokenizer_inst()
+
+    for game in games:
+        input_tokens = tokenizer.tokenize(game.question)
+        for tok in input_tokens:
+            word2occ[tok] += 1
+
+    # parse the questions
+    for word, occ in word2occ.items():
+        if occ >= word_min_occurence:
+            word2i[word] = len(word2i)
+
+    # parse the answers
+    for answer in answer2occ.keys():
+        answer2i[answer] = len(answer2i)
+
+    print("Number of words: {}".format(len(word2i)))
+    print("Number of answers: {}".format(len(answer2i)))
+
+    preprocessed_folder_path = os.path.join(dataset.root_folder_path, 'preprocessed')
+    dict_file_path = os.path.join(preprocessed_folder_path, dict_filename)
+
+    if not os.path.isdir(preprocessed_folder_path):
+        os.mkdir(preprocessed_folder_path)
+
+    with open(dict_file_path, 'w') as f:
+        json.dump({
+            'word2i': word2i,
+            'answer2i': answer2i
+        }, f, indent=2)
+
+
 def do_visualization():
     return 1
 
@@ -363,16 +413,26 @@ def get_config(config_path):
 
 def main(args):
 
-    if 0 < sum([args.training, args.preprocessing, args.inference]) > 1:
+    if 0 < sum([args.training, args.preprocessing, args.inference, args.feature_extract, args.create_dict]) > 1:
         print("[ERROR] Can only do one task at a time (--training, --preprocessing or --inference)")
         exit(1)
 
+    is_preprocessing = False
+
     if args.training:
         task = "train_film"
-    elif args.preprocessing:
-        task = "preprocessing"
     elif args.inference:
         task = "inference"
+    elif args.preprocessing:
+        task = "full_preprocessing"
+        is_preprocessing = True
+    elif args.feature_extract:
+        task = "feature_extract"
+        is_preprocessing = True
+    elif args.create_dict:
+        task = "create_dict"
+        is_preprocessing = True
+
 
     if args.random_seed is not None:
         set_random_seed(args.random_seed)
@@ -396,7 +456,7 @@ def main(args):
 
     film_model_config = get_config(args.config_path)
 
-    create_output_folder = not args.preprocessing
+    create_output_folder = not is_preprocessing
 
     if create_output_folder:
         # TODO : See if this is optimal file structure
@@ -409,12 +469,13 @@ def main(args):
     ########################################################
     ################### Data Loading #######################
     ########################################################
-    dataset = CLEARDataset(data_path, film_model_config['input'], batch_size=args.batch_size, preprocessing=args.preprocessing)
+    dataset = CLEARDataset(data_path, film_model_config['input'],
+                           batch_size=args.batch_size, tokenize_text=not is_preprocessing)
 
     ########################################################
     ################## Network Setup #######################
     ########################################################
-    network_wrapper = FiLM_Network_Wrapper(film_model_config, dataset)
+    network_wrapper = FiLM_Network_Wrapper(film_model_config, dataset, preprocessing=is_preprocessing)
 
     with tf.Session(config=tf.ConfigProto(gpu_options=tf.GPUOptions(allow_growth=True), allow_soft_placement=True)) as sess:
         # Debugging Tools
@@ -427,7 +488,12 @@ def main(args):
         elif task == "inference":
             do_test_inference(sess, dataset, network_wrapper, output_dated_folder,
                               args.film_ckpt_path, args.resnet_ckpt_path, set_name=args.inference_set)
-        elif task == "preprocessing":
+        elif task == "feature_extract":
+            preextract_features(sess, dataset, network_wrapper, args.resnet_ckpt_path)
+        elif task == "create_dict":
+            create_dict_from_questions(dataset)
+        elif task == "full_preprocessing":
+            create_dict_from_questions(dataset)
             preextract_features(sess, dataset, network_wrapper, args.resnet_ckpt_path)
 
         time_elapsed = str(datetime.now() - current_datetime)
