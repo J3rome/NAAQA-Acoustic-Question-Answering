@@ -1,23 +1,19 @@
-import tensorflow as tf
-from tqdm import tqdm
-import numpy as np
-import h5py
+import argparse
 from collections import defaultdict
 from _datetime import datetime
 import json
 import os
 import subprocess
 import random
-from collections import OrderedDict
 
-from tensorflow.python import debug as tf_debug
+import tensorflow as tf
+from tqdm import tqdm
+import numpy as np
+import h5py
 
-from aqa.models.film_network import FiLM_Network
-from aqa.data_interfaces.CLEAR_tokenizer import CLEARTokenizer
 from aqa.models.film_network_wrapper import FiLM_Network_Wrapper
-from aqa.data_interfaces.CLEAR_dataset import CLEARDataset, CLEARBatchifier
+from aqa.data_interfaces.CLEAR_dataset import CLEARDataset
 from aqa.model_handlers.optimizer import create_optimizer
-from aqa.models.resnet import create_resnet
 
 
 
