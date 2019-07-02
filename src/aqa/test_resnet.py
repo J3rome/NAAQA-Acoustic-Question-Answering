@@ -80,7 +80,7 @@ def create_folder_if_necessary(folder_path, overwrite_folder=False):
 
 def create_symlink_to_latest_folder(experiment_folder, dated_folder_name, symlink_name='latest'):
     symlink_path = "%s/%s" % (experiment_folder, symlink_name)
-    if os.path.isdir(symlink_path) or not os.path.exists(os.readlink(symlink_path)):
+    if os.path.isdir(symlink_path) or (os.path.exists(symlink_path) and not os.path.exists(os.readlink(symlink_path))):
         # Remove the previous symlink before creating a new one (We readlink to recover in case of broken symlink)
         os.remove(symlink_path)
 
