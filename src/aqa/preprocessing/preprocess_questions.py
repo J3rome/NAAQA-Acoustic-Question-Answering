@@ -28,7 +28,7 @@ if __name__ == '__main__':
               }
 
     answer2i = {#'<padding>': 0,        # FIXME : Why would we need padding in the answers ?
-                '<unk>': 0
+                '<unk>': 0              # FIXME : We have no training example with unkonwn answer. Add Switch to remove unknown answer
                 }
 
     answer2occ = dataset.answer_counter['train']

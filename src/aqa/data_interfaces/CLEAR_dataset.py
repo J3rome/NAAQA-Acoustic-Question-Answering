@@ -52,7 +52,7 @@ class CLEARDataset(object):
         with open("{}/attributes.json".format(folder)) as f:
             attributes = json.load(f)
 
-        self.answer_to_family = {}
+        self.answer_to_family = {"<unk>": "unknown"}       # FIXME : Quantify what is the impact of having an unknown answer
 
         for family, answers in attributes.items():
             for answer in answers:
