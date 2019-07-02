@@ -15,7 +15,29 @@ from aqa.models.film_network_wrapper import FiLM_Network_Wrapper
 from aqa.data_interfaces.CLEAR_dataset import CLEARDataset
 from aqa.model_handlers.optimizer import create_optimizer
 
+parser = argparse.ArgumentParser('FiLM model for CLEAR Dataset (Acoustic Question Answering)', fromfile_prefix_chars='@')
 
+parser.add_argument("--training", help="FiLM model training", action='store_true')
+parser.add_argument("--inference", help="FiLM model inference", action='store_true')
+parser.add_argument("--preprocessing", help="Data preprocessing (Word tokenization & Feature Pre-Extraction",
+                    action='store_true')
+
+# Input parameters
+parser.add_argument("--data_root_path", type=str, default='data', help="Directory with data")
+parser.add_argument("--version_name", type=str, help="Name of the dataset version")
+parser.add_argument("--resnet_ckpt_path", type=str, default=None, help="Path to resnet-101 ckpt file")
+parser.add_argument("--film_ckpt_path", type=str, default=None, help="Path to Film pretrained ckpt file")
+parser.add_argument("--config_path", type=str, default='config/film.json', help="Path to Film pretrained ckpt file")         # FIXME : Add default value
+parser.add_argument("--inference_set", type=str, default='test', help="Define on which set the inference should be runned")
+# TODO : Add option for custom test file
+
+# Output parameters
+parser.add_argument("-output_root_path", type=str, default='output', help="Directory with image")
+
+# Other parameters
+parser.add_argument("--nb_epoch", type=int, default=5, help="Nb of epoch for training")
+parser.add_argument("--batch_size", type=int, default=32, help="Batch size (For training and inference)")
+parser.add_argument("--random_seed", type=int, default=None, help="Random seed used for the experiment")
 
 
 # TODO : Arguments Handling
@@ -334,88 +356,51 @@ def do_visualization():
     return 1
 
 
-def main():
-    # TODO : Seed management
-    #task = "train_film"
-    #task = "test_inference"
-    task = "preextract_features"
+def get_config(config_path):
+    with open(config_path) as f:
+        return json.load(f)
 
-    # Parameters
-    nb_epoch = 5
-    nb_thread = 2
-    batch_size = 32
-    seed = 667
+
+def main(args):
+
+    if 0 < sum([args.training, args.preprocessing, args.inference]) > 1:
+        print("[ERROR] Can only do one task at a time (--training, --preprocessing or --inference)")
+        exit(1)
+
+    if args.training:
+        task = "train_film"
+    elif args.preprocessing:
+        task = "preprocessing"
+    elif args.inference:
+        task = "inference"
+
+    if args.random_seed is not None:
+        set_random_seed(args.random_seed)
 
     # Paths
-    root_folder = "data"
-    experiment_name = "v2.0.0_1k_scenes_1_inst_per_scene"
-    experiment_path = "%s/%s" % (root_folder, experiment_name)
-    resnet_ckpt_path = "%s/resnet/resnet_v1_101.ckpt" % root_folder
+    data_path = "%s/%s" % (args.data_root_path, args.version_name)
 
-    output_root_folder = "output"
-    output_task_folder = "%s/%s" % (output_root_folder, task)
-    output_experiment_folder = "%s/%s" %(output_task_folder, experiment_name)
+    output_task_folder = "%s/%s" % (args.output_root_path, task)
+    output_experiment_folder = "%s/%s" %(output_task_folder, args.version_name)
     current_datetime = datetime.now()
     current_datetime_str = current_datetime.strftime("%Y-%m-%d_%Hh%M")
     output_dated_folder = "%s/%s" % (output_experiment_folder, current_datetime_str)
 
-    experiment_date = "2019-06-13_02h46"
-    film_ckpt_path = "%s/train_film/%s/%s/best/checkpoint.ckpt" % (output_root_folder, experiment_name, experiment_date)
+    if args.resnet_ckpt_path is None:
+        args.resnet_ckpt_path = "%s/resnet/resnet_v1_101.ckpt" % args.data_root_path
 
-    # TODO : Output folder should contains info about the config used
-    # TODO : Read config from file
-    film_model_config = {
-        "input": {
-            "type": "raw",
-            "dim": [224, 224, 3],
-            #"type": "conv",
-            #"dim": [224, 224, 3],   # TODO : Those should be infered from the shape of input tensor
-        },
-        "feature_extractor": {
-            "type": "resnet",
-            "version": 101,
-            "output_layer": "block3/unit_22/bottleneck_v1"
-        },
-        "question": {
-            "word_embedding_dim": 200,
-            "rnn_state_size": 4096
-        },
-        "stem": {
-            "spatial_location": True,
-            "conv_out": 128,
-            "conv_kernel": [3, 3]
-        },
-        "resblock": {
-            "no_resblock": 4,
-            "spatial_location": True,
-            "kernel1": [1, 1],
-            "kernel2": [3, 3]
-        },
-        "classifier": {
-            "spatial_location": True,
-            "conv_out": 512,
-            "conv_kernel": [1, 1],
-            "no_mlp_units": 1024
-        },
-        'optimizer' : {
-            "learning_rate": 3e-4,
-            "clip_val": 0.0,
-            "weight_decay": 1e-5
-        }
-    }
+    if args.film_ckpt_path is None:
+        experiment_date = "2019-06-23_16h37"
+        #experiment_date = "latest"
+        args.film_ckpt_path = "%s/train_film/%s/%s/best/checkpoint.ckpt" % (args.output_root_path, args.version_name, experiment_date)
 
+    film_model_config = get_config(args.config_path)
 
-    restore_feature_extractor_weights = True if film_model_config['input']['type'] != 'conv' else False
-    restore_film_weights = True if "inference" in task else False
-    create_output_folder = True if not 'pre' in task else False
-    is_preprocessing_task = True if 'pre' in task else False
-
-    if seed is not None:
-        set_random_seed(seed)
+    create_output_folder = not args.preprocessing
 
     if create_output_folder:
         # TODO : See if this is optimal file structure
-        create_folder_if_necessary(output_root_folder)
+        create_folder_if_necessary(args.output_root_path)
         create_folder_if_necessary(output_task_folder)
         create_folder_if_necessary(output_experiment_folder)
         create_folder_if_necessary(output_dated_folder)
@@ -424,27 +409,26 @@ def main():
     ########################################################
     ################### Data Loading #######################
     ########################################################
-    dataset = CLEARDataset(experiment_path, film_model_config['input'], batch_size=batch_size, preprocessing=is_preprocessing_task)
+    dataset = CLEARDataset(data_path, film_model_config['input'], batch_size=args.batch_size, preprocessing=args.preprocessing)
 
     ########################################################
     ################## Network Setup #######################
     ########################################################
     network_wrapper = FiLM_Network_Wrapper(film_model_config, dataset)
 
-    # GPU Options
-    gpu_options = tf.GPUOptions(allow_growth=True)
-
-    with tf.Session(config=tf.ConfigProto(gpu_options=gpu_options, allow_soft_placement=True)) as sess:
+    with tf.Session(config=tf.ConfigProto(gpu_options=tf.GPUOptions(allow_growth=True), allow_soft_placement=True)) as sess:
         # Debugging Tools
         #sess = tf_debug.TensorBoardDebugWrapperSession(sess, "T480s:8076")
-        tensorboard_writer = tf.summary.FileWriter('test_resnet_logs', sess.graph)
+        tensorboard_writer = tf.summary.FileWriter('test_resnet_logs', sess.graph)   #FIXME : Make the path parametrable ?
 
         if task == "train_film":
-            do_film_training(sess, dataset, network_wrapper, film_model_config['optimizer'], resnet_ckpt_path, nb_epoch, output_dated_folder)
-        elif task == "test_inference":
-            do_test_inference(sess, dataset, network_wrapper, output_dated_folder, film_ckpt_path, resnet_ckpt_path)
-        elif task == "preextract_features":
-            preextract_features(sess, dataset, network_wrapper, resnet_ckpt_path)
+            do_film_training(sess, dataset, network_wrapper, film_model_config['optimizer'],
+                             args.resnet_ckpt_path, args.nb_epoch, output_dated_folder)
+        elif task == "inference":
+            do_test_inference(sess, dataset, network_wrapper, output_dated_folder,
+                              args.film_ckpt_path, args.resnet_ckpt_path, set_name=args.inference_set)
+        elif task == "preprocessing":
+            preextract_features(sess, dataset, network_wrapper, args.resnet_ckpt_path)
 
         time_elapsed = str(datetime.now() - current_datetime)
 
@@ -462,13 +446,14 @@ def main():
 
         print("All Done")
 
+
 if __name__ == "__main__":
-    main()
+    args = parser.parse_args()
+    main(args)
 
         # TODO : Extract Beta And Gamma Parameters + T-SNE
         # TODO : Feed RAW image directly to the FiLM network
         # TODO : Quantify time cost of using raw images vs preprocessed conv features
-        # TODO : See how using the full resnet + FiLM impact batch size (More parameters than with preprocessing)
         # TODO : Resize images ? Do we absolutely need 224x224 for the resnet preprocessing ?
         #        Since we extract a layer in resnet, we can feed any size, its fully convolutional up to that point
         #        When feeding directly to FiLM, we can use original size ?
