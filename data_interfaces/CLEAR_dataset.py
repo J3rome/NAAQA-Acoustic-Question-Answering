@@ -86,8 +86,17 @@ class CLEARDataset(object):
                         answer = str(answer) if type(answer) == int else answer
                         answer = self.tokenizer.encode_answer(answer) if tokenize_text else answer
 
-                    image_id = int(sample["scene_index"])
-                    image_filename = sample["scene_filename"].replace('.wav', ".png")       # The clear dataset specify the filename to the scene wav file
+                    if 'scene_index' in sample:
+                        image_id = int(sample["scene_index"])
+                    else:
+                        # Backward compatibility with older CLEVR format
+                        image_id = int(sample["image_index"])
+
+                    if "scene_filename" in sample:
+                        image_filename = sample["scene_filename"].replace('.wav', ".png")       # The clear dataset specify the filename to the scene wav file
+                    else:
+                        # Backward compatibility with older CLEVR format
+                        image_filename = sample["image_filename"].replace('AQA_', 'CLEAR_')
 
                     self.games[set_type].append(Game(id=question_id,
                                       image=CLEARImage(image_id, image_filename, self.image_builder, set_type),
