@@ -34,6 +34,27 @@ def create_symlink_to_latest_folder(experiment_folder, dated_folder_name, symlin
     subprocess.run('cd %s && ln -s %s %s' % (experiment_folder, dated_folder_name, symlink_name), shell=True)
 
 
+def process_predictions(dataset, predictions, raw_batch):
+    processed_predictions = []
+    for i, result in enumerate(predictions):
+        decoded_prediction = dataset.tokenizer.decode_answer(result)
+        decoded_ground_truth = dataset.tokenizer.decode_answer(raw_batch[i].answer)
+        prediction_answer_family = dataset.answer_to_family[decoded_prediction]
+        ground_truth_answer_family = dataset.answer_to_family[decoded_ground_truth]
+        processed_predictions.append({
+            'question_id': raw_batch[i].id,
+            'scene_id': raw_batch[i].image.id,
+            'correct': bool(result == raw_batch[i].answer),
+            'correct_answer_family': bool(prediction_answer_family == ground_truth_answer_family),
+            'prediction': decoded_prediction,
+            'ground_truth': decoded_ground_truth,
+            'prediction_answer_family': prediction_answer_family,
+            'ground_truth_answer_family': ground_truth_answer_family
+        })
+
+    return processed_predictions
+
+
 def save_training_stats(stats_output_file, epoch_nb, train_accuracy, train_loss, val_accuracy, val_loss):
     """
     Will read the stats file from disk and append new epoch stats (Will create the file if not present)

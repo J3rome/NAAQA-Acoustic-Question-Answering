@@ -10,7 +10,7 @@ import numpy as np
 import h5py
 import ujson
 
-from utils import set_random_seed, create_folder_if_necessary, get_config
+from utils import set_random_seed, create_folder_if_necessary, get_config, process_predictions
 from utils import create_symlink_to_latest_folder, save_training_stats, save_inference_results
 from utils import is_tensor_optimizer, is_tensor_prediction, is_tensor_scalar
 
@@ -108,27 +108,6 @@ def preextract_features(sess, dataset, network_wrapper, resnet_ckpt_path, sets=[
         ujson.dump({
             "extracted_feature_shape" : feature_extractor_output_shape
         }, f, indent=2)
-
-
-def process_predictions(dataset, predictions, raw_batch):
-    processed_results = []
-    for i, result in enumerate(predictions):
-        decoded_prediction = dataset.tokenizer.decode_answer(result)
-        decoded_ground_truth = dataset.tokenizer.decode_answer(raw_batch[i].answer)
-        prediction_answer_family = dataset.answer_to_family[decoded_prediction]
-        ground_truth_answer_family = dataset.answer_to_family[decoded_ground_truth]
-        processed_results.append({
-            'question_id': raw_batch[i].id,
-            'scene_id': raw_batch[i].image.id,
-            'correct': bool(result == raw_batch[i].answer),
-            'correct_answer_family': bool(prediction_answer_family == ground_truth_answer_family),
-            'prediction': decoded_prediction,
-            'ground_truth': decoded_ground_truth,
-            'prediction_answer_family': prediction_answer_family,
-            'ground_truth_answer_family': ground_truth_answer_family
-        })
-
-    return processed_results
 
 
 # >>> Training
