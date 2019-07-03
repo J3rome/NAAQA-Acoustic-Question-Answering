@@ -75,5 +75,8 @@ class FiLM_Network_Wrapper():
     def get_feed_dict(self, is_training, question, answer, image, seq_length):
         return self.film_network.get_feed_dict(is_training, question, answer, image, seq_length, image_var=self.input_image)
 
+    def get_gamma_beta(self):
+        return self.film_network.get_gamma_beta()
+
     def create_optimizer(self, config, var_list=None):
         return self.film_network.create_optimizer(config, var_list=var_list)

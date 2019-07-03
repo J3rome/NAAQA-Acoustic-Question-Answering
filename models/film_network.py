@@ -34,7 +34,7 @@ def film_layer(ft, context, reuse=False):
 
     output = (1 + gammas) * ft + betas
 
-    return output, film_params_vector
+    return output, film_params_vector[:, :feature_size], film_params_vector[:, feature_size:]
 
 
 class FiLMResblock(object):
@@ -79,7 +79,7 @@ class FiLMResblock(object):
 
         # Apply FILM layer Residual connection
         with tf.variable_scope("FiLM", reuse=reuse):
-            self.conv2_film, self.gamma_beta = film_layer_fct(self.conv2_bn, context, reuse=reuse)
+            self.conv2_film, self.gamma_vector, self.beta_vector = film_layer_fct(self.conv2_bn, context, reuse=reuse)
 
         # Apply ReLU
         self.conv2_out = tf.nn.relu(self.conv2_film)
@@ -270,6 +270,15 @@ class FiLM_Network(ResnetModel):
 
     def get_prediction(self):
         return self.prediction
+
+    def get_gamma_beta(self):
+        gamma_vectors = []
+        beta_vectors = []
+        for resblock in self.resblocks:
+            gamma_vectors.append(resblock.gamma_vector)
+            beta_vectors.append(resblock.beta_vector)
+
+        return gamma_vectors, beta_vectors
 
     def create_optimizer(self, config, finetune=[], optimizer=tf.train.AdamOptimizer, var_list=None):
 
