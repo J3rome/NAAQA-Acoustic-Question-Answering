@@ -4,6 +4,7 @@ import numpy as np
 import tensorflow as tf
 import subprocess
 import ujson
+from collections import defaultdict
 
 
 def get_config(config_path):
@@ -55,6 +56,28 @@ def process_predictions(dataset, predictions, raw_batch):
     return processed_predictions
 
 
+def process_gamma_beta(processed_predictions, gamma_vectors_per_resblock, beta_vectors_per_resblock):
+    processed_gamma_beta_vectors = []
+
+    gamma_vectors_per_resblock = [v.tolist() for v in gamma_vectors_per_resblock]
+    beta_vectors_per_resblock = [v.tolist() for v in beta_vectors_per_resblock]
+
+    for result_index, processed_prediction in enumerate(processed_predictions):
+        question_index = processed_prediction['question_id']
+        processed_gamma_beta_vector = defaultdict(lambda : {})
+        for resblock_index, gamma_vectors, beta_vectors in zip(range(len(gamma_vectors_per_resblock)), gamma_vectors_per_resblock, beta_vectors_per_resblock):
+
+            processed_gamma_beta_vector['question_index'] = question_index
+            processed_gamma_beta_vector['resblock_%d' % resblock_index]['gamma_vector'] = gamma_vectors[result_index]
+            processed_gamma_beta_vector['resblock_%d' % resblock_index]['beta_vector'] = beta_vectors[result_index]
+
+            # TODO : Add more attributes ? Could simply be cross loaded via question.json
+
+        processed_gamma_beta_vectors.append(processed_gamma_beta_vector)
+
+    return processed_gamma_beta_vectors
+
+
 def save_training_stats(stats_output_file, epoch_nb, train_accuracy, train_loss, val_accuracy, val_loss):
     """
     Will read the stats file from disk and append new epoch stats (Will create the file if not present)
@@ -79,9 +102,9 @@ def save_training_stats(stats_output_file, epoch_nb, train_accuracy, train_loss,
         ujson.dump(stats, f, indent=2, sort_keys=True)
 
 
-def save_inference_results(results, output_folder, filename="results.json"):
+def save_json(results, output_folder, filename, indented=True):
     with open("%s/%s" % (output_folder, filename), 'w') as f:
-        ujson.dump(results, f, indent=2)
+        ujson.dump(results, f, indent=2 if indented else None)
 
 
 def is_tensor_optimizer(x):

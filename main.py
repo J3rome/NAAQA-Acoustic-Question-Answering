@@ -10,8 +10,8 @@ import numpy as np
 import h5py
 import ujson
 
-from utils import set_random_seed, create_folder_if_necessary, get_config, process_predictions
-from utils import create_symlink_to_latest_folder, save_training_stats, save_inference_results
+from utils import set_random_seed, create_folder_if_necessary, get_config, process_predictions, process_gamma_beta
+from utils import create_symlink_to_latest_folder, save_training_stats, save_json
 from utils import is_tensor_optimizer, is_tensor_prediction, is_tensor_scalar
 
 from models.film_network_wrapper import FiLM_Network_Wrapper
@@ -213,8 +213,8 @@ def do_film_training(sess, dataset, network_wrapper, optimizer_config, resnet_ck
         save_training_stats(stats_file_path, epoch, train_accuracy, train_loss, val_accuracy, val_loss)
 
         if keep_results:
-            save_inference_results(train_predictions, epoch_output_folder_path, filename="train_inferences.json")
-            save_inference_results(val_predictions, epoch_output_folder_path, filename="val_inferences.json")
+            save_json(train_predictions, epoch_output_folder_path, filename="train_inferences.json")
+            save_json(val_predictions, epoch_output_folder_path, filename="val_inferences.json")
 
         stats.append({
             'epoch' : epoch,
@@ -244,27 +244,41 @@ def do_test_inference(sess, dataset, network_wrapper, output_folder, film_ckpt_p
 
     network_wrapper.restore_film_network_weights(sess, film_ckpt_path)
 
-    processed_results = []
+    network_predictions = network_wrapper.get_network_prediction()
+    gamma_vector_tensors, beta_vector_tensors = network_wrapper.get_gamma_beta()
+
+    processed_predictions = []
+
+    processed_gamma_beta = []
 
     for batch in tqdm(test_batches):
         feed_dict = network_wrapper.get_feed_dict(False, batch['question'], batch['answer'],
                                                   batch['image'], batch['seq_length'])
 
-        results = sess.run(network_wrapper.get_network_prediction(), feed_dict=feed_dict)
+        predictions, gamma_vectors, beta_vectors = sess.run([network_predictions,
+                                                            gamma_vector_tensors,
+                                                            beta_vector_tensors],
+                                                            feed_dict=feed_dict)
 
-        processed_results += process_predictions(dataset, results, batch['raw'])
+        batch_processed_predictions = process_predictions(dataset, predictions, batch['raw'])
+        processed_predictions += batch_processed_predictions
+
+        processed_gamma_beta += process_gamma_beta(batch_processed_predictions, gamma_vectors, beta_vectors)
 
     # Batches are required to have always the same size.
     # We don't want the batch padding to interfere with the test accuracy.
     # We removed the padded (duplicated) examples
     if test_batches.nb_padded_in_last_batch > 0:
-        processed_results = processed_results[:-test_batches.nb_padded_in_last_batch]
+        processed_predictions = processed_predictions[:-test_batches.nb_padded_in_last_batch]
+        processed_gamma_beta = processed_gamma_beta[:-test_batches.nb_padded_in_last_batch]
 
-    nb_correct = sum(1 for r in processed_results if r['correct'])
-    nb_results = len(processed_results)
+
+    nb_correct = sum(1 for r in processed_predictions if r['correct'])
+    nb_results = len(processed_predictions)
     accuracy = nb_correct/nb_results
 
-    save_inference_results(processed_results, output_folder)
+    save_json(processed_predictions, output_folder, filename='results.json')
+    save_json(processed_gamma_beta, output_folder, filename='gamma_beta.json')
 
     print("Test set accuracy : %f" % accuracy)
 
