@@ -56,6 +56,7 @@ parser.add_argument("--random_seed", type=int, default=None, help="Random seed u
 #
 
 
+# >>> Feature Extraction
 def preextract_features(sess, dataset, network_wrapper, resnet_ckpt_path, sets=['train', 'val', 'test'], output_folder_name="preprocessed"):
 
     # FIXME: Config should be set automatically to raw when this option is used
@@ -130,6 +131,7 @@ def process_predictions(dataset, predictions, raw_batch):
     return processed_results
 
 
+# >>> Training
 def do_one_epoch(sess, batchifier, network_wrapper, outputs_var, keep_results=False):
     # check for optimizer to define training/eval mode
     is_training = any([is_tensor_optimizer(x) for x in outputs_var])
@@ -250,6 +252,7 @@ def do_film_training(sess, dataset, network_wrapper, optimizer_config, resnet_ck
     subprocess.run("cd %s && ln -s Epoch_%.2d best" % (output_folder, best_epoch), shell=True)
 
 
+# >>> Inference
 def do_test_inference(sess, dataset, network_wrapper, output_folder, film_ckpt_path, resnet_ckpt_path, set_name="test"):
     test_batches = dataset.get_batches(set_name, shuffled=False)
 
@@ -287,6 +290,7 @@ def do_test_inference(sess, dataset, network_wrapper, output_folder, film_ckpt_p
     print("Test set accuracy : %f" % accuracy)
 
 
+# >>> Dictionary Creation (For word tokenization)
 def create_dict_from_questions(dataset, word_min_occurence=1, dict_filename='dict.json'):
     # FIXME : Should we use the whole dataset to create the dictionary ?
     games = dataset.games['train']
@@ -356,7 +360,6 @@ def main(args):
         task = "create_dict"
         is_preprocessing = True
 
-
     if args.random_seed is not None:
         set_random_seed(args.random_seed)
 
@@ -373,8 +376,8 @@ def main(args):
         args.resnet_ckpt_path = "%s/resnet/resnet_v1_101.ckpt" % args.data_root_path
 
     if args.film_ckpt_path is None:
-        experiment_date = "2019-06-23_16h37"
-        #experiment_date = "latest"
+        #experiment_date = "2019-06-23_16h37"
+        experiment_date = "latest"
         args.film_ckpt_path = "%s/train_film/%s/%s/best/checkpoint.ckpt" % (args.output_root_path, args.version_name, experiment_date)
 
     film_model_config = get_config(args.config_path)
