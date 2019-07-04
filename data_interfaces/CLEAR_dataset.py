@@ -182,8 +182,6 @@ class CLEARBatchifier(object):
         return sum([len(b) for b in self.batches])
 
     def load_batch(self, games):
-        start_time = time.time()
-
         batch = collections.defaultdict(list)
         batch_size = len(games)
 
@@ -196,7 +194,6 @@ class CLEARBatchifier(object):
             batch['question'].append(game.question)
             batch['answer'].append(game.answer)
 
-            img_load_start_time = time.time()
             # retrieve the image source type
             img = game.image.get_image()    # FIXME : This is the thing that should be parallelize in a CPU Pool..
             if "image" not in batch: # initialize an empty array for better memory consumption
@@ -208,7 +205,6 @@ class CLEARBatchifier(object):
         if self.tokenizer:
             batch['question'], batch['seq_length'] = self.tokenizer.pad_tokens(batch['question'])
 
-        tqdm.write("Batch loaded in %f" % (time.time() - start_time))
 
         return batch
 

@@ -116,7 +116,6 @@ def do_film_training(sess, dataset, network_wrapper, optimizer_config, resnet_ck
         sess.run(tf.variables_initializer(network_wrapper.feature_extractor_variables))
         network_wrapper.restore_feature_extractor_weights(sess, resnet_ckpt_path)
 
-    stats = []
     removed_epoch = []
 
     # Training Loop
@@ -125,10 +124,13 @@ def do_film_training(sess, dataset, network_wrapper, optimizer_config, resnet_ck
         create_folder_if_necessary(epoch_output_folder_path)
 
         print("Epoch %d" % epoch)
+        time_before_epoch = datetime.now()
         train_loss, train_accuracy, train_predictions = do_one_epoch(sess, dataset.get_batches('train'),
                                                                      network_wrapper,
                                                                      [loss, accuracy, prediction, optimize_step],
                                                                      keep_results=keep_results)
+
+        epoch_train_time = datetime.now() - time_before_epoch
 
         print("Training :")
         print("    Loss : %f  - Accuracy : %f" % (train_loss, train_accuracy))
@@ -143,19 +145,12 @@ def do_film_training(sess, dataset, network_wrapper, optimizer_config, resnet_ck
         print("Validation :")
         print("    Loss : %f  - Accuracy : %f" % (val_loss, val_accuracy))
 
-        save_training_stats(stats_file_path, epoch, train_accuracy, train_loss, val_accuracy, val_loss)
+        stats = save_training_stats(stats_file_path, epoch, train_accuracy, train_loss,
+                            val_accuracy, val_loss, epoch_train_time)
 
         if keep_results:
             save_json(train_predictions, epoch_output_folder_path, filename="train_inferences.json")
             save_json(val_predictions, epoch_output_folder_path, filename="val_inferences.json")
-
-        stats.append({
-            'epoch' : epoch,
-            'train_loss' : train_loss,
-            'train_accuracy': train_accuracy,
-            'val_loss' : val_loss,
-            'val_accuracy' : val_accuracy
-        })
 
         network_wrapper.save_film_checkpoint(sess, "%s/checkpoint.ckpt" % epoch_output_folder_path)
 
@@ -169,11 +164,11 @@ def do_film_training(sess, dataset, network_wrapper, optimizer_config, resnet_ck
                 if epoch_stat['epoch'] not in removed_epoch:
                     removed_epoch.append(epoch_stat['epoch'])
 
-                    shutil.rmtree("%s/Epoch_%.2d" % (output_folder, epoch_stat['epoch']))
+                    shutil.rmtree("%s/%s" % (output_folder, epoch_stat['epoch']))
 
     # Create a symlink to best epoch output folder
     best_epoch = sorted(stats, key=lambda s: s['val_accuracy'], reverse=True)[0]['epoch']
-    subprocess.run("cd %s && ln -s Epoch_%.2d best" % (output_folder, best_epoch), shell=True)
+    subprocess.run("cd %s && ln -s %s best" % (output_folder, best_epoch), shell=True)
 
 
 # >>> Inference

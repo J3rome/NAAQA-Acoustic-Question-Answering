@@ -78,7 +78,8 @@ def process_gamma_beta(processed_predictions, gamma_vectors_per_resblock, beta_v
     return processed_gamma_beta_vectors
 
 
-def save_training_stats(stats_output_file, epoch_nb, train_accuracy, train_loss, val_accuracy, val_loss):
+def save_training_stats(stats_output_file, epoch_nb, train_accuracy, train_loss, val_accuracy,
+                        val_loss, epoch_train_time):
     """
     Will read the stats file from disk and append new epoch stats (Will create the file if not present)
     """
@@ -89,7 +90,8 @@ def save_training_stats(stats_output_file, epoch_nb, train_accuracy, train_loss,
         stats = []
 
     stats.append({
-        'epoch': "epoch_%.3d" % (epoch_nb + 1),
+        'epoch': "Epoch_%.2d" % epoch_nb,
+        'train_time': str(epoch_train_time),
         'train_acc': train_accuracy,
         'train_loss': train_loss,
         'val_accuracy': val_accuracy,
@@ -100,6 +102,8 @@ def save_training_stats(stats_output_file, epoch_nb, train_accuracy, train_loss,
 
     with open(stats_output_file, 'w') as f:
         ujson.dump(stats, f, indent=2, sort_keys=True)
+
+    return stats
 
 
 def save_json(results, output_folder, filename, indented=True):
