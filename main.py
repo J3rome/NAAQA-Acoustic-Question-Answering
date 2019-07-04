@@ -1,13 +1,11 @@
 import argparse
 from collections import defaultdict
 from _datetime import datetime
-import os
 import subprocess
 
 import tensorflow as tf
 from tqdm import tqdm
 import numpy as np
-import h5py
 import ujson
 
 from utils import set_random_seed, create_folder_if_necessary, get_config, process_predictions, process_gamma_beta
@@ -16,7 +14,7 @@ from utils import is_tensor_optimizer, is_tensor_prediction, is_tensor_scalar
 
 from models.film_network_wrapper import FiLM_Network_Wrapper
 from data_interfaces.CLEAR_dataset import CLEARDataset
-from data_interfaces.CLEAR_tokenizer import CLEARTokenizer
+from preprocessing import preextract_features, create_dict_from_questions
 
 parser = argparse.ArgumentParser('FiLM model for CLEAR Dataset (Acoustic Question Answering)', fromfile_prefix_chars='@')
 
@@ -54,61 +52,6 @@ parser.add_argument("--random_seed", type=int, default=None, help="Random seed u
 #       Run from Raw Images (Resnet With fixed weights)
 #       Run from Raw Images with VISUALIZATION
 #
-
-
-# >>> Feature Extraction
-def preextract_features(sess, dataset, network_wrapper, resnet_ckpt_path, sets=['train', 'val', 'test'], output_folder_name="preprocessed"):
-
-    # FIXME: Config should be set automatically to raw when this option is used
-    assert dataset.is_raw_img(), "Config must be set to raw image"
-
-    input_image = network_wrapper.get_input_image()
-    feature_extractor = network_wrapper.get_feature_extractor()
-    feature_extractor_output_shape = [int(dim) for dim in feature_extractor.get_shape()[1:]]
-    output_folder = "%s/%s" % (dataset.root_folder_path, output_folder_name)
-
-    create_folder_if_necessary(output_folder)
-
-    # We want to process each scene only one time (Keep only game per scene)
-    dataset.keep_1_game_per_scene()
-
-    sess.run(tf.global_variables_initializer())
-
-    network_wrapper.restore_feature_extractor_weights(sess, resnet_ckpt_path)
-
-    for set_type in sets:
-        print("Extracting feature for set '%s'" % set_type)
-        batches = dataset.get_batches(set_type)
-        nb_games = batches.get_nb_games()
-        output_filepath = "%s/%s_features.h5" % (output_folder, set_type)
-        batch_size = batches.batch_size
-
-        # TODO : Add check to see if file already exist
-        with h5py.File(output_filepath, 'w') as f:
-            h5_dataset = f.create_dataset('features', shape=[nb_games] + feature_extractor_output_shape, dtype=np.float32)
-            h5_idx2img = f.create_dataset('idx2img', shape=[nb_games], dtype=np.int32)
-            h5_idx = 0
-
-            for batch in tqdm(batches):
-                feed_dict = {
-                    input_image: np.array(batch['image'])
-                }
-                features = sess.run(feature_extractor, feed_dict=feed_dict)
-
-                h5_dataset[h5_idx: h5_idx + batch_size] = features
-
-                for i, game in enumerate(batch['raw']):
-                    h5_idx2img[h5_idx + i] = game.image.id
-
-                h5_idx += batch_size
-
-        print("%s set features extracted to '%s'." % (set_type, output_filepath))
-
-    with open('%s/feature_shape.json' % output_folder, 'w') as f:
-        ujson.dump({
-            "extracted_feature_shape" : feature_extractor_output_shape
-        }, f, indent=2)
-
 
 # >>> Training
 def do_one_epoch(sess, batchifier, network_wrapper, outputs_var, keep_results=False):
@@ -170,20 +113,6 @@ def do_film_training(sess, dataset, network_wrapper, optimizer_config, resnet_ck
         sess.run(tf.variables_initializer(network_wrapper.feature_extractor_variables))
         network_wrapper.restore_feature_extractor_weights(sess, resnet_ckpt_path)
 
-    ##################################
-    # TESTING
-    #stem_conv_weights = [v for v in tf.trainable_variables() if v.name == 'clear/stem/stem_conv/weights:0'][0]
-    #stem_conv_weights = sess.run(stem_conv_weights)
-    #stem_conv_weights = stem_conv_weights.tolist()
-
-    #with open('saved_stem_conv_weights_full4.json', 'w') as f:
-    #    json.dump(stem_conv_weights, f, indent=2)
-
-    #moving_parameters = [v for v in tf.global_variables() if ('moving' in v.name) and 'Adam' not in v.name]
-    #gamma_beta_parameters = [v for v in tf.global_variables() if ('gamma' in v.name or 'beta' in v.name) and 'Adam' not in v.name and 'power' not in v.name]
-
-    ##################################
-
     stats = []
 
     # Training Loop
@@ -232,7 +161,7 @@ def do_film_training(sess, dataset, network_wrapper, optimizer_config, resnet_ck
 
 
 # >>> Inference
-def do_test_inference(sess, dataset, network_wrapper, output_folder, film_ckpt_path, resnet_ckpt_path, set_name="test"):
+def do_batch_inference(sess, dataset, network_wrapper, output_folder, film_ckpt_path, resnet_ckpt_path, set_name="test"):
     test_batches = dataset.get_batches(set_name, shuffled=False)
 
     sess.run(tf.variables_initializer(network_wrapper.film_variables))
@@ -272,7 +201,6 @@ def do_test_inference(sess, dataset, network_wrapper, output_folder, film_ckpt_p
         processed_predictions = processed_predictions[:-test_batches.nb_padded_in_last_batch]
         processed_gamma_beta = processed_gamma_beta[:-test_batches.nb_padded_in_last_batch]
 
-
     nb_correct = sum(1 for r in processed_predictions if r['correct'])
     nb_results = len(processed_predictions)
     accuracy = nb_correct/nb_results
@@ -281,54 +209,6 @@ def do_test_inference(sess, dataset, network_wrapper, output_folder, film_ckpt_p
     save_json(processed_gamma_beta, output_folder, filename='gamma_beta.json')
 
     print("Test set accuracy : %f" % accuracy)
-
-
-# >>> Dictionary Creation (For word tokenization)
-def create_dict_from_questions(dataset, word_min_occurence=1, dict_filename='dict.json'):
-    # FIXME : Should we use the whole dataset to create the dictionary ?
-    games = dataset.games['train']
-
-    word2i = {'<padding>': 0,
-              '<unk>': 1
-              }
-
-    answer2i = {  # '<padding>': 0,        # FIXME : Why would we need padding in the answers ?
-        '<unk>': 0  # FIXME : We have no training example with unkonwn answer. Add Switch to remove unknown answer
-    }
-
-    answer2occ = dataset.answer_counter['train']
-    word2occ = defaultdict(int)
-
-    tokenizer = CLEARTokenizer.get_tokenizer_inst()
-
-    for game in games:
-        input_tokens = tokenizer.tokenize(game.question)
-        for tok in input_tokens:
-            word2occ[tok] += 1
-
-    # parse the questions
-    for word, occ in word2occ.items():
-        if occ >= word_min_occurence:
-            word2i[word] = len(word2i)
-
-    # parse the answers
-    for answer in answer2occ.keys():
-        answer2i[answer] = len(answer2i)
-
-    print("Number of words: {}".format(len(word2i)))
-    print("Number of answers: {}".format(len(answer2i)))
-
-    preprocessed_folder_path = os.path.join(dataset.root_folder_path, 'preprocessed')
-    dict_file_path = os.path.join(preprocessed_folder_path, dict_filename)
-
-    if not os.path.isdir(preprocessed_folder_path):
-        os.mkdir(preprocessed_folder_path)
-
-    with open(dict_file_path, 'w') as f:
-        ujson.dump({
-            'word2i': word2i,
-            'answer2i': answer2i
-        }, f, indent=2)
 
 
 def main(args):
@@ -405,7 +285,7 @@ def main(args):
             do_film_training(sess, dataset, network_wrapper, film_model_config['optimizer'],
                              args.resnet_ckpt_path, args.nb_epoch, output_dated_folder)
         elif task == "inference":
-            do_test_inference(sess, dataset, network_wrapper, output_dated_folder,
+            do_batch_inference(sess, dataset, network_wrapper, output_dated_folder,
                               args.film_ckpt_path, args.resnet_ckpt_path, set_name=args.inference_set)
         elif task == "feature_extract":
             preextract_features(sess, dataset, network_wrapper, args.resnet_ckpt_path)
