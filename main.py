@@ -2,6 +2,7 @@ import argparse
 from collections import defaultdict
 from _datetime import datetime
 import subprocess
+import shutil
 
 import tensorflow as tf
 from tqdm import tqdm
@@ -38,7 +39,8 @@ parser.add_argument("--inference_set", type=str, default='test', help="Define on
 parser.add_argument("-output_root_path", type=str, default='output', help="Directory with image")
 
 # Other parameters
-parser.add_argument("--nb_epoch", type=int, default=5, help="Nb of epoch for training")
+parser.add_argument("--nb_epoch", type=int, default=15, help="Nb of epoch for training")
+parser.add_argument("--nb_epoch_stats_to_keep", type=int, default=5, help="Nb of epoch stats to keep for training")
 parser.add_argument("--batch_size", type=int, default=32, help="Batch size (For training and inference)")
 parser.add_argument("--random_seed", type=int, default=None, help="Random seed used for the experiment")
 
@@ -92,7 +94,8 @@ def do_one_epoch(sess, batchifier, network_wrapper, outputs_var, keep_results=Fa
     return to_return
 
 
-def do_film_training(sess, dataset, network_wrapper, optimizer_config, resnet_ckpt_path, nb_epoch, output_folder, keep_results=True):
+def do_film_training(sess, dataset, network_wrapper, optimizer_config, resnet_ckpt_path, nb_epoch, output_folder,
+                     keep_results=True, nb_epoch_to_keep=None):
     stats_file_path = "%s/stats.json" % output_folder
 
     # Setup optimizer (For training)
@@ -114,6 +117,7 @@ def do_film_training(sess, dataset, network_wrapper, optimizer_config, resnet_ck
         network_wrapper.restore_feature_extractor_weights(sess, resnet_ckpt_path)
 
     stats = []
+    removed_epoch = []
 
     # Training Loop
     for epoch in range(nb_epoch):
@@ -154,6 +158,18 @@ def do_film_training(sess, dataset, network_wrapper, optimizer_config, resnet_ck
         })
 
         network_wrapper.save_film_checkpoint(sess, "%s/checkpoint.ckpt" % epoch_output_folder_path)
+
+        if nb_epoch_to_keep is not None:
+            # FIXME : Definitely not the most efficient way to do this
+            sorted_stats = sorted(stats, key=lambda s: s['val_accuracy'], reverse=True)
+
+            epoch_to_remove = sorted_stats[nb_epoch_to_keep:]
+
+            for epoch_stat in epoch_to_remove:
+                if epoch_stat['epoch'] not in removed_epoch:
+                    removed_epoch.append(epoch_stat['epoch'])
+
+                    shutil.rmtree("%s/Epoch_%.2d" % (output_folder, epoch_stat['epoch']))
 
     # Create a symlink to best epoch output folder
     best_epoch = sorted(stats, key=lambda s: s['val_accuracy'], reverse=True)[0]['epoch']
@@ -283,14 +299,19 @@ def main(args):
 
         if task == "train_film":
             do_film_training(sess, dataset, network_wrapper, film_model_config['optimizer'],
-                             args.resnet_ckpt_path, args.nb_epoch, output_dated_folder)
+                             args.resnet_ckpt_path, args.nb_epoch, output_dated_folder,
+                             nb_epoch_to_keep=args.nb_epoch_stats_to_keep)
+
         elif task == "inference":
             do_batch_inference(sess, dataset, network_wrapper, output_dated_folder,
                               args.film_ckpt_path, args.resnet_ckpt_path, set_name=args.inference_set)
+
         elif task == "feature_extract":
             preextract_features(sess, dataset, network_wrapper, args.resnet_ckpt_path)
+
         elif task == "create_dict":
             create_dict_from_questions(dataset)
+
         elif task == "full_preprocessing":
             create_dict_from_questions(dataset)
             preextract_features(sess, dataset, network_wrapper, args.resnet_ckpt_path)
