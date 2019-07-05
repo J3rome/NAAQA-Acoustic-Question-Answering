@@ -15,12 +15,14 @@ from utils import is_tensor_optimizer, is_tensor_prediction, is_tensor_scalar
 
 from models.film_network_wrapper import FiLM_Network_Wrapper
 from data_interfaces.CLEAR_dataset import CLEARDataset
+from visualization import grad_cam_visualization
 from preprocessing import preextract_features, create_dict_from_questions
 
 parser = argparse.ArgumentParser('FiLM model for CLEAR Dataset (Acoustic Question Answering)', fromfile_prefix_chars='@')
 
 parser.add_argument("--training", help="FiLM model training", action='store_true')
 parser.add_argument("--inference", help="FiLM model inference", action='store_true')
+parser.add_argument("--visualize", help="FiLM model visualization", action='store_true')
 parser.add_argument("--preprocessing", help="Data preprocessing (Word tokenization & Feature Pre-Extraction",
                     action='store_true')
 parser.add_argument("--feature_extract", help="Feature Pre-Extraction", action='store_true')
@@ -224,8 +226,12 @@ def do_batch_inference(sess, dataset, network_wrapper, output_folder, film_ckpt_
 
 def main(args):
 
-    if 0 < sum([args.training, args.preprocessing, args.inference, args.feature_extract, args.create_dict]) > 1:
-        print("[ERROR] Can only do one task at a time (--training, --preprocessing or --inference)")
+    mutually_exclusive_params = [args.training, args.preprocessing, args.inference,
+                                 args.feature_extract, args.create_dict, args.visualize]
+
+    if 0 < sum(mutually_exclusive_params) > 1:
+        print("[ERROR] Can only do one task at a time (--training, --inference, --visualize," +
+              " --preprocessing, --create_dict, --feature_extract)")
         exit(1)
 
     is_preprocessing = False
@@ -234,6 +240,8 @@ def main(args):
         task = "train_film"
     elif args.inference:
         task = "inference"
+    elif args.visualize:
+        task = "visualize_grad_cam"
     elif args.preprocessing:
         task = "full_preprocessing"
         is_preprocessing = True
@@ -300,6 +308,9 @@ def main(args):
         elif task == "inference":
             do_batch_inference(sess, dataset, network_wrapper, output_dated_folder,
                               args.film_ckpt_path, args.resnet_ckpt_path, set_name=args.inference_set)
+
+        elif task == "visualize_grad_cam":
+            grad_cam_visualization(sess, network_wrapper, args.film_ckpt_path, args.resnet_ckpt_path)
 
         elif task == "feature_extract":
             preextract_features(sess, dataset, network_wrapper, args.resnet_ckpt_path)
