@@ -121,3 +121,11 @@ def is_tensor_scalar(x):
 
 def is_tensor_prediction(x):
     return isinstance(x, tf.Tensor) and 'predicted_answer' in x.name
+
+
+def is_tensor_gamma_list(x):
+    return isinstance(x, list) and isinstance(x[0], tf.Tensor) and 'gamma' in x[0].name
+
+
+def is_tensor_beta_list(x):
+    return isinstance(x, list) and isinstance(x[0], tf.Tensor) and 'beta' in x[0].name

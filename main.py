@@ -11,7 +11,7 @@ import ujson
 
 from utils import set_random_seed, create_folder_if_necessary, get_config, process_predictions, process_gamma_beta
 from utils import create_symlink_to_latest_folder, save_training_stats, save_json
-from utils import is_tensor_optimizer, is_tensor_prediction, is_tensor_scalar
+from utils import is_tensor_optimizer, is_tensor_prediction, is_tensor_scalar, is_tensor_beta_list, is_tensor_gamma_list
 
 from models.film_network_wrapper import FiLM_Network_Wrapper
 from data_interfaces.CLEAR_dataset import CLEARDataset
@@ -58,12 +58,14 @@ parser.add_argument("--random_seed", type=int, default=None, help="Random seed u
 #
 
 # >>> Training
-def do_one_epoch(sess, batchifier, network_wrapper, outputs_var, keep_results=False):
+def do_one_epoch(sess, batchifier, network_wrapper, outputs_var):
     # check for optimizer to define training/eval mode
     is_training = any([is_tensor_optimizer(x) for x in outputs_var])
 
     aggregated_outputs = defaultdict(lambda : [])
+    gamma_beta = {'gamma': [], 'beta': []}
     processed_predictions = []
+    processed_gamma_beta = []
 
     for batch in tqdm(batchifier):
 
@@ -72,32 +74,37 @@ def do_one_epoch(sess, batchifier, network_wrapper, outputs_var, keep_results=Fa
         results = sess.run(outputs_var, feed_dict=feed_dict)
 
         for var, result in zip(outputs_var, results):
-            if is_tensor_scalar(var) and var in outputs_var:
+            if is_tensor_scalar(var):
                 aggregated_outputs[var].append(result)
 
-            elif is_tensor_prediction(var) and keep_results:
-
+            elif is_tensor_prediction(var):
                 aggregated_outputs[var] = True
+                processed_predictions.append(process_predictions(network_wrapper.get_dataset(), result, batch['raw']))
 
-                processed_predictions += process_predictions(network_wrapper.get_dataset(), result, batch['raw'])
+            elif is_tensor_gamma_list(var):
+                gamma_beta['gamma'].append(result)
+            elif is_tensor_beta_list(var):
+                gamma_beta['beta'].append(result)
 
     for var in aggregated_outputs.keys():
         if is_tensor_scalar(var):
             aggregated_outputs[var] = np.mean(aggregated_outputs[var]).item()
         elif is_tensor_prediction(var):
-            aggregated_outputs[var] = processed_predictions
+            aggregated_outputs[var] = [pred for epoch in processed_predictions for pred in epoch]
+
+    for batch_index, gamma_vectors_per_batch, beta_vectors_per_batch in zip(range(len(gamma_beta['gamma'])), gamma_beta['gamma'], gamma_beta['beta']):
+        processed_gamma_beta += process_gamma_beta(processed_predictions[batch_index], gamma_vectors_per_batch, beta_vectors_per_batch)
 
     to_return = list(aggregated_outputs.values())
-
-    if len(to_return) < 3:
-        # This method should always return 3 results (Because of the way we unpack it)
-        to_return += []
+    if len(processed_gamma_beta) > 0:
+        # FIXME : Not keeping the order here. Not dependent on the operation order anymore
+        to_return.append(processed_gamma_beta)
 
     return to_return
 
 
 def do_film_training(sess, dataset, network_wrapper, optimizer_config, resnet_ckpt_path, nb_epoch, output_folder,
-                     keep_results=True, nb_epoch_to_keep=None):
+                     nb_epoch_to_keep=None):
     stats_file_path = "%s/stats.json" % output_folder
 
     # Setup optimizer (For training)
@@ -120,6 +127,10 @@ def do_film_training(sess, dataset, network_wrapper, optimizer_config, resnet_ck
 
     removed_epoch = []
 
+    gamma_vector_tensors, beta_vector_tensors = network_wrapper.get_gamma_beta()
+
+    op_to_run = [loss, accuracy, prediction, gamma_vector_tensors, beta_vector_tensors]
+
     # Training Loop
     for epoch in range(nb_epoch):
         epoch_output_folder_path = "%s/Epoch_%.2d" % (output_folder, epoch)
@@ -127,10 +138,10 @@ def do_film_training(sess, dataset, network_wrapper, optimizer_config, resnet_ck
 
         print("Epoch %d" % epoch)
         time_before_epoch = datetime.now()
-        train_loss, train_accuracy, train_predictions = do_one_epoch(sess, dataset.get_batches('train'),
-                                                                     network_wrapper,
-                                                                     [loss, accuracy, prediction, optimize_step],
-                                                                     keep_results=keep_results)
+        train_loss, train_accuracy, train_predictions, train_gamma_beta_vectors = do_one_epoch(sess,
+                                                                                        dataset.get_batches('train'),
+                                                                                        network_wrapper,
+                                                                                        op_to_run + [optimize_step])
 
         epoch_train_time = datetime.now() - time_before_epoch
 
@@ -140,9 +151,9 @@ def do_film_training(sess, dataset, network_wrapper, optimizer_config, resnet_ck
         # FIXME : Inference of validation set doesn't yield same result.
         # FIXME : Should val batches be shuffled ?
         # FIXME : Validation accuracy is skewed by the batch padding. We could recalculate accuracy from the prediction (After removing padded ones)
-        val_loss, val_accuracy, val_predictions = do_one_epoch(sess, dataset.get_batches('val', shuffled=False),
-                                                               network_wrapper, [loss, accuracy, prediction],
-                                                               keep_results=keep_results)
+        val_loss, val_accuracy, val_predictions, val_gamma_beta_vectors = do_one_epoch(sess,
+                                                                            dataset.get_batches('val', shuffled=False),
+                                                                            network_wrapper, op_to_run)
 
         print("Validation :")
         print("    Loss : %f  - Accuracy : %f" % (val_loss, val_accuracy))
@@ -150,9 +161,10 @@ def do_film_training(sess, dataset, network_wrapper, optimizer_config, resnet_ck
         stats = save_training_stats(stats_file_path, epoch, train_accuracy, train_loss,
                             val_accuracy, val_loss, epoch_train_time)
 
-        if keep_results:
-            save_json(train_predictions, epoch_output_folder_path, filename="train_inferences.json")
-            save_json(val_predictions, epoch_output_folder_path, filename="val_inferences.json")
+        save_json(train_predictions, epoch_output_folder_path, filename="train_inferences.json")
+        save_json(val_predictions, epoch_output_folder_path, filename="val_inferences.json")
+        save_json(train_gamma_beta_vectors, epoch_output_folder_path, filename='train_gamma_beta.json')
+        save_json(val_gamma_beta_vectors, epoch_output_folder_path, filename='val_gamma_beta.json')
 
         network_wrapper.save_film_checkpoint(sess, "%s/checkpoint.ckpt" % epoch_output_folder_path)
 

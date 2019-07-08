@@ -34,7 +34,14 @@ def film_layer(ft, context, reuse=False):
 
     output = (1 + gammas) * ft + betas
 
-    return output, film_params_vector[:, :feature_size], film_params_vector[:, feature_size:]
+    with tf.variable_scope('gamma', reuse=reuse):
+        gamma_vector = film_params_vector[:, :feature_size]
+
+    with tf.variable_scope('beta', reuse=reuse):
+        beta_vector = film_params_vector[:, feature_size:]
+
+
+    return output, gamma_vector, beta_vector
 
 
 class FiLMResblock(object):
