@@ -108,7 +108,7 @@ def save_training_stats(stats_output_file, epoch_nb, train_accuracy, train_loss,
 
 def save_json(results, output_folder, filename, indented=True):
     with open("%s/%s" % (output_folder, filename), 'w') as f:
-        ujson.dump(results, f, indent=2 if indented else None)
+        ujson.dump(results, f, indent=2 if indented else None, escape_forward_slashes=False)
 
 
 def is_tensor_optimizer(x):
