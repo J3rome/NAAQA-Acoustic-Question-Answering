@@ -284,6 +284,9 @@ def main(args):
         create_folder_if_necessary(output_dated_folder)
         create_symlink_to_latest_folder(output_experiment_folder, current_datetime_str)
 
+        # Save arguments to output folder
+        save_json(args, output_dated_folder, filename="arguments.json")
+
     ########################################################
     ################### Data Loading #######################
     ########################################################
