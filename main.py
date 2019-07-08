@@ -35,6 +35,8 @@ parser.add_argument("--resnet_ckpt_path", type=str, default=None, help="Path to 
 parser.add_argument("--film_ckpt_path", type=str, default=None, help="Path to Film pretrained ckpt file")
 parser.add_argument("--config_path", type=str, default='config/film.json', help="Path to Film pretrained ckpt file")         # FIXME : Add default value
 parser.add_argument("--inference_set", type=str, default='test', help="Define on which set the inference should be runned")
+parser.add_argument("--dict_file_path", type=str, default=None, help="Define what dictionnary file should be used")
+
 # TODO : Add option for custom test file
 
 # Output parameters
@@ -284,6 +286,9 @@ def main(args):
         experiment_date = "latest"
         args.film_ckpt_path = "%s/train_film/%s/%s/best/checkpoint.ckpt" % (args.output_root_path, args.version_name, experiment_date)
 
+    if args.dict_file_path is None:
+        args.dict_file_path = "%s/preprocessed/dict.json" % data_path
+
     film_model_config = get_config(args.config_path)
 
     create_output_folder = not is_preprocessing
@@ -296,14 +301,18 @@ def main(args):
         create_folder_if_necessary(output_dated_folder)
         create_symlink_to_latest_folder(output_experiment_folder, current_datetime_str)
 
-        # Save arguments to output folder
+        # Save arguments & config to output folder
         save_json(args, output_dated_folder, filename="arguments.json")
+        save_json(film_model_config, output_dated_folder, filename='config_%s.json' % film_model_config['input']['type'])
+
+        # Copy dictionary file used
+        shutil.copyfile(args.dict_file_path, "%s/dict.json" % output_dated_folder)
 
     ########################################################
     ################### Data Loading #######################
     ########################################################
-    dataset = CLEARDataset(data_path, film_model_config['input'],
-                           batch_size=args.batch_size, tokenize_text=not is_preprocessing)
+    dataset = CLEARDataset(data_path, film_model_config['input'], batch_size=args.batch_size,
+                           tokenize_text=not is_preprocessing, dict_file_path=args.dict_file_path)
 
     ########################################################
     ################## Network Setup #######################
@@ -345,11 +354,7 @@ def main(args):
         # TODO : Export visualizations
 
     if create_output_folder:
-        with open('%s/config_%s.json' % (output_dated_folder, film_model_config['input']['type']), 'w') as f:
-            ujson.dump(film_model_config, f, indent=2)
-
-        with open('%s/timing.json' % output_dated_folder, 'w') as f:
-            ujson.dump({'time_elapsed': time_elapsed}, f, indent=2)
+        save_json({'time_elapsed': time_elapsed}, output_dated_folder, filename='timing.json')
 
         print("All Done")
 
