@@ -63,22 +63,25 @@ class ErrorImgLoader(AbstractImgLoader):
 
 
 class RawImageBuilder(AbstractImgBuilder):
-    def __init__(self, img_dir, width, height, per_channel_mean_to_substract=None):
+    def __init__(self, img_dir, width, height, normalize_image=True, per_channel_mean_to_substract=None):
         AbstractImgBuilder.__init__(self, img_dir, is_raw=True, require_process=True)
         self.width = width
         self.height = height
         self.per_channel_mean_to_substract = per_channel_mean_to_substract
+        self.normalize_image = normalize_image
 
     def build(self, image_id, filename, which_set, **kwargs):
         img_path = os.path.join(self.img_dir, which_set, filename)
-        return RawImageLoader(img_path, self.width, self.height, per_channel_mean_to_substract=self.per_channel_mean_to_substract)
+        return RawImageLoader(img_path, self.width, self.height, normalize_image=self.normalize_image,
+                              per_channel_mean_to_substract=self.per_channel_mean_to_substract)
 
 class RawImageLoader(AbstractImgLoader):
-    def __init__(self, img_path, width, height, per_channel_mean_to_substract):
+    def __init__(self, img_path, width, height, normalize_image, per_channel_mean_to_substract):
         AbstractImgLoader.__init__(self, img_path)
         self.width = width
         self.height = height
         self.per_channel_mean_to_substract = per_channel_mean_to_substract
+        self.normalize_image = normalize_image
 
 
     def get_image(self, **kwargs):
@@ -87,6 +90,11 @@ class RawImageLoader(AbstractImgLoader):
         img = resize_image(img, self.width , self.height)
         img = np.array(img, dtype=np.float32)
 
+        if self.normalize_image:
+            img_min = img.min()
+            img = (img - img_min) / (img.max() - img_min)
+            
+        # FIXME : This is clashing with the normalize image
         if self.per_channel_mean_to_substract is not None:
             img -= self.per_channel_mean_to_substract[None, None, :]
 
