@@ -80,18 +80,19 @@ def create_dict_from_questions(dataset, word_min_occurence=1, dict_filename='dic
 
     tokenizer = CLEARTokenizer.get_tokenizer_inst()
 
+    # Tokenize questions
     for game in games:
         input_tokens = tokenizer.tokenize(game.question)
         for tok in input_tokens:
             word2occ[tok] += 1
 
-    # parse the questions
-    for word, occ in word2occ.items():
+    # Sort tokens by words to enhance reproducibility
+    for word, occ in sorted(word2occ.items(), key=lambda x: x[0]):
         if occ >= word_min_occurence:
             word2i[word] = len(word2i)
 
     # parse the answers
-    for answer in answer2occ.keys():
+    for answer in sorted(answer2occ.keys()):
         answer2i[answer] = len(answer2i)
 
     print("Number of words: {}".format(len(word2i)))
