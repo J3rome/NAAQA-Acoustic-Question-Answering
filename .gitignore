@@ -105,6 +105,13 @@ ENV/
 
 /tensorboard/
 /Vis_*/
+/*logs/
+/*checkpoints/
 
 /data
 /out/
+.idea/
+/output
+/activate-venv
+/*.json
+/*beholder
