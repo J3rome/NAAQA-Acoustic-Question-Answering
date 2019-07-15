@@ -6,6 +6,27 @@ from models.abstract_network import ResnetModel     # TODO : Verify, is this rea
 
 import models.utils as model_utils
 
+
+def variable_summaries(var, name_scope=None):
+    """Attach a lot of summaries to a Tensor (for TensorBoard visualization)."""
+    def create_summaries(var):
+        with tf.name_scope('summaries'):
+            mean = tf.reduce_mean(var)
+            tf.summary.scalar('mean', mean)
+            with tf.name_scope('stddev'):
+                stddev = tf.sqrt(tf.reduce_mean(tf.square(var - mean)))
+            tf.summary.scalar('stddev', stddev)
+            tf.summary.scalar('max', tf.reduce_max(var))
+            tf.summary.scalar('min', tf.reduce_min(var))
+            tf.summary.histogram('histogram', var)
+
+    if name_scope is None:
+        create_summaries(var)
+    else:
+        with tf.name_scope(name_scope):
+            create_summaries(var)
+
+
 def film_layer(ft, context, reuse=False):
     """
     A very basic FiLM layer with a linear transformation from context to FiLM parameters
@@ -66,6 +87,8 @@ class FiLMResblock(object):
                           scope='conv1',
                           reuse=reuse)
 
+        variable_summaries(self.conv1_out, name_scope='conv1')
+
         # Second convolution
         self.conv2 = tfc_layers.conv2d(self.conv1_out,
                           num_outputs=feature_size,
@@ -84,15 +107,25 @@ class FiLMResblock(object):
                                   is_training=is_training,
                                   reuse=reuse)
 
+            variable_summaries(self.conv2)
+            variable_summaries(self.conv2_bn, name_scope='bn')
+
         # Apply FILM layer Residual connection
         with tf.variable_scope("FiLM", reuse=reuse):
             self.conv2_film, self.gamma_vector, self.beta_vector = film_layer_fct(self.conv2_bn, context, reuse=reuse)
+            variable_summaries(self.conv2_film, name_scope='conv2_out')
+            variable_summaries(self.gamma_vector, name_scope='gamma')
+            variable_summaries(self.beta_vector, name_scope='beta')
+
 
         # Apply ReLU
         self.conv2_out = tf.nn.relu(self.conv2_film)
+        variable_summaries(self.conv2_out, name_scope='conv2_relu')
 
         # Residual connection
         self.output = self.conv2_out + self.conv1_out
+
+        variable_summaries(self.output, name_scope='output')
 
     def get(self):
         return self.output
@@ -131,6 +164,8 @@ class FiLM_Network(ResnetModel):
                 scope="word_embedding",
                 reuse=reuse)
 
+            variable_summaries(word_emb, name_scope='word_embedding')
+
             # word_emb = tf.nn.dropout(word_emb, dropout_keep)
             rnn_cell = tfc_rnn.GRUCell(
                 num_units=config["question"]["rnn_state_size"],
@@ -142,6 +177,8 @@ class FiLM_Network(ResnetModel):
                 inputs=word_emb,
                 dtype=tf.float32,
                 sequence_length=self._seq_length)
+
+            variable_summaries(self.rnn_state, name_scope='rnn_state')
 
             #####################
             #   IMAGES
@@ -155,12 +192,13 @@ class FiLM_Network(ResnetModel):
             assert len(self._image.get_shape()) == 4, \
                 "Incorrect image input and/or attention mechanism (should be none)"
 
+            variable_summaries(self._image, name_scope='input_image')
+
             #####################
             #   STEM
             #####################
 
             with tf.variable_scope("stem", reuse=reuse):
-
                 stem_features = self._image
                 if config["stem"]["spatial_location"]:
                     stem_features = model_utils.append_spatial_location(stem_features)
@@ -173,6 +211,8 @@ class FiLM_Network(ResnetModel):
                                                    activation_fn=tf.nn.relu,
                                                    reuse=reuse,
                                                    scope="stem_conv")
+
+                variable_summaries(self.stem_conv, name_scope='stem_conv')
 
             #####################
             #   FiLM Layers
@@ -218,7 +258,10 @@ class FiLM_Network(ResnetModel):
                                                       reuse=reuse,
                                                       scope="classifier_conv")
 
+                variable_summaries(self.classif_conv, name_scope='classifier_conv')
+
                 self.max_pool = tf.reduce_max(self.classif_conv, axis=[1,2], keep_dims=False, name="global_max_pool")
+                variable_summaries(self.max_pool, name_scope='global_max_pool')
 
                 self.hidden_state = tfc_layers.fully_connected(self.max_pool,
                                                                num_outputs=config["classifier"]["no_mlp_units"],
@@ -228,27 +271,36 @@ class FiLM_Network(ResnetModel):
                                                                reuse=reuse,
                                                                scope="classifier_hidden_layer")
 
+                variable_summaries(self.hidden_state, name_scope='classif_hidden')
+
                 self.out = tfc_layers.fully_connected(self.hidden_state,
                                                              num_outputs=no_answers,
                                                              activation_fn=None,
                                                              reuse=reuse,
                                                              scope="classifier_softmax_layer")
 
+                variable_summaries(self.out, name_scope='fully_connected')
+
             #####################
             #   Loss
             #####################
 
             self.cross_entropy = tf.nn.sparse_softmax_cross_entropy_with_logits(logits=self.out, labels=self._answer, name='cross_entropy')
+            variable_summaries(self.cross_entropy, name_scope='cross_entropy')
+
             self.loss = tf.reduce_mean(self.cross_entropy)
+            variable_summaries(self.loss, name_scope='loss')
 
             self.softmax = tf.nn.softmax(self.out, name='answer_prob')
+            variable_summaries(self.softmax, name_scope='softmax')
             self.prediction = tf.argmax(self.out, axis=1, name='predicted_answer')  # no need to compute the softmax
+
+            #variable_summaries(self.prediction, name_scope='prediction')
 
             with tf.variable_scope('accuracy'):
                 self.accuracy = tf.equal(self.prediction, self._answer)
                 self.accuracy = tf.reduce_mean(tf.cast(self.accuracy, tf.float32))
-
-            tf.summary.scalar('accuracy', self.accuracy)
+                variable_summaries(self.accuracy)
 
             print('FiLM Model... built!')
 
