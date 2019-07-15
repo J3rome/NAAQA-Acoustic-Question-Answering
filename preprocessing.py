@@ -8,7 +8,7 @@ from collections import defaultdict
 from random import shuffle
 
 from data_interfaces.CLEAR_tokenizer import CLEARTokenizer
-from utils import create_folder_if_necessary
+from utils import create_folder_if_necessary, save_json
 
 # >>> Feature Extraction
 def preextract_features(sess, dataset, network_wrapper, resnet_ckpt_path, sets=['train', 'val', 'test'], output_folder_name="preprocessed"):
@@ -58,10 +58,9 @@ def preextract_features(sess, dataset, network_wrapper, resnet_ckpt_path, sets=[
 
         print("%s set features extracted to '%s'." % (set_type, output_filepath))
 
-    with open('%s/feature_shape.json' % output_folder, 'w') as f:
-        ujson.dump({
-            "extracted_feature_shape" : feature_extractor_output_shape
-        }, f, indent=2)
+    save_json({"extracted_feature_shape" : feature_extractor_output_shape},
+              output_folder, 'feature_shape.json', indented=True)
+
 
 # >>> Dictionary Creation (For word tokenization)
 def create_dict_from_questions(dataset, word_min_occurence=1, dict_filename='dict.json'):
@@ -109,16 +108,14 @@ def create_dict_from_questions(dataset, word_min_occurence=1, dict_filename='dic
     print("Number of answers: {}".format(len(answer2i)))
 
     preprocessed_folder_path = os.path.join(dataset.root_folder_path, 'preprocessed')
-    dict_file_path = os.path.join(preprocessed_folder_path, dict_filename)
 
     if not os.path.isdir(preprocessed_folder_path):
         os.mkdir(preprocessed_folder_path)
 
-    with open(dict_file_path, 'w') as f:
-        ujson.dump({
+    save_json({
             'word2i': word2i,
             'answer2i': answer2i
-        }, f, indent=2)
+        }, preprocessed_folder_path, dict_filename)
 
 
 if __name__ == "__main__":
