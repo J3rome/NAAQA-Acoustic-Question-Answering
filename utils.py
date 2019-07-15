@@ -111,6 +111,11 @@ def save_json(results, output_folder, filename, indented=True):
         ujson.dump(results, f, indent=2 if indented else None, escape_forward_slashes=False)
 
 
+def read_json(folder, filename):
+    with open('%s/%s' % (folder, filename), 'r') as f:
+        return ujson.load(f)
+
+
 def is_tensor_optimizer(x):
     return hasattr(x, 'op_def')
 
