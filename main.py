@@ -48,6 +48,8 @@ parser.add_argument("--nb_epoch", type=int, default=15, help="Nb of epoch for tr
 parser.add_argument("--nb_epoch_stats_to_keep", type=int, default=5, help="Nb of epoch stats to keep for training")
 parser.add_argument("--batch_size", type=int, default=32, help="Batch size (For training and inference)")
 parser.add_argument("--random_seed", type=int, default=None, help="Random seed used for the experiment")
+parser.add_argument("--force_dict_all_answer", help="Will make sure that all answers are included in the dict" +
+                                                    "(not just the one appearing in the train set)", action='store_true')
 
 
 # TODO : Arguments Handling
@@ -364,10 +366,10 @@ def main(args):
             preextract_features(sess, dataset, network_wrapper, args.resnet_ckpt_path)
 
         elif task == "create_dict":
-            create_dict_from_questions(dataset)
+            create_dict_from_questions(dataset, force_all_answers=args.force_dict_all_answer)
 
         elif task == "full_preprocessing":
-            create_dict_from_questions(dataset)
+            create_dict_from_questions(dataset, force_all_answers=args.force_dict_all_answer)
             preextract_features(sess, dataset, network_wrapper, args.resnet_ckpt_path)
 
         time_elapsed = str(datetime.now() - current_datetime)

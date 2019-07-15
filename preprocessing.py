@@ -8,7 +8,8 @@ from collections import defaultdict
 from random import shuffle
 
 from data_interfaces.CLEAR_tokenizer import CLEARTokenizer
-from utils import create_folder_if_necessary, save_json
+from utils import create_folder_if_necessary, save_json, read_json
+
 
 # >>> Feature Extraction
 def preextract_features(sess, dataset, network_wrapper, resnet_ckpt_path, sets=['train', 'val', 'test'], output_folder_name="preprocessed"):
@@ -63,7 +64,7 @@ def preextract_features(sess, dataset, network_wrapper, resnet_ckpt_path, sets=[
 
 
 # >>> Dictionary Creation (For word tokenization)
-def create_dict_from_questions(dataset, word_min_occurence=1, dict_filename='dict.json'):
+def create_dict_from_questions(dataset, word_min_occurence=1, dict_filename='dict.json', force_all_answers=False):
     # FIXME : Should we use the whole dataset to create the dictionary ?
     games = dataset.games['train']
 
@@ -103,6 +104,21 @@ def create_dict_from_questions(dataset, word_min_occurence=1, dict_filename='dic
     for answer in sorted_answers:
         answer2i[answer] = answer_index
         answer_index += 1
+
+    if force_all_answers:
+        all_answers = read_json(dataset.root_folder_path, 'attributes.json')
+
+        all_answers = [a for answers in all_answers.values() for a in answers]
+
+        index_before_padding = answer_index
+
+        for answer in all_answers:
+            if answer not in answer2i:
+                answer2i[answer] = answer_index
+                answer_index += 1
+                print(answer)
+
+        print("Padded dict with %d missing answers" % (answer_index - index_before_padding))
 
     print("Number of words: {}".format(len(word2i)))
     print("Number of answers: {}".format(len(answer2i)))
