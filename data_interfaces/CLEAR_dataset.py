@@ -3,8 +3,6 @@ import math
 import random
 import collections
 import numpy as np
-import time
-from tqdm import tqdm
 import os
 
 from data_interfaces.CLEAR_tokenizer import CLEARTokenizer
@@ -143,7 +141,7 @@ def create_semaphore_iterator(obj_list, semaphores):
 class CLEARBatchifier(object):
     """Provides an generic multithreaded iterator over the dataset."""
 
-    def __init__(self, games, batch_size, tokenizer, shuffle= True, pad_batches=True):
+    def __init__(self, games, batch_size, tokenizer, shuffle= True, pad_batches=False):
 
         self.tokenizer = tokenizer
 
