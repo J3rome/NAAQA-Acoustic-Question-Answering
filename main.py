@@ -297,8 +297,13 @@ def main(args):
     current_datetime = datetime.now()
     current_datetime_str = current_datetime.strftime("%Y-%m-%d_%Hh%M")
     output_dated_folder = "%s/%s" % (output_experiment_folder, current_datetime_str)
-    writer_folder = '_logs/%s' % current_datetime_str
-    beholder_folder = '_beholder/%s' %current_datetime_str
+
+    tensorboard_folder = "%s/tensorboard" % args.output_root_path
+
+    train_writer_folder = '%s/train/%s' % (tensorboard_folder, current_datetime_str)
+    val_writer_folder = '%s/val/%s' % (tensorboard_folder, current_datetime_str)
+    test_writer_folder = '%s/test/%s' % (tensorboard_folder, current_datetime_str)
+    beholder_folder = '%s/beholder' % tensorboard_folder
 
     if args.resnet_ckpt_path is None:
         args.resnet_ckpt_path = "%s/resnet/resnet_v1_101.ckpt" % args.data_root_path
@@ -344,10 +349,10 @@ def main(args):
     with tf.Session(config=tf.ConfigProto(gpu_options=tf.GPUOptions(allow_growth=True), allow_soft_placement=True)) as sess:
         # Debugging Tools
         #sess = tf_debug.TensorBoardDebugWrapperSession(sess, "T480s:8076")
-        train_writer = tf.summary.FileWriter('train' + writer_folder, sess.graph)  # FIXME : Make the path parametrable ?
-        val_writer = tf.summary.FileWriter('val' + writer_folder, sess.graph)  # FIXME : Make the path parametrable ?
+        train_writer = tf.summary.FileWriter(train_writer_folder, sess.graph)  # FIXME : Make the path parametrable ?
+        val_writer = tf.summary.FileWriter(val_writer_folder, sess.graph)  # FIXME : Make the path parametrable ?
 
-        beholder = Beholder('train_beholder')
+        beholder = Beholder(beholder_folder)
 
         if task == "train_film":
             do_film_training(sess, dataset, network_wrapper, film_model_config['optimizer'],
