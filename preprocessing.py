@@ -5,6 +5,7 @@ import tensorflow as tf
 import numpy as np
 from tqdm import tqdm
 from collections import defaultdict
+from random import shuffle
 
 from data_interfaces.CLEAR_tokenizer import CLEARTokenizer
 from utils import create_folder_if_necessary
@@ -70,10 +71,12 @@ def create_dict_from_questions(dataset, word_min_occurence=1, dict_filename='dic
     word2i = {'<padding>': 0,
               '<unk>': 1
               }
+    word_index = max(word2i.values()) + 1
 
-    answer2i = {  # '<padding>': 0,        # FIXME : Why would we need padding in the answers ?
+    answer2i = {  #'<padding>': 0,        # FIXME : Why would we need padding in the answers ?
         '<unk>': 0  # FIXME : We have no training example with unkonwn answer. Add Switch to remove unknown answer
     }
+    answer_index = max(answer2i.values()) + 1
 
     answer2occ = dataset.answer_counter['train']
     word2occ = defaultdict(int)
@@ -86,14 +89,21 @@ def create_dict_from_questions(dataset, word_min_occurence=1, dict_filename='dic
         for tok in input_tokens:
             word2occ[tok] += 1
 
-    # Sort tokens by words to enhance reproducibility
-    for word, occ in sorted(word2occ.items(), key=lambda x: x[0]):
-        if occ >= word_min_occurence:
-            word2i[word] = len(word2i)
+    # Sort tokens then shuffle then to keep control over the order (to enhance reproducibility)
+    sorted_words = sorted(word2occ.items(), key=lambda x: x[0])
+    shuffle(sorted_words)
 
+    for word_occ in sorted_words:
+        if word_occ[1] >= word_min_occurence:
+            word2i[word_occ[0]] = word_index
+            word_index += 1
+
+    sorted_answers = sorted(answer2occ.keys())
+    shuffle(sorted_answers)
     # parse the answers
-    for answer in sorted(answer2occ.keys()):
-        answer2i[answer] = len(answer2i)
+    for answer in sorted_answers:
+        answer2i[answer] = answer_index
+        answer_index += 1
 
     print("Number of words: {}".format(len(word2i)))
     print("Number of answers: {}".format(len(answer2i)))
