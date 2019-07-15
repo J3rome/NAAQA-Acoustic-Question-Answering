@@ -1,7 +1,0 @@
--data_dir=data/v1.0.0_50k_scenes_20_inst
--img_dir=data/v1.0.0_50k_scenes_20_inst/preprocessed
--config=config/clevr/film.2resblock.json
--exp_dir=out/v2.0.0_50k_scenes_20_inst_2resblock
--no_thread=6
--gpu_ratio=0.99
--no_gpu=1
