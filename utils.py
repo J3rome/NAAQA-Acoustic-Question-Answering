@@ -129,3 +129,7 @@ def is_tensor_gamma_list(x):
 
 def is_tensor_beta_list(x):
     return isinstance(x, list) and isinstance(x[0], tf.Tensor) and 'beta' in x[0].name
+
+
+def is_tensor_summary(x):
+    return isinstance(x, tf.Tensor) and x.dtype is tf.string

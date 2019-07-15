@@ -5,13 +5,14 @@ import subprocess
 import shutil
 
 import tensorflow as tf
+from tensorboard.plugins.beholder import Beholder
 from tqdm import tqdm
 import numpy as np
 import ujson
 
 from utils import set_random_seed, create_folder_if_necessary, get_config, process_predictions, process_gamma_beta
 from utils import create_symlink_to_latest_folder, save_training_stats, save_json
-from utils import is_tensor_optimizer, is_tensor_prediction, is_tensor_scalar, is_tensor_beta_list, is_tensor_gamma_list
+from utils import is_tensor_optimizer, is_tensor_prediction, is_tensor_scalar, is_tensor_beta_list, is_tensor_gamma_list, is_tensor_summary
 
 from models.film_network_wrapper import FiLM_Network_Wrapper
 from data_interfaces.CLEAR_dataset import CLEARDataset
@@ -60,7 +61,7 @@ parser.add_argument("--random_seed", type=int, default=None, help="Random seed u
 #
 
 # >>> Training
-def do_one_epoch(sess, batchifier, network_wrapper, outputs_var):
+def do_one_epoch(sess, batchifier, network_wrapper, outputs_var, epoch_index, writer=None, beholder=None):
     # check for optimizer to define training/eval mode
     is_training = any([is_tensor_optimizer(x) for x in outputs_var])
 
@@ -69,11 +70,17 @@ def do_one_epoch(sess, batchifier, network_wrapper, outputs_var):
     processed_predictions = []
     processed_gamma_beta = []
 
+    summary_index = epoch_index * batchifier.batch_size
+
     for batch in tqdm(batchifier):
 
         feed_dict = network_wrapper.get_feed_dict(is_training, batch['question'], batch['answer'], batch['image'], batch['seq_length'])
 
         results = sess.run(outputs_var, feed_dict=feed_dict)
+
+        if beholder is not None:
+            print("Beholder Update")
+            beholder.update(session=sess)
 
         for var, result in zip(outputs_var, results):
             if is_tensor_scalar(var):
@@ -87,6 +94,13 @@ def do_one_epoch(sess, batchifier, network_wrapper, outputs_var):
                 gamma_beta['gamma'].append(result)
             elif is_tensor_beta_list(var):
                 gamma_beta['beta'].append(result)
+
+            elif is_tensor_summary(var) and writer is not None:
+                writer.add_summary(result, summary_index)
+                summary_index += 1
+
+        if writer is not None and summary_index > epoch_index * batchifier.batch_size:
+            writer.flush()
 
     for var in aggregated_outputs.keys():
         if is_tensor_scalar(var):
@@ -106,7 +120,7 @@ def do_one_epoch(sess, batchifier, network_wrapper, outputs_var):
 
 
 def do_film_training(sess, dataset, network_wrapper, optimizer_config, resnet_ckpt_path, nb_epoch, output_folder,
-                     nb_epoch_to_keep=None):
+                     train_writer=None, val_writer=None, beholder=None, nb_epoch_to_keep=None):
     stats_file_path = "%s/stats.json" % output_folder
 
     # Setup optimizer (For training)
@@ -131,7 +145,7 @@ def do_film_training(sess, dataset, network_wrapper, optimizer_config, resnet_ck
 
     gamma_vector_tensors, beta_vector_tensors = network_wrapper.get_gamma_beta()
 
-    op_to_run = [loss, accuracy, prediction, gamma_vector_tensors, beta_vector_tensors]
+    op_to_run = [tf.summary.merge_all(), loss, accuracy, prediction, gamma_vector_tensors, beta_vector_tensors]
 
     # Training Loop
     for epoch in range(nb_epoch):
@@ -143,7 +157,10 @@ def do_film_training(sess, dataset, network_wrapper, optimizer_config, resnet_ck
         train_loss, train_accuracy, train_predictions, train_gamma_beta_vectors = do_one_epoch(sess,
                                                                                         dataset.get_batches('train'),
                                                                                         network_wrapper,
-                                                                                        op_to_run + [optimize_step])
+                                                                                        op_to_run + [optimize_step],
+                                                                                        epoch,
+                                                                                        writer=train_writer,
+                                                                                        beholder=beholder)
 
         epoch_train_time = datetime.now() - time_before_epoch
 
@@ -155,7 +172,8 @@ def do_film_training(sess, dataset, network_wrapper, optimizer_config, resnet_ck
         # FIXME : Validation accuracy is skewed by the batch padding. We could recalculate accuracy from the prediction (After removing padded ones)
         val_loss, val_accuracy, val_predictions, val_gamma_beta_vectors = do_one_epoch(sess,
                                                                             dataset.get_batches('val', shuffled=False),
-                                                                            network_wrapper, op_to_run)
+                                                                            network_wrapper, op_to_run,
+                                                                            epoch, writer=None)#val_writer)
 
         print("Validation :")
         print("    Loss : %f  - Accuracy : %f" % (val_loss, val_accuracy))
@@ -277,6 +295,8 @@ def main(args):
     current_datetime = datetime.now()
     current_datetime_str = current_datetime.strftime("%Y-%m-%d_%Hh%M")
     output_dated_folder = "%s/%s" % (output_experiment_folder, current_datetime_str)
+    writer_folder = '_logs/%s' % current_datetime_str
+    beholder_folder = '_beholder/%s' %current_datetime_str
 
     if args.resnet_ckpt_path is None:
         args.resnet_ckpt_path = "%s/resnet/resnet_v1_101.ckpt" % args.data_root_path
@@ -322,11 +342,15 @@ def main(args):
     with tf.Session(config=tf.ConfigProto(gpu_options=tf.GPUOptions(allow_growth=True), allow_soft_placement=True)) as sess:
         # Debugging Tools
         #sess = tf_debug.TensorBoardDebugWrapperSession(sess, "T480s:8076")
-        tensorboard_writer = tf.summary.FileWriter('test_resnet_logs', sess.graph)   #FIXME : Make the path parametrable ?
+        train_writer = tf.summary.FileWriter('train' + writer_folder, sess.graph)  # FIXME : Make the path parametrable ?
+        val_writer = tf.summary.FileWriter('val' + writer_folder, sess.graph)  # FIXME : Make the path parametrable ?
+
+        beholder = Beholder('train_beholder')
 
         if task == "train_film":
             do_film_training(sess, dataset, network_wrapper, film_model_config['optimizer'],
                              args.resnet_ckpt_path, args.nb_epoch, output_dated_folder,
+                             train_writer=train_writer, val_writer=val_writer, beholder=beholder,
                              nb_epoch_to_keep=args.nb_epoch_stats_to_keep)
 
         elif task == "inference":

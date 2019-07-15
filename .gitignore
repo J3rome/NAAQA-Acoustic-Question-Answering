@@ -114,3 +114,4 @@ ENV/
 /output
 /activate-venv
 /*.json
+/*beholder
