@@ -7,6 +7,7 @@ import os
 
 from data_interfaces.CLEAR_tokenizer import CLEARTokenizer
 from data_interfaces.CLEAR_image_loader import CLEARImage, get_img_builder
+from utils import read_json
 
 class Game(object):
     def __init__(self, id, image, question, answer):
@@ -28,9 +29,11 @@ class CLEARDataset(object):
         else:
             self.sets = sets
 
+        preprocessed_folder_path = '{}/preprocessed'.format(folder)
+
         if tokenize_text:
             if dict_file_path is None:
-                dict_file_path = '{}/preprocessed/dict.json'.format(folder)
+                dict_file_path = '{}/dict.json'.format(preprocessed_folder_path)
 
             self.tokenizer = CLEARTokenizer(dict_file_path)
         else:
@@ -40,16 +43,14 @@ class CLEARDataset(object):
         self.batch_size = batch_size
         self.image_builder = get_img_builder(image_config, folder, bufferize=None)    # TODO : Figure out buffersize
 
-        preprocessed_feature_shape_json_path = "{}/preprocessed/feature_shape.json".format(folder)
+        feature_shape_filename = "feature_shape.json"
 
         if self.image_builder.is_raw_image():
             self.input_shape = image_config['dim']
-        elif os.path.isfile(preprocessed_feature_shape_json_path):
-            with open(preprocessed_feature_shape_json_path) as f:
-                self.input_shape = json.load(f)['extracted_feature_shape']
+        elif os.path.isfile("{}/{}".format(preprocessed_folder_path, feature_shape_filename)):
+            self.input_shape = read_json(preprocessed_folder_path, feature_shape_filename)
 
-        with open("{}/attributes.json".format(folder)) as f:
-            attributes = json.load(f)
+        attributes = read_json(folder, 'attributes.json')
 
         self.answer_to_family = {"<unk>": "unknown"}       # FIXME : Quantify what is the impact of having an unknown answer
 
