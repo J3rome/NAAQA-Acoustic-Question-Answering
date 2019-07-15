@@ -110,15 +110,16 @@ def create_dict_from_questions(dataset, word_min_occurence=1, dict_filename='dic
 
         all_answers = [a for answers in all_answers.values() for a in answers]
 
-        index_before_padding = answer_index
+        padded_answers = []
 
         for answer in all_answers:
             if answer not in answer2i:
                 answer2i[answer] = answer_index
                 answer_index += 1
-                print(answer)
+                padded_answers.append(answer)
 
-        print("Padded dict with %d missing answers" % (answer_index - index_before_padding))
+        print("Padded dict with %d missing answers : " % len(padded_answers))
+        print(padded_answers)
 
     print("Number of words: {}".format(len(word2i)))
     print("Number of answers: {}".format(len(answer2i)))
