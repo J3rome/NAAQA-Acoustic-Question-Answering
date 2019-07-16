@@ -75,6 +75,9 @@ class RawImageBuilder(AbstractImgBuilder):
         return RawImageLoader(img_path, self.width, self.height, normalize_image=self.normalize_image,
                               per_channel_mean_to_substract=self.per_channel_mean_to_substract)
 
+from skimage import io
+from skimage.color import rgba2rgb
+
 class RawImageLoader(AbstractImgLoader):
     def __init__(self, img_path, width, height, normalize_image, per_channel_mean_to_substract):
         AbstractImgLoader.__init__(self, img_path)
@@ -85,18 +88,22 @@ class RawImageLoader(AbstractImgLoader):
 
 
     def get_image(self, **kwargs):
-        img = Image.open(self.img_path).convert('RGB')
+        #img = Image.open(self.img_path).convert('RGB')
 
-        img = resize_image(img, self.width , self.height)
-        img = np.array(img, dtype=np.float32)
+        # Our images are saved as RGBA. The A dimension is always 1.
+        # We could simply get rid of it instead of converting
+        img = io.imread(self.img_path)[:,:,:3]
 
-        if self.normalize_image:
-            img_min = img.min()
-            img = (img - img_min) / (img.max() - img_min)
+        #img = resize_image(img, self.width , self.height)
+        #img = np.array(img, dtype=np.float32)
+
+        #if self.normalize_image:
+        #    img_min = img.min()
+        #    img = (img - img_min) / (img.max() - img_min)
             
         # FIXME : This is clashing with the normalize image
-        if self.per_channel_mean_to_substract is not None:
-            img -= self.per_channel_mean_to_substract[None, None, :]
+        #if self.per_channel_mean_to_substract is not None:
+        #    img -= self.per_channel_mean_to_substract[None, None, :]
 
         return img
 
