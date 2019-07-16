@@ -48,7 +48,7 @@ class CLEARDataset(object):
         if self.image_builder.is_raw_image():
             self.input_shape = image_config['dim']
         elif os.path.isfile("{}/{}".format(preprocessed_folder_path, feature_shape_filename)):
-            self.input_shape = read_json(preprocessed_folder_path, feature_shape_filename)
+            self.input_shape = read_json(preprocessed_folder_path, feature_shape_filename)['extracted_feature_shape']
 
         attributes = read_json(folder, 'attributes.json')
 
