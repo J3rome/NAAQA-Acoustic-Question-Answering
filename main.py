@@ -352,7 +352,8 @@ def main(args):
         train_writer = tf.summary.FileWriter(train_writer_folder, sess.graph)  # FIXME : Make the path parametrable ?
         val_writer = tf.summary.FileWriter(val_writer_folder, sess.graph)  # FIXME : Make the path parametrable ?
 
-        beholder = Beholder(beholder_folder)
+        #beholder = Beholder(beholder_folder)
+        beholder = None
 
         if task == "train_film":
             do_film_training(sess, dataset, network_wrapper, film_model_config['optimizer'],
