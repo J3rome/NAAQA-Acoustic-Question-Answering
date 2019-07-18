@@ -19,6 +19,12 @@ from data_interfaces.CLEAR_dataset import CLEARDataset
 from visualization import grad_cam_visualization
 from preprocessing import preextract_features, create_dict_from_questions
 
+# NEW IMPORTS
+from models.torch_film_model import CLEAR_FiLM_model
+from data_interfaces.torch_dataset import CLEAR_dataset
+from torchsummary import summary
+import torch
+
 parser = argparse.ArgumentParser('FiLM model for CLEAR Dataset (Acoustic Question Answering)', fromfile_prefix_chars='@')
 
 parser.add_argument("--training", help="FiLM model training", action='store_true')
@@ -334,6 +340,25 @@ def main(args):
 
         # Copy dictionary file used
         shutil.copyfile(args.dict_file_path, "%s/dict.json" % output_dated_folder)
+
+    # Torch Tests
+
+    dataset = CLEAR_dataset(data_path, film_model_config['input'], 'train',
+                            dict_file_path=args.dict_file_path, transforms=None)
+
+    # FIXME : Should not query the tokenizer directly. Won't work in preprocessing mode
+    # FIXME : (Actually, should not instantiate the whole model if in preprocessing. Could use a wrapper or If-Else)
+    model = CLEAR_FiLM_model(film_model_config, dataset.tokenizer.no_words, dataset.tokenizer.no_answers)
+
+    #model.cuda()
+    #torch.backends.cudnn.benchmark = True
+
+
+    summary(model, [(3, 224, 224), (22,)])
+
+    print("YOLOOO")
+
+    exit(0)
 
     ########################################################
     ################### Data Loading #######################

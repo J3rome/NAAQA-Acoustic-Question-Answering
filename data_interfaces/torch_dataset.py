@@ -50,14 +50,14 @@ class ToTensor(object):
         return {
             'image': torch.from_numpy(image).float().div(255),
             #'image': torchvision.transforms.functional.to_tensor(image),
-            'question': torch.from_numpy(sample['question']),
+            'question': torch.from_numpy(sample['question']).int(),
             'answer': torch.from_numpy(sample['answer'])
         }
 
 
 class CLEAR_dataset(Dataset):
 
-    def __init__(self, folder, image_config, batch_size, set, transforms=None, dict_file_path=None, tokenize_text=True):
+    def __init__(self, folder, image_config, set, transforms=None, dict_file_path=None, tokenize_text=True):
         # TODO : I think we should have 1 dataset object for each sets (Train. val test)
 
         preprocessed_folder_path = '{}/preprocessed'.format(folder)
@@ -246,17 +246,17 @@ if __name__ == "__main__":
             "dim": [224, 224, 3]
         }
 
-    test_dataset = CLEAR_dataset('data/v2.0.0_1k_scenes_1_inst_per_scene', image_config, 0, 'train', transforms=ToTensor())
+    test_dataset = CLEAR_dataset('data/v2.0.0_1k_scenes_1_inst_per_scene', image_config, 'train', transforms=ToTensor())
 
     collate_fct = create_collate_fct(test_dataset.tokenizer)
 
     dataloader = DataLoader(test_dataset, batch_size=16, shuffle=False, num_workers=4, collate_fn=collate_fct)
 
-    device = torch.device("cuda:0" if torch.cuda.is_available() else 'cpu')
+    #device = torch.device("cuda:0" if torch.cuda.is_available() else 'cpu')
 
-    train_model(device, None, dataloader)
+    #train_model(device, None, dataloader)
 
-    #batch = next(iter(dataloader))
+    batch = next(iter(dataloader))
     #grid = torchvision.utils.make_grid(batch['image'], padding=3)
     #imshow(grid)
     #plt.show()
