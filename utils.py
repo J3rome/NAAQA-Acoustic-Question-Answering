@@ -6,6 +6,8 @@ import subprocess
 import ujson
 from collections import defaultdict
 
+import torch
+
 
 def get_config(config_path):
     with open(config_path) as f:
@@ -15,7 +17,10 @@ def get_config(config_path):
 def set_random_seed(seed):
     random.seed(seed)
     np.random.seed(seed)
-    tf.random.set_random_seed(seed)
+    torch.manual_seed(seed)
+
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed(seed)
 
 
 def create_folder_if_necessary(folder_path, overwrite_folder=False):
