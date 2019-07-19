@@ -272,10 +272,10 @@ def do_batch_inference(sess, dataset, network_wrapper, output_folder, film_ckpt_
 
 
 # FIXME : This does training on train. We should divide it in a do_one_epoch() so we can call both train and val. (Or is it better to have a do_one_epoch + eval ?)
-def train_model(device, model, dataloader, criterion=None, optimizer=None, scheduler=None, num_epochs=25):
+def train_model(device, model, dataloader, output_folder, criterion=None, optimizer=None, scheduler=None, num_epochs=25):
     since = time.time()
 
-    #best_model_wts = copy.deepcopy(model.state_dict())
+    best_model_wts = copy.deepcopy(model.state_dict())
     best_acc = 0.0
 
     dataset_size = len(dataloader.dataset)
@@ -285,7 +285,6 @@ def train_model(device, model, dataloader, criterion=None, optimizer=None, sched
         print('-' * 10)
 
         #scheduler.step()
-        #model.cuda()
         model.train()  # Set model to training mode
 
         running_loss = 0.0
@@ -319,6 +318,10 @@ def train_model(device, model, dataloader, criterion=None, optimizer=None, sched
 
         print('{} Loss: {:.4f} Acc: {:.4f}'.format('Train', epoch_loss, epoch_acc))
 
+        if epoch_acc > best_acc:
+            best_acc = epoch_acc
+            best_model_wts = copy.deepcopy(model.state_dict())
+
 
         # TODO : Save model
         # TODO : Save gamma & beta
@@ -330,8 +333,11 @@ def train_model(device, model, dataloader, criterion=None, optimizer=None, sched
         time_elapsed // 60, time_elapsed % 60))
     print('Best val Acc: {:4f}'.format(best_acc))
 
+    # Save best model weights
+    torch.save(best_model_wts, '%s/best_model.pt' % output_folder)
+
     # load best model weights
-    #model.load_state_dict(best_model_wts)
+    model.load_state_dict(best_model_wts)
     return model
 
 def main(args):
@@ -444,7 +450,7 @@ def main(args):
                                  weight_decay=film_model_config['optimizer']['weight_decay'])
     #scheduler = torch.optim.lr_scheduler   # FIXME : Using a scheduler give the ability to decay only each N epoch.
 
-    train_model(device=device, model=film_model, dataloader=train_dataloader,
+    train_model(device=device, model=film_model, dataloader=train_dataloader, output_folder=output_dated_folder,
                 criterion=nn.CrossEntropyLoss(), optimizer=optimizer, num_epochs=args.nb_epoch)
 
     print("All Done for now")
