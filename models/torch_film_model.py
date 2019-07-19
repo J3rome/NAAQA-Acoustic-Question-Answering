@@ -128,51 +128,13 @@ class FiLMed_resblock(nn.Module):
         return out + conv1_out
 
 
-
-
 class CLEAR_FiLM_model(nn.Module):
-    def __init__(self, config, no_words, no_answers):
+    def __init__(self, config, input_image_channels, nb_words, nb_answers):
         super(CLEAR_FiLM_model, self).__init__()
-
-        seq_length = 0
-
-        # Dropout
-
-        # Inputs
-            # question (And seq_length ?)
-            # Image
-            # Answer (Ground Truth)
-
-        # Layers
-            # Question Pipeline
-                # Question -> Word Embedding
-                # Word Embedding -> GRU
-
-            # Image Pipeline
-                # Image -> Spatial Location layer (Not sure what it is..)
-                # Image + Spatial -> Stem convolution -> Batch Norm -> Relu
-
-                # Resblocks (Can have multiple resblock)
-                    # Stem Conv -> Spatial Location Layer (Input can also be output of last resblock
-                    # Stem Conv + Spatial -> Conv1 -> relu
-                    # Conv1 -> Conv2
-                    # Conv2 -> BN
-                    ### GRU Hidden State * BN -> Conv2_FiLMed -> Relu
-                    # Residual (Conv1 + Conv2_FiLMed_Relu)
-
-            # Classifier
-                # Last Resblock Output -> Spatial Location
-                # Last Resblock Output + Spatial -> Conv -> BN -> Relu
-                # Conv -> Max Pooling (Keep 1 data per dimension)       # TODO : Max Vs Average Vs Concat(Max,Average)
-                # MaxPool -> Fully Connected -> BN -> Relu
-                # Hidden Fully Connected -> Fully Connected -> Output (Softmax layer)
-
-        # Loss
-            # Cross entropy
 
         # Question Pipeline
         # FIXME : seq_length must be fed as the first dimension
-        self.word_emb = nn.Embedding(num_embeddings=no_words,
+        self.word_emb = nn.Embedding(num_embeddings=nb_words,
                                      embedding_dim=config['question']['word_embedding_dim'])
 
         # TODO : Make sure we have the correct activation fct
@@ -188,7 +150,7 @@ class CLEAR_FiLM_model(nn.Module):
         ## Stem
         # TODO : Add spatial location
         self.stem_conv = nn.Sequential(
-            Conv2d_tf(in_channels=3, out_channels=config['stem']['conv_out'],
+            Conv2d_tf(in_channels=input_image_channels, out_channels=config['stem']['conv_out'],
                       kernel_size=config['stem']['conv_kernel'], stride=1, padding='SAME', dilation=1),
 
             nn.BatchNorm2d(config['stem']['conv_out']),
@@ -226,7 +188,7 @@ class CLEAR_FiLM_model(nn.Module):
         )
 
         # FIXME : Rename to softmax ? OR are we missing the softmax ?
-        self.out = nn.Linear(config['classifier']['no_mlp_units'], no_answers)
+        self.out = nn.Linear(config['classifier']['no_mlp_units'], nb_answers)
 
     def forward(self, question, input_image):
         # Question Pipeline

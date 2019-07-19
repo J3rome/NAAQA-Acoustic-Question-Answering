@@ -421,28 +421,32 @@ def main(args):
 
     device = 'cuda:0' if torch.cuda.is_available() and not args.use_cpu else 'cpu'
 
+    transforms_list = []
+    if film_model_config['input']['type'] == 'raw':
+        transforms_list = [ResizeImg((14, 14))]     # FIXME : Find a way to increase this
+
     train_dataset = CLEAR_dataset(data_path, film_model_config['input'], 'train',
                             dict_file_path=args.dict_file_path,
-                            transforms=transforms.Compose([
-                                ResizeImg((14, 14)),
-                                ToTensor()
-                            ]))
+                            transforms=transforms.Compose(transforms_list + [ToTensor()]))
 
     nb_words, nb_answers = train_dataset.get_token_counts()
 
     train_dataloader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=False,
                                   num_workers=4, collate_fn=train_dataset.CLEAR_collate_fct)
 
+    input_image_shape = train_dataset[0]['image'].size()
+
     # FIXME : Should not query the tokenizer directly. Won't work in preprocessing mode
     # FIXME : (Actually, should not instantiate the whole model if in preprocessing. Could use a wrapper or If-Else)
-    film_model = CLEAR_FiLM_model(film_model_config, nb_words, nb_answers)
+    film_model = CLEAR_FiLM_model(film_model_config, input_image_channels=input_image_shape[0],
+                                  nb_words=nb_words, nb_answers=nb_answers)
 
     if device != 'cpu':
         torch.backends.cudnn.benchmark = True
         torch.backends.cudnn.deterministic = True
         film_model.cuda()
 
-    summary(film_model, [(22,), (3, 224, 224)], device=device)
+    summary(film_model, [(22,), input_image_shape], device=device)
 
     # Training
     # FIXME : Not sure what is the current behavious when specifying weight decay to Adam Optimizer. INVESTIGATE THIS
