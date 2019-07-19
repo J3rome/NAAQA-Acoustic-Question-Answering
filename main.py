@@ -59,11 +59,10 @@ parser.add_argument("--nb_epoch", type=int, default=15, help="Nb of epoch for tr
 parser.add_argument("--nb_epoch_stats_to_keep", type=int, default=5, help="Nb of epoch stats to keep for training")
 parser.add_argument("--batch_size", type=int, default=32, help="Batch size (For training and inference)")
 parser.add_argument("--random_seed", type=int, default=None, help="Random seed used for the experiment")
-parser.add_argument("--create_dict", help="Create word dictionary (for tokenization)", action='store_true')
+parser.add_argument("--use_cpu", help="Model will be run/train on CPU", action='store_true')
 parser.add_argument("--force_dict_all_answer", help="Will make sure that all answers are included in the dict" +
                                                     "(not just the one appearing in the train set)" +
                                                     " -- Preprocessing option" , action='store_true')
-parser.add_argument("--use_cpu", help="Model will be run/train on CPU", action='store_true')
 
 
 # TODO : Arguments Handling
