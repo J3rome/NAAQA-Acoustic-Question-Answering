@@ -92,7 +92,8 @@ class RawImageLoader(AbstractImgLoader):
 
         # Our images are saved as RGBA. The A dimension is always 1.
         # We could simply get rid of it instead of converting
-        img = io.imread(self.img_path)[:,:,:3]
+        #img = io.imread(self.img_path)[:,:,:3]
+        img = Image.open(self.img_path).convert('RGB')
 
         #img = resize_image(img, self.width , self.height)
         #img = np.array(img, dtype=np.float32)

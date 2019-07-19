@@ -21,9 +21,14 @@ from preprocessing import preextract_features, create_dict_from_questions
 
 # NEW IMPORTS
 from models.torch_film_model import CLEAR_FiLM_model
-from data_interfaces.torch_dataset import CLEAR_dataset
-from torchsummary import summary
+from data_interfaces.torch_dataset import CLEAR_dataset, ToTensor, ResizeImg  # FIXME : ToTensor should be imported from somewhere else. Utils ?
+from models.torchsummary import summary     # Custom version of torchsummary to fix bugs with input
 import torch
+import time
+import copy
+from torch.utils.data import DataLoader
+import torch.nn as nn
+from torchvision import transforms
 
 parser = argparse.ArgumentParser('FiLM model for CLEAR Dataset (Acoustic Question Answering)', fromfile_prefix_chars='@')
 
@@ -54,8 +59,11 @@ parser.add_argument("--nb_epoch", type=int, default=15, help="Nb of epoch for tr
 parser.add_argument("--nb_epoch_stats_to_keep", type=int, default=5, help="Nb of epoch stats to keep for training")
 parser.add_argument("--batch_size", type=int, default=32, help="Batch size (For training and inference)")
 parser.add_argument("--random_seed", type=int, default=None, help="Random seed used for the experiment")
+parser.add_argument("--create_dict", help="Create word dictionary (for tokenization)", action='store_true')
 parser.add_argument("--force_dict_all_answer", help="Will make sure that all answers are included in the dict" +
-                                                    "(not just the one appearing in the train set)", action='store_true')
+                                                    "(not just the one appearing in the train set)" +
+                                                    " -- Preprocessing option" , action='store_true')
+parser.add_argument("--use_cpu", help="Model will be run/train on CPU", action='store_true')
 
 
 # TODO : Arguments Handling
@@ -264,6 +272,69 @@ def do_batch_inference(sess, dataset, network_wrapper, output_folder, film_ckpt_
     print("Test set accuracy : %f" % accuracy)
 
 
+# FIXME : This does training on train. We should divide it in a do_one_epoch() so we can call both train and val. (Or is it better to have a do_one_epoch + eval ?)
+def train_model(device, model, dataloader, criterion=None, optimizer=None, scheduler=None, num_epochs=25):
+    since = time.time()
+
+    #best_model_wts = copy.deepcopy(model.state_dict())
+    best_acc = 0.0
+
+    dataset_size = len(dataloader.dataset)
+
+    for epoch in range(num_epochs):
+        print('Epoch {}/{}'.format(epoch, num_epochs - 1))
+        print('-' * 10)
+
+        #scheduler.step()
+        #model.cuda()
+        model.train()  # Set model to training mode
+
+        running_loss = 0.0
+        running_corrects = 0
+
+        for i, batch in enumerate(dataloader):
+            mem_trace.report('Batch %d' % i)
+            # TODO : make sure they have the correct type
+            images = batch['image'].to(device)#.type(torch.cuda.FloatTensor)
+            questions = batch['question'].to(device)#.type(torch.cuda.LongTensor)
+            answers = batch['answer'].to(device)#.type(torch.cuda.LongTensor)
+
+            # zero the parameter gradients
+            optimizer.zero_grad()
+
+            with torch.set_grad_enabled(True):  # FIXME : Do we need to set this to false when evaluating validation ?
+                outputs = model(questions, images)
+                _, preds = torch.max(outputs, 1)
+                loss = criterion(outputs, answers)
+
+                # backward + optimize only if in training phase
+                loss.backward()
+                optimizer.step()
+
+            # statistics
+            running_loss += loss.item() * dataloader.batch_size
+            running_corrects += torch.sum(preds == answers.data)
+
+        epoch_loss = running_loss / dataset_size
+        epoch_acc = running_corrects.double() / dataset_size
+
+        print('{} Loss: {:.4f} Acc: {:.4f}'.format('Train', epoch_loss, epoch_acc))
+
+
+        # TODO : Save model
+        # TODO : Save gamma & beta
+        # TODO : Visualize gradcam
+        print()
+
+    time_elapsed = time.time() - since
+    print('Training complete in {:.0f}m {:.0f}s'.format(
+        time_elapsed // 60, time_elapsed % 60))
+    print('Best val Acc: {:4f}'.format(best_acc))
+
+    # load best model weights
+    #model.load_state_dict(best_model_wts)
+    return model
+
 def main(args):
 
     mutually_exclusive_params = [args.training, args.preprocessing, args.inference,
@@ -343,21 +414,41 @@ def main(args):
 
     # Torch Tests
 
-    dataset = CLEAR_dataset(data_path, film_model_config['input'], 'train',
-                            dict_file_path=args.dict_file_path, transforms=None)
+    device = 'cuda:0' if torch.cuda.is_available() and not args.use_cpu else 'cpu'
+
+    train_dataset = CLEAR_dataset(data_path, film_model_config['input'], 'train',
+                            dict_file_path=args.dict_file_path,
+                            transforms=transforms.Compose([
+                                ResizeImg((14, 14)),
+                                ToTensor()
+                            ]))
+
+    nb_words, nb_answers = train_dataset.get_token_counts()
+
+    train_dataloader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=False,
+                                  num_workers=4, collate_fn=train_dataset.CLEAR_collate_fct)
 
     # FIXME : Should not query the tokenizer directly. Won't work in preprocessing mode
     # FIXME : (Actually, should not instantiate the whole model if in preprocessing. Could use a wrapper or If-Else)
-    model = CLEAR_FiLM_model(film_model_config, dataset.tokenizer.no_words, dataset.tokenizer.no_answers)
+    film_model = CLEAR_FiLM_model(film_model_config, nb_words, nb_answers)
 
-    #model.cuda()
-    #torch.backends.cudnn.benchmark = True
+    if device != 'cpu':
+        torch.backends.cudnn.benchmark = True
+        torch.backends.cudnn.deterministic = True
+        film_model.cuda()
 
+    summary(film_model, [(22,), (3, 224, 224)], device=device)
 
-    summary(model, [(3, 224, 224), (22,)])
+    # Training
+    # FIXME : Not sure what is the current behavious when specifying weight decay to Adam Optimizer. INVESTIGATE THIS
+    optimizer = torch.optim.Adam(film_model.parameters(), lr=film_model_config['optimizer']['learning_rate'],
+                                 weight_decay=film_model_config['optimizer']['weight_decay'])
+    #scheduler = torch.optim.lr_scheduler   # FIXME : Using a scheduler give the ability to decay only each N epoch.
 
-    print("YOLOOO")
+    train_model(device=device, model=film_model, dataloader=train_dataloader,
+                criterion=nn.CrossEntropyLoss(), optimizer=optimizer, num_epochs=args.nb_epoch)
 
+    print("All Done for now")
     exit(0)
 
     ########################################################
