@@ -60,7 +60,8 @@ def summary(model, input_size, batch_size=-1, device="cuda"):
     # batch_size of 2 for batchnorm
     x = []
     x.append(torch.rand(2, *input_size[0]).type(dtype_prefix.LongTensor))
-    x.append(torch.rand(2, *input_size[1]).type(dtype_prefix.FloatTensor))
+    x.append(torch.rand(2).type(dtype_prefix.LongTensor) + 1)
+    x.append(torch.rand(2, *input_size[2]).type(dtype_prefix.FloatTensor))
 
     #x = [torch.rand(2, *in_size).type(dtype) for in_size in input_size]
     # print(type(x[0]))
@@ -76,7 +77,7 @@ def summary(model, input_size, batch_size=-1, device="cuda"):
 
     # make a forward pass
     # print(x.shape)
-    model(*x)
+    model(*x, pack_sequence=False)
 
     # remove these hooks
     for h in hooks:
