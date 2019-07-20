@@ -447,7 +447,7 @@ def main(args):
         torch.backends.cudnn.deterministic = True
         film_model.cuda()
 
-    summary(film_model, [(22,), input_image_shape], device=device)
+    summary(film_model, [(22,), (1,), input_image_shape], device=device)
 
     # Training
     # FIXME : Not sure what is the current behavious when specifying weight decay to Adam Optimizer. INVESTIGATE THIS
