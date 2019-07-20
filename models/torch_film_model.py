@@ -57,42 +57,33 @@ class Conv2d_tf(nn.Conv2d):
 # TODO : Get size of tensor dynamically
 
 class FiLM_layer(nn.Module):
-    def __init__(self, in_channels, out_channels):
+    def __init__(self, in_channels, out_channels, save_gammas_betas=True):
         super(FiLM_layer, self).__init__()
 
         self.in_channels = in_channels
         self.out_channels = out_channels
+        self.save_gammas_betas = save_gammas_betas
 
-        self.gamma = None
-        self.beta = None
+        # TODO : Prealocate gamma and betas ? In Tensor ? Np Array ? Only if save_gammas_betas == True
+        self.gammas = None
+        self.betas = None
 
-        self.params_vector = nn.Linear(self.in_channels, 2 * self.out_channels)
+        self.params_vector = nn.Linear(self.in_channels, 2 * self.out_channels)     # FIXME : Original film have another multiplier : num_modules (which is 4 --> Number of resblock)
+                                                                                    # FIXME : The linear layer is not in here on the original tho. This might be why we don't have *4 for the number of resblock (We are inside the resblock here)
 
     def forward(self, input_features, rnn_last_hidden_state):
         film_params = self.params_vector(rnn_last_hidden_state)
 
-        # FIXME : I don't think unsqueezing is needed
-        #film_params = film_params.unsqueeze(0).unsqueeze(0)
+        gammas, betas = film_params.split(self.out_channels, dim=-1)
 
-        # FIXME : This is temporary... FIX FILM layer
-        tiled_params = torch.ones(input_features.size(0), input_features.size(1)*2, input_features.size(2), input_features.size(3)).type(torch.FloatTensor)
+        if self.save_gammas_betas:
+            self.gammas = gammas.detach()
+            self.betas = betas.detach()
 
-        # FIXME : THIS IS A PATCH. SHOULD NOT BE NEEDED WHEN WE USE REAL FILM LAYER
-        if torch.cuda.is_available():
-            tiled_params = tiled_params.cuda()
-
-        #tiled_params = film_params.repeat(1, 1, input_features.size(2), input_features.size(3))
-
-        gammas = tiled_params[:, :self.out_channels, :, :]
-        betas = tiled_params[:, self.out_channels:, :, :]
-
-        out = (1 + gammas) * input_features + betas
-
-        # FIXME : Is this slowing us down ? Copying to the cpu is costly
-        self.gamma = gammas[0, 0, 0, :].detach().cpu().numpy()
-        self.beta = betas[0, 0, 0, :].detach().cpu().numpy()
-
-        return out
+        gammas = gammas.unsqueeze(2).unsqueeze(3).expand_as(input_features)
+        betas = betas.unsqueeze(2).unsqueeze(3).expand_as(input_features)
+        return (gammas * input_features) + betas        # FIXME : Tensorflow implementation do 1 + gammas
+                                                        # FIXME : Original implementation have a shift of 1 (Just after film_gen.decoder forward)
 
 
 class FiLMed_resblock(nn.Module):
@@ -198,12 +189,20 @@ class CLEAR_FiLM_model(nn.Module):
                                                                enforce_sorted=False)        # FIXME : Verify implication of enforce_sorted
         rnn_out, rnn_hidden = self.rnn_state(word_emb)
 
+        if pack_sequence:
+            rnn_out, _ = torch.nn.utils.rnn.pad_packed_sequence(rnn_out, batch_first=True)
+
+        # We wan't an index to the last token  (len - 1)
+        question_lengths = question_lengths - 1
+        last_token_indexes = question_lengths.view(-1, 1, 1).expand(-1, 1, self.rnn_state.hidden_size).long()
+        rnn_hidden_state = rnn_out.gather(1, last_token_indexes).view(-1, self.rnn_state.hidden_size)       # FIXME : Is rnn_hidden_state the correct name here ?
+
         # Image Pipeline
         # TODO : If RAW img, should pass through ResNet Feature Extractor Before
         conv_out = self.stem_conv(input_image)
 
         for resblock in self.resblocks:
-            conv_out = resblock(conv_out, rnn_hidden[-1])
+            conv_out = resblock(conv_out, rnn_hidden_state)
 
         # Classification
         classif_out = self.classif_conv(conv_out)
