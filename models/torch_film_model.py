@@ -68,8 +68,8 @@ class FiLM_layer(nn.Module):
 
         self.params_vector = nn.Linear(self.in_channels, 2 * self.out_channels)
 
-    def forward(self, input_features, rnn_state):
-        film_params = self.params_vector(rnn_state[:,0,:])
+    def forward(self, input_features, rnn_last_hidden_state):
+        film_params = self.params_vector(rnn_last_hidden_state)
 
         # FIXME : I don't think unsqueezing is needed
         #film_params = film_params.unsqueeze(0).unsqueeze(0)
@@ -190,17 +190,20 @@ class CLEAR_FiLM_model(nn.Module):
         # FIXME : Rename to softmax ? OR are we missing the softmax ?
         self.out = nn.Linear(config['classifier']['no_mlp_units'], nb_answers)
 
-    def forward(self, question, input_image):
+    def forward(self, question, question_lengths, input_image, pack_sequence=True):
         # Question Pipeline
-        rnn_out = self.word_emb(question)
-        rnn_out, rnn_hidden = self.rnn_state(rnn_out)
+        word_emb = self.word_emb(question)
+        if pack_sequence:
+            word_emb = torch.nn.utils.rnn.pack_padded_sequence(word_emb, question_lengths, batch_first=True,
+                                                               enforce_sorted=False)        # FIXME : Verify implication of enforce_sorted
+        rnn_out, rnn_hidden = self.rnn_state(word_emb)
 
         # Image Pipeline
         # TODO : If RAW img, should pass through ResNet Feature Extractor Before
         conv_out = self.stem_conv(input_image)
 
         for resblock in self.resblocks:
-            conv_out = resblock(conv_out, rnn_out)
+            conv_out = resblock(conv_out, rnn_hidden[-1])
 
         # Classification
         classif_out = self.classif_conv(conv_out)

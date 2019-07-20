@@ -296,12 +296,13 @@ def train_model(device, model, dataloader, output_folder, criterion=None, optimi
             images = batch['image'].to(device)#.type(torch.cuda.FloatTensor)
             questions = batch['question'].to(device)#.type(torch.cuda.LongTensor)
             answers = batch['answer'].to(device)#.type(torch.cuda.LongTensor)
+            seq_lengths = batch['seq_length'].to(device)
 
             # zero the parameter gradients
             optimizer.zero_grad()
 
             with torch.set_grad_enabled(True):  # FIXME : Do we need to set this to false when evaluating validation ?
-                outputs = model(questions, images)
+                outputs = model(questions, seq_lengths, images)
                 _, preds = torch.max(outputs, 1)
                 loss = criterion(outputs, answers)
 

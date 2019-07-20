@@ -153,10 +153,11 @@ class CLEAR_dataset(Dataset):
     def CLEAR_collate_fct(self, batch):
         batch_questions = [b['question'] for b in batch]
 
-        padded_questions, seq_length = self.tokenizer.pad_tokens(batch_questions)
+        padded_questions, seq_lengths = self.tokenizer.pad_tokens(batch_questions)
 
-        for sample, padded_question in zip(batch, padded_questions):
+        for sample, padded_question, seq_length in zip(batch, padded_questions, seq_lengths):
             sample['question'] = padded_question
+            sample['seq_length'] = seq_length
 
         return torch.utils.data.dataloader.default_collate(batch)
 
