@@ -76,7 +76,7 @@ parser.add_argument("--force_dict_all_answer", help="Will make sure that all ans
 #
 
 # >>> Training
-def do_one_epoch(sess, batchifier, network_wrapper, outputs_var, epoch_index, writer=None, beholder=None):
+def do_one_epoch_TF(sess, batchifier, network_wrapper, outputs_var, epoch_index, writer=None, beholder=None):
     # check for optimizer to define training/eval mode
     is_training = any([is_tensor_optimizer(x) for x in outputs_var])
 
@@ -134,7 +134,7 @@ def do_one_epoch(sess, batchifier, network_wrapper, outputs_var, epoch_index, wr
     return to_return
 
 
-def do_film_training(sess, dataset, network_wrapper, optimizer_config, resnet_ckpt_path, nb_epoch, output_folder,
+def do_film_training_TF(sess, dataset, network_wrapper, optimizer_config, resnet_ckpt_path, nb_epoch, output_folder,
                      train_writer=None, val_writer=None, beholder=None, nb_epoch_to_keep=None):
     stats_file_path = "%s/stats.json" % output_folder
 
@@ -221,7 +221,7 @@ def do_film_training(sess, dataset, network_wrapper, optimizer_config, resnet_ck
 
 
 # >>> Inference
-def do_batch_inference(sess, dataset, network_wrapper, output_folder, film_ckpt_path, resnet_ckpt_path, set_name="test"):
+def do_batch_inference_TF(sess, dataset, network_wrapper, output_folder, film_ckpt_path, resnet_ckpt_path, set_name="test"):
     test_batches = dataset.get_batches(set_name, shuffled=False)
 
     sess.run(tf.variables_initializer(network_wrapper.film_variables))
@@ -482,13 +482,13 @@ def main(args):
         beholder = None
 
         if task == "train_film":
-            do_film_training(sess, dataset, network_wrapper, film_model_config['optimizer'],
+            do_film_training_TF(sess, dataset, network_wrapper, film_model_config['optimizer'],
                              args.resnet_ckpt_path, args.nb_epoch, output_dated_folder,
                              train_writer=train_writer, val_writer=val_writer, beholder=beholder,
                              nb_epoch_to_keep=args.nb_epoch_stats_to_keep)
 
         elif task == "inference":
-            do_batch_inference(sess, dataset, network_wrapper, output_dated_folder,
+            do_batch_inference_TF(sess, dataset, network_wrapper, output_dated_folder,
                               args.film_ckpt_path, args.resnet_ckpt_path, set_name=args.inference_set)
 
         elif task == "visualize_grad_cam":
