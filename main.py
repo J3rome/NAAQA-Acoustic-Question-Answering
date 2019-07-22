@@ -472,7 +472,8 @@ def main(args):
     # FIXME : Should not query the tokenizer directly. Won't work in preprocessing mode
     # FIXME : (Actually, should not instantiate the whole model if in preprocessing. Could use a wrapper or If-Else)
     film_model = CLEAR_FiLM_model(film_model_config, input_image_channels=input_image_shape[0],
-                                  nb_words=nb_words, nb_answers=nb_answers)
+                                  nb_words=nb_words, nb_answers=nb_answers,
+                                  sequence_padding_idx=train_dataset.tokenizer.padding_token)
 
     if device != 'cpu':
         torch.backends.cudnn.benchmark = True

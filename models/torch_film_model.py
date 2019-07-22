@@ -120,13 +120,14 @@ class FiLMed_resblock(nn.Module):
 
 
 class CLEAR_FiLM_model(nn.Module):
-    def __init__(self, config, input_image_channels, nb_words, nb_answers):
+    def __init__(self, config, input_image_channels, nb_words, nb_answers, sequence_padding_idx=0):
         super(CLEAR_FiLM_model, self).__init__()
 
         # Question Pipeline
         # FIXME : seq_length must be fed as the first dimension
         self.word_emb = nn.Embedding(num_embeddings=nb_words,
-                                     embedding_dim=config['question']['word_embedding_dim'])
+                                     embedding_dim=config['question']['word_embedding_dim'],
+                                     padding_idx=sequence_padding_idx)
 
         # TODO : Make sure we have the correct activation fct
         self.rnn_state = nn.GRU(input_size=config['question']['word_embedding_dim'],
