@@ -303,10 +303,8 @@ def run_one_game(device, model, games, data_path, input_config, transforms_list=
 
 
 def process_dataloader(is_training, device, model, dataloader, criterion=None, optimizer=None):
-
+    # Model should already be copied to GPU at this point
     #assert (is_training and criterion and optimizer)
-
-    model.to(device)        # FIXME : Verify if there is a cost. We can do it once before the training loop
 
     if is_training:
         model.train()       #FIXME :Verify, is there a cost to calling train multiple time ? Is there a way to check if already set ?
@@ -317,12 +315,19 @@ def process_dataloader(is_training, device, model, dataloader, criterion=None, o
     running_loss = 0.0
     running_corrects = 0
 
+    processed_predictions = []
+    processed_gammas_betas = []
+
     for batch in tqdm(dataloader):
         # mem_trace.report('Batch %d' % i)
         images = batch['image'].to(device)  # .type(torch.cuda.FloatTensor)
         questions = batch['question'].to(device)  # .type(torch.cuda.LongTensor)
         answers = batch['answer'].to(device)  # .type(torch.cuda.LongTensor)
         seq_lengths = batch['seq_length'].to(device)
+
+        # Those are not processed by the network, only used to create statistics. Therefore, no need to copy to GPU
+        questions_id = batch['id']
+        scenes_id = batch['scene_id']
 
         if is_training:
             # zero the parameter gradients
@@ -339,44 +344,90 @@ def process_dataloader(is_training, device, model, dataloader, criterion=None, o
                 loss.backward()
                 optimizer.step()
 
+        batch_processed_predictions = process_predictions(dataloader.dataset, preds.tolist(), answers.tolist(),
+                                                          questions_id.tolist(), scenes_id.tolist())
+
+        processed_predictions += batch_processed_predictions
+
+        gammas, betas = model.get_gammas_betas()
+        processed_gammas_betas += process_gamma_beta(batch_processed_predictions, gammas, betas)
+
         # statistics
         if criterion:
             running_loss += loss.item() * dataloader.batch_size
-        running_corrects += torch.sum(preds == answers.data)
+        running_corrects += torch.sum(preds == answers.data).item()
 
     # Todo : accumulate preds & create processed result
 
     epoch_loss = running_loss / dataset_size
-    epoch_acc = running_corrects.double() / dataset_size
+    epoch_acc = running_corrects / dataset_size
 
-    return epoch_loss, epoch_acc
+    return epoch_loss, epoch_acc, processed_predictions, processed_gammas_betas
 
 
-def train_model(device, model, dataloaders, output_folder, criterion=None, optimizer=None, scheduler=None, num_epochs=25):
+def train_model(device, model, dataloaders, output_folder, criterion=None, optimizer=None, scheduler=None,
+                nb_epoch=25, nb_epoch_to_keep=None):
+
+    stats_file_path = "%s/stats.json" % output_folder
+    removed_epoch = []
+
     since = time.time()
-
     best_model_state = copy.deepcopy(model.state_dict())
     best_val_acc = 0.0
 
-    for epoch in range(num_epochs):
-        print('Epoch {}/{}'.format(epoch, num_epochs - 1))
+    for epoch in range(nb_epoch):
+        epoch_output_folder_path = "%s/Epoch_%.2d" % (output_folder, epoch)
+        create_folder_if_necessary(epoch_output_folder_path)
+        print('Epoch {}/{}'.format(epoch, nb_epoch - 1))
         print('-' * 10)
 
-        epoch_train_loss, epoch_train_acc = process_dataloader(True, device, model, dataloaders['train'], criterion, optimizer)
-        print('{} Loss: {:.4f} Acc: {:.4f}'.format('Train', epoch_train_loss, epoch_train_acc))
+        time_before_train = datetime.now()
+        train_loss, train_acc, train_predictions, train_gammas_betas = process_dataloader(True, device, model,
+                                                                                          dataloaders['train'],
+                                                                                          criterion, optimizer)
+        epoch_train_time = datetime.now() - time_before_train
 
-        epoch_val_loss, epoch_val_acc = process_dataloader(False, device, model, dataloaders['val'], criterion, optimizer)
-        print('{} Loss: {:.4f} Acc: {:.4f}'.format('Val', epoch_val_loss, epoch_val_acc))
+        print('\n{} Loss: {:.4f} Acc: {:.4f}'.format('Train', train_loss, train_acc))
 
-        if epoch_val_acc > best_val_acc:
-            best_val_acc = epoch_val_acc
+        val_loss, val_acc, val_predictions, val_gammas_betas = process_dataloader(False, device, model,
+                                                                                  dataloaders['val'], criterion,
+                                                                                  optimizer)
+        print('\n{} Loss: {:.4f} Acc: {:.4f}'.format('Val', val_loss, val_acc))
+
+        if val_acc > best_val_acc:
+            best_val_acc = val_acc
             best_model_state = copy.deepcopy(model.state_dict())
 
-        # TODO : Save gamma & beta
         # TODO : Visualize gradcam
         # TODO : Epoch stats
         # TODO : Save X best models, not just the best
+
+        stats = save_training_stats(stats_file_path, epoch, train_acc, train_loss, val_acc, val_loss, epoch_train_time)
+
+        save_json(train_predictions, epoch_output_folder_path, filename="train_inferences.json")
+        save_json(val_predictions, epoch_output_folder_path, filename="val_inferences.json")
+        save_json(train_gammas_betas, epoch_output_folder_path, filename="train_gamma_beta.json")
+        save_json(val_gammas_betas, epoch_output_folder_path, filename="val_gamma_beta.json")
+
+        # Save training weights
+        torch.save(model.state_dict(), '%s/model.pt' % epoch_output_folder_path)
+
+        if nb_epoch_to_keep is not None:
+            # FIXME : Definitely not the most efficient way to do this
+            sorted_stats = sorted(stats, key=lambda s: float(s['val_acc']), reverse=True)
+
+            epoch_to_remove = sorted_stats[nb_epoch_to_keep:]
+
+            for epoch_stat in epoch_to_remove:
+                if epoch_stat['epoch'] not in removed_epoch:
+                    removed_epoch.append(epoch_stat['epoch'])
+
+                    shutil.rmtree("%s/%s" % (output_folder, epoch_stat['epoch']))
         print()
+
+    # Create a symlink to best epoch output folder
+    best_epoch = sorted(stats, key=lambda s: float(s['val_acc']), reverse=True)[0]['epoch']
+    subprocess.run("cd %s && ln -s %s best" % (output_folder, best_epoch), shell=True)
 
     time_elapsed = time.time() - since
     print('Training complete in {:.0f}m {:.0f}s'.format(time_elapsed // 60, time_elapsed % 60))
@@ -475,6 +526,8 @@ def main(args):
     if film_model_config['input']['type'] == 'raw':
         transforms_list = [ResizeImg((14, 14))]     # FIXME : Find a way to increase this
 
+    print("Creating Datasets")
+
     train_dataset = CLEAR_dataset(data_path, film_model_config['input'], 'train',
                             dict_file_path=args.dict_file_path,
                             transforms=transforms.Compose(transforms_list + [ToTensor()]))
@@ -487,21 +540,30 @@ def main(args):
                                 dict_file_path=args.dict_file_path,
                                 transforms=transforms.Compose(transforms_list + [ToTensor()]))
 
+    #trickytest_dataset = CLEAR_dataset(data_path, film_model_config['input'], 'trickytest',
+    #                             dict_file_path=args.dict_file_path,
+    #                             transforms=transforms.Compose(transforms_list + [ToTensor()]))
+
     nb_words, nb_answers = train_dataset.get_token_counts()
 
-    train_dataloader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=False,
+    print("Creating Dataloaders")
+    train_dataloader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True,
                                   num_workers=4, collate_fn=train_dataset.CLEAR_collate_fct)
 
-    val_dataloader = DataLoader(val_dataset, batch_size=args.batch_size, shuffle=False,
+    val_dataloader = DataLoader(val_dataset, batch_size=args.batch_size, shuffle=True,
                                   num_workers=4, collate_fn=train_dataset.CLEAR_collate_fct)
 
     test_dataloader = DataLoader(test_dataset, batch_size=args.batch_size, shuffle=False,
                                   num_workers=4, collate_fn=train_dataset.CLEAR_collate_fct)
 
+    #trickytest_dataloader = DataLoader(trickytest_dataset, batch_size=args.batch_size, shuffle=False,
+    #                             num_workers=4, collate_fn=train_dataset.CLEAR_collate_fct)
+
     input_image_shape = train_dataset[0]['image'].size()
 
     # FIXME : Should not query the tokenizer directly. Won't work in preprocessing mode
     # FIXME : (Actually, should not instantiate the whole model if in preprocessing. Could use a wrapper or If-Else)
+    print("Creating model")
     film_model = CLEAR_FiLM_model(film_model_config, input_image_channels=input_image_shape[0],
                                   nb_words=nb_words, nb_answers=nb_answers,
                                   sequence_padding_idx=train_dataset.tokenizer.padding_token)
@@ -510,6 +572,8 @@ def main(args):
         torch.backends.cudnn.benchmark = True
         torch.backends.cudnn.deterministic = True
         film_model.cuda()
+
+    print("Ready to run")
 
     summary(film_model, [(22,), (1,), input_image_shape], device=device)
 
@@ -521,7 +585,7 @@ def main(args):
 
     train_model(device=device, model=film_model, dataloaders={'train': train_dataloader, 'val': val_dataloader},
                 output_folder=output_dated_folder, criterion=nn.CrossEntropyLoss(), optimizer=optimizer,
-                num_epochs=args.nb_epoch)
+                nb_epoch=args.nb_epoch, nb_epoch_to_keep=args.nb_epoch_stats_to_keep)
 
     print("All Done for now")
     exit(0)

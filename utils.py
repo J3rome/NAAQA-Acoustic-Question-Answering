@@ -40,17 +40,17 @@ def create_symlink_to_latest_folder(experiment_folder, dated_folder_name, symlin
     subprocess.run('cd %s && ln -s %s %s' % (experiment_folder, dated_folder_name, symlink_name), shell=True)
 
 
-def process_predictions(dataset, predictions, raw_batch):
+def process_predictions(dataset, predictions, ground_truths, questions_id, scenes_id):
     processed_predictions = []
-    for i, result in enumerate(predictions):
-        decoded_prediction = dataset.tokenizer.decode_answer(result)
-        decoded_ground_truth = dataset.tokenizer.decode_answer(raw_batch[i].answer)
+    for prediction, ground_truth, question_id, scene_id in zip(predictions, ground_truths, questions_id, scenes_id):
+        decoded_prediction = dataset.tokenizer.decode_answer(prediction)
+        decoded_ground_truth = dataset.tokenizer.decode_answer(ground_truth)
         prediction_answer_family = dataset.answer_to_family[decoded_prediction]
         ground_truth_answer_family = dataset.answer_to_family[decoded_ground_truth]
         processed_predictions.append({
-            'question_id': raw_batch[i].id,
-            'scene_id': raw_batch[i].image.id,
-            'correct': bool(result == raw_batch[i].answer),
+            'question_id': question_id,
+            'scene_id': scene_id,
+            'correct': bool(prediction == ground_truth),
             'correct_answer_family': bool(prediction_answer_family == ground_truth_answer_family),
             'prediction': decoded_prediction,
             'ground_truth': decoded_ground_truth,
@@ -97,13 +97,13 @@ def save_training_stats(stats_output_file, epoch_nb, train_accuracy, train_loss,
     stats.append({
         'epoch': "Epoch_%.2d" % epoch_nb,
         'train_time': str(epoch_train_time),
-        'train_acc': train_accuracy,
-        'train_loss': train_loss,
-        'val_accuracy': val_accuracy,
-        'val_loss': val_loss
+        'train_acc': '%.5f' % train_accuracy,
+        'train_loss': '%.5f' % train_loss,
+        'val_acc': '%.5f' %val_accuracy,
+        'val_loss': '%.5f' % val_loss
     })
 
-    stats = sorted(stats, key=lambda e: e['val_loss'])
+    stats = sorted(stats, key=lambda e: float(e['val_acc']))
 
     with open(stats_output_file, 'w') as f:
         ujson.dump(stats, f, indent=2, sort_keys=True)

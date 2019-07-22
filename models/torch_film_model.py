@@ -77,8 +77,8 @@ class FiLM_layer(nn.Module):
         gammas, betas = film_params.split(self.out_channels, dim=-1)
 
         if self.save_gammas_betas:
-            self.gammas = gammas.detach()
-            self.betas = betas.detach()
+            self.gammas = gammas.detach() #.tolist()    # FIXME
+            self.betas = betas.detach()#.tolist()
 
         gammas = gammas.unsqueeze(2).unsqueeze(3).expand_as(input_features)
         betas = betas.unsqueeze(2).unsqueeze(3).expand_as(input_features)
@@ -124,12 +124,11 @@ class CLEAR_FiLM_model(nn.Module):
         super(CLEAR_FiLM_model, self).__init__()
 
         # Question Pipeline
-        # FIXME : seq_length must be fed as the first dimension
         self.word_emb = nn.Embedding(num_embeddings=nb_words,
                                      embedding_dim=config['question']['word_embedding_dim'],
                                      padding_idx=sequence_padding_idx)
 
-        # TODO : Make sure we have the correct activation fct
+        # TODO : Make sure we have the correct activation fct (Validate that default is tanh)
         self.rnn_state = nn.GRU(input_size=config['question']['word_embedding_dim'],
                                 hidden_size=config["question"]["rnn_state_size"],
                                 batch_first=True,
@@ -219,7 +218,14 @@ class CLEAR_FiLM_model(nn.Module):
 
         return classif_out
 
-        # FIXME : Are we missing a softmax here ?
+    def get_gammas_betas(self):
+        gammas = []
+        betas = []
+        for resblock in self.resblocks:
+            betas.append(resblock.conv2_filmed.betas)
+            gammas.append(resblock.conv2_filmed.gammas)
+
+        return gammas, betas
 
 
 
