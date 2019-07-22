@@ -113,7 +113,7 @@ class CLEAR_dataset(Dataset):
 
             self.games.append({
                 'id': question_id,
-                'image': CLEARImage(image_id, image_filename, self.image_builder, self.set),
+                'image': {'id': image_id, 'filename': image_filename, 'set': self.set},
                 'question': question,
                 'answer': answer
             })
@@ -128,12 +128,19 @@ class CLEAR_dataset(Dataset):
     def __getitem__(self, idx):
         requested_game = self.games[idx]
 
+        # Reference to H5py file must be shared between workers (when dataloader.num_workers > 0)
+        # We create the image here since it will create the img_builder which contain the h5 file ref
+        image = CLEARImage(requested_game['image']['id'],
+                           requested_game['image']['filename'],
+                           self.image_builder,
+                           requested_game['image']['set'])
+
         game_with_image = {
             'id': requested_game['id'],
-            'image': requested_game['image'].get_image(),
+            'image': image.get_image(),
             'question': np.array(requested_game['question']),
             'answer': np.array(requested_game['answer']),
-            'scene_id': requested_game['image'].id
+            'scene_id': image.id
         }
 
         if self.transforms:
