@@ -300,7 +300,8 @@ def process_dataloader(is_training, device, model, dataloader, criterion=None, o
         with torch.set_grad_enabled(is_training):  # FIXME : Do we need to set this to false when evaluating validation ?
             outputs = model(questions, seq_lengths, images)
             _, preds = torch.max(outputs, 1)
-            loss = criterion(outputs, answers)
+            if criterion:
+                loss = criterion(outputs, answers)
 
             if is_training:
                 # backward + optimize only if in training phase
@@ -308,7 +309,8 @@ def process_dataloader(is_training, device, model, dataloader, criterion=None, o
                 optimizer.step()
 
         # statistics
-        running_loss += loss.item() * dataloader.batch_size
+        if criterion:
+            running_loss += loss.item() * dataloader.batch_size
         running_corrects += torch.sum(preds == answers.data)
 
     # Todo : accumulate preds & create processed result
