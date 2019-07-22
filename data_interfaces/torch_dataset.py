@@ -42,7 +42,7 @@ class ResizeImg(object):
 
 class CLEAR_dataset(Dataset):
 
-    def __init__(self, folder, image_config, set, transforms=None, dict_file_path=None, tokenize_text=True):
+    def __init__(self, folder, image_config, set, questions=None, transforms=None, dict_file_path=None, tokenize_text=True):
         preprocessed_folder_path = '{}/preprocessed'.format(folder)
 
         if tokenize_text:
@@ -79,46 +79,46 @@ class CLEAR_dataset(Dataset):
         self.answer_counter = collections.Counter()
         self.answers = []
 
-        question_file_path = '{}/questions/CLEAR_{}_questions.json'.format(folder, self.set)
+        # Questions can either be read from file or provided as an array
+        if questions is None:
+            question_file_path = '{}/questions/CLEAR_{}_questions.json'.format(folder, self.set)
 
-        with open(question_file_path) as question_file:
-            data = ujson.load(question_file)
-            info = data["info"]
-            samples = data["questions"]
+            with open(question_file_path) as question_file:
+                samples = ujson.load(question_file)["questions"]
+        else:
+            samples = questions
 
-            for sample in samples:
+        for sample in samples:
+            question_id = int(sample["question_index"])
+            question = self.tokenizer.encode_question(sample["question"]) if tokenize_text else sample['question']
 
-                question_id = int(sample["question_index"])
-                question = self.tokenizer.encode_question(sample["question"]) if tokenize_text else sample['question']
+            answer = sample.get("answer", None)  # None for test set
+            if answer is not None:
+                answer = str(answer) if type(answer) == int else answer
+                answer = self.tokenizer.encode_answer(answer) if tokenize_text else answer
 
-                answer = sample.get("answer", None)  # None for test set
-                if answer is not None:
-                    answer = str(answer) if type(answer) == int else answer
-                    answer = self.tokenizer.encode_answer(answer) if tokenize_text else answer
+            if 'scene_index' in sample:
+                image_id = int(sample["scene_index"])
+            else:
+                # Backward compatibility with older CLEVR format
+                image_id = int(sample["image_index"])
 
-                if 'scene_index' in sample:
-                    image_id = int(sample["scene_index"])
-                else:
-                    # Backward compatibility with older CLEVR format
-                    image_id = int(sample["image_index"])
+            if "scene_filename" in sample:
+                image_filename = sample["scene_filename"].replace('.wav', ".png")  # The clear dataset specify the filename to the scene wav file
+            else:
+                # Backward compatibility with older CLEVR format
+                image_filename = sample["image_filename"].replace('AQA_', 'CLEAR_')
 
-                if "scene_filename" in sample:
-                    image_filename = sample["scene_filename"].replace('.wav',
-                                                                      ".png")  # The clear dataset specify the filename to the scene wav file
-                else:
-                    # Backward compatibility with older CLEVR format
-                    image_filename = sample["image_filename"].replace('AQA_', 'CLEAR_')
+            self.games.append({
+                'id': question_id,
+                'image': CLEARImage(image_id, image_filename, self.image_builder, self.set),
+                'question': question,
+                'answer': answer
+            })
 
-                self.games.append({
-                    'id': question_id,
-                    'image': CLEARImage(image_id, image_filename, self.image_builder, self.set),
-                    'question': question,
-                    'answer': answer
-                })
+            self.answers.append(answer)
 
-                self.answers.append(answer)
-
-                self.answer_counter[answer] += 1
+            self.answer_counter[answer] += 1
 
     def __len__(self):
         return len(self.games)
