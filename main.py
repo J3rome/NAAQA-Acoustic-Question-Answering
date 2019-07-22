@@ -286,7 +286,7 @@ def process_dataloader(is_training, device, model, dataloader, criterion=None, o
     running_loss = 0.0
     running_corrects = 0
 
-    for i, batch in enumerate(dataloader):
+    for batch in tqdm(dataloader):
         # mem_trace.report('Batch %d' % i)
         images = batch['image'].to(device)  # .type(torch.cuda.FloatTensor)
         questions = batch['question'].to(device)  # .type(torch.cuda.LongTensor)
