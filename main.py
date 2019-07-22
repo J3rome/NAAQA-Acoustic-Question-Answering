@@ -372,8 +372,6 @@ def train_model(device, model, dataloaders, output_folder, criterion=None, optim
     removed_epoch = []
 
     since = time.time()
-    best_model_state = copy.deepcopy(model.state_dict())
-    best_val_acc = 0.0
 
     for epoch in range(nb_epoch):
         epoch_output_folder_path = "%s/Epoch_%.2d" % (output_folder, epoch)
@@ -394,13 +392,9 @@ def train_model(device, model, dataloaders, output_folder, criterion=None, optim
                                                                                   optimizer)
         print('\n{} Loss: {:.4f} Acc: {:.4f}'.format('Val', val_loss, val_acc))
 
-        if val_acc > best_val_acc:
-            best_val_acc = val_acc
-            best_model_state = copy.deepcopy(model.state_dict())
-
+        # TODO : Resnet Preprocessing
         # TODO : Visualize gradcam
-        # TODO : Epoch stats
-        # TODO : Save X best models, not just the best
+        # TODO : T-SNE plots
 
         stats = save_training_stats(stats_file_path, epoch, train_acc, train_loss, val_acc, val_loss, epoch_train_time)
 
@@ -408,6 +402,8 @@ def train_model(device, model, dataloaders, output_folder, criterion=None, optim
         save_json(val_predictions, epoch_output_folder_path, filename="val_inferences.json")
         save_json(train_gammas_betas, epoch_output_folder_path, filename="train_gamma_beta.json")
         save_json(val_gammas_betas, epoch_output_folder_path, filename="val_gamma_beta.json")
+
+        print("Training took %s" % str(epoch_train_time))
 
         # Save training weights
         torch.save(model.state_dict(), '%s/model.pt' % epoch_output_folder_path)
@@ -426,18 +422,15 @@ def train_model(device, model, dataloaders, output_folder, criterion=None, optim
         print()
 
     # Create a symlink to best epoch output folder
-    best_epoch = sorted(stats, key=lambda s: float(s['val_acc']), reverse=True)[0]['epoch']
-    subprocess.run("cd %s && ln -s %s best" % (output_folder, best_epoch), shell=True)
+    best_epoch = sorted(stats, key=lambda s: float(s['val_acc']), reverse=True)[0]
+    subprocess.run("cd %s && ln -s %s best" % (output_folder, best_epoch['epoch']), shell=True)
 
     time_elapsed = time.time() - since
     print('Training complete in {:.0f}m {:.0f}s'.format(time_elapsed // 60, time_elapsed % 60))
-    print('Best val Acc: {:4f}'.format(best_val_acc))
+    print('Best val Acc: {:4f}'.format(best_epoch['val_acc']))
 
-    # Save best model weights
-    torch.save(best_model_state, '%s/best_model.pt' % output_folder)
-
-    # load best model weights
-    model.load_state_dict(best_model_state)
+    # TODO : load best model weights ?
+    #model.load_state_dict(best_model_state)
     return model
 
 

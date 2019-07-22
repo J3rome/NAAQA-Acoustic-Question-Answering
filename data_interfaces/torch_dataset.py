@@ -130,6 +130,7 @@ class CLEAR_dataset(Dataset):
 
         # Reference to H5py file must be shared between workers (when dataloader.num_workers > 0)
         # We create the image here since it will create the img_builder which contain the h5 file ref
+        # See See https://discuss.pytorch.org/t/dataloader-when-num-worker-0-there-is-bug/25643/33
         image = CLEARImage(requested_game['image']['id'],
                            requested_game['image']['filename'],
                            self.image_builder,
