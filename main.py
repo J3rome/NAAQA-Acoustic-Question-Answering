@@ -271,6 +271,37 @@ def do_batch_inference_TF(sess, dataset, network_wrapper, output_folder, film_ck
     print("Test set accuracy : %f" % accuracy)
 
 
+# TODO : Interactive mode
+def run_one_game(device, model, games, data_path, input_config, transforms_list=[]):
+
+    # TODO : Should be able to run from a specific image (Not necessarly inside data/experiment_name/images/set_type)
+
+    set_type = 'test'
+    game = {
+            "question_index" : 1,
+            "question": "How many loud things can we hear ?",
+            "answer": 3,
+            "scene_index": 3
+        }
+
+    game['scene_filename'] = "CLEAR_%s_%06d.png" % (set_type, game['scene_index'])
+
+    games = [
+        game
+    ]
+
+    test_dataset = CLEAR_dataset(data_path, input_config, set_type, questions=games,
+                                 dict_file_path=args.dict_file_path,
+                                 transforms=transforms.Compose(transforms_list + [ToTensor()]))
+
+    test_dataloader = DataLoader(test_dataset, batch_size=1, shuffle=False,
+                                  num_workers=1, collate_fn=test_dataset.CLEAR_collate_fct)
+
+    _, accuracy = process_dataloader(False, device, model, test_dataloader)
+
+    print("Accuracy is : %f" % accuracy)
+
+
 def process_dataloader(is_training, device, model, dataloader, criterion=None, optimizer=None):
 
     #assert (is_training and criterion and optimizer)
