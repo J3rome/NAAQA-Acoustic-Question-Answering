@@ -169,7 +169,7 @@ def do_film_training_TF(sess, dataset, network_wrapper, optimizer_config, resnet
 
         print("Epoch %d" % epoch)
         time_before_epoch = datetime.now()
-        train_loss, train_accuracy, train_predictions, train_gamma_beta_vectors = do_one_epoch(sess,
+        train_loss, train_accuracy, train_predictions, train_gamma_beta_vectors = do_one_epoch_TF(sess,
                                                                                         dataset.get_batches('train'),
                                                                                         network_wrapper,
                                                                                         op_to_run + [optimize_step],
@@ -185,7 +185,7 @@ def do_film_training_TF(sess, dataset, network_wrapper, optimizer_config, resnet
         # FIXME : Inference of validation set doesn't yield same result.
         # FIXME : Should val batches be shuffled ?
         # FIXME : Validation accuracy is skewed by the batch padding. We could recalculate accuracy from the prediction (After removing padded ones)
-        val_loss, val_accuracy, val_predictions, val_gamma_beta_vectors = do_one_epoch(sess,
+        val_loss, val_accuracy, val_predictions, val_gamma_beta_vectors = do_one_epoch_TF(sess,
                                                                             dataset.get_batches('val', shuffled=False),
                                                                             network_wrapper, op_to_run,
                                                                             epoch, writer=None)#val_writer)
