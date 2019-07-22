@@ -179,8 +179,9 @@ class CLEAR_FiLM_model(nn.Module):
             nn.ReLU(inplace=True),
         )
 
-        # FIXME : Rename to softmax ? OR are we missing the softmax ?
-        self.out = nn.Linear(config['classifier']['no_mlp_units'], nb_answers)
+        self.linear_out = nn.Linear(config['classifier']['no_mlp_units'], nb_answers)
+
+        self.softmax = nn.Softmax()
 
     def forward(self, question, question_lengths, input_image, pack_sequence=True):
         # Question Pipeline
@@ -213,11 +214,13 @@ class CLEAR_FiLM_model(nn.Module):
         classif_out, _ = classif_out.max(dim=2)
 
         classif_out = self.classif_hidden(classif_out)
-        classif_out = self.out(classif_out)
+        classif_out = self.linear_out(classif_out)
+        classif_out = self.softmax(classif_out)
+
+        return classif_out
 
         # FIXME : Are we missing a softmax here ?
 
-        return classif_out
 
 
 if __name__ == "__main__":
