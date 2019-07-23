@@ -178,7 +178,7 @@ class CLEAR_dataset(Dataset):
     def CLEAR_collate_fct(self, batch):
         batch_questions = [b['question'] for b in batch]
 
-        padded_questions, seq_lengths = self.tokenizer.pad_tokens(batch_questions)
+        padded_questions, seq_lengths = CLEARTokenizer.pad_tokens(batch_questions, padding_token=self.get_padding_token())
 
         for sample, padded_question, seq_length in zip(batch, padded_questions, seq_lengths):
             sample['question'] = padded_question

@@ -20,7 +20,7 @@ from visualization import grad_cam_visualization
 from preprocessing import preextract_features, create_dict_from_questions
 
 # NEW IMPORTS
-from models.torch_film_model import CLEAR_FiLM_model
+from models.torch_film_model import CLEAR_FiLM_model, CLEAR_feature_extractor
 from data_interfaces.torch_dataset import CLEAR_dataset, ToTensor, ResizeImg  # FIXME : ToTensor should be imported from somewhere else. Utils ?
 from models.torchsummary import summary     # Custom version of torchsummary to fix bugs with input
 import torch
@@ -35,8 +35,6 @@ parser = argparse.ArgumentParser('FiLM model for CLEAR Dataset (Acoustic Questio
 parser.add_argument("--training", help="FiLM model training", action='store_true')
 parser.add_argument("--inference", help="FiLM model inference", action='store_true')
 parser.add_argument("--visualize", help="FiLM model visualization", action='store_true')
-parser.add_argument("--preprocessing", help="Data preprocessing (Word tokenization & Feature Pre-Extraction",
-                    action='store_true')
 parser.add_argument("--feature_extract", help="Feature Pre-Extraction", action='store_true')
 parser.add_argument("--create_dict", help="Create word dictionary (for tokenization)", action='store_true')
 
@@ -451,7 +449,7 @@ def train_model(device, model, dataloaders, output_folder, criterion=None, optim
 
 def main(args):
 
-    mutually_exclusive_params = [args.training, args.preprocessing, args.inference,
+    mutually_exclusive_params = [args.training, args.inference,
                                  args.feature_extract, args.create_dict, args.visualize]
 
     if 0 < sum(mutually_exclusive_params) > 1:
@@ -459,23 +457,16 @@ def main(args):
               " --preprocessing, --create_dict, --feature_extract)")
         exit(1)
 
-    is_preprocessing = False
-
     if args.training:
         task = "train_film"
     elif args.inference:
         task = "inference"
     elif args.visualize:
         task = "visualize_grad_cam"
-    elif args.preprocessing:
-        task = "full_preprocessing"
-        is_preprocessing = True
     elif args.feature_extract:
         task = "feature_extract"
-        is_preprocessing = True
     elif args.create_dict:
         task = "create_dict"
-        is_preprocessing = True
 
     if args.random_seed is not None:
         set_random_seed(args.random_seed)
@@ -509,7 +500,7 @@ def main(args):
 
     film_model_config = get_config(args.config_path)
 
-    create_output_folder = not is_preprocessing
+    create_output_folder = not args.create_dict and not args.feature_extract
 
     if create_output_folder:
         # TODO : See if this is optimal file structure
@@ -533,24 +524,25 @@ def main(args):
     ####################################
 
     transforms_list = []
+    # FIXME : When preprocessing features, we should force input type to raw
     if film_model_config['input']['type'] == 'raw':
-        transforms_list = [ResizeImg((14, 14))]     # TODO : Take size as parameter ?
+        transforms_list = [ResizeImg((224, 224))]     # TODO : Take size as parameter ?
 
     transforms_to_apply = transforms.Compose(transforms_list + [ToTensor()])
 
     print("Creating Datasets")
-    dict_file_path = None if is_preprocessing else args.dict_file_path
+    dict_file_path = None if not args.create_dict else args.dict_file_path
 
-    transforms_to_apply = None if is_preprocessing else transforms_to_apply
+    #transforms_to_apply = None if is_preprocessing else transforms_to_apply
 
     train_dataset = CLEAR_dataset(data_path, film_model_config['input'], 'train', dict_file_path=dict_file_path,
-                                  transforms=transforms_to_apply, tokenize_text=not is_preprocessing)
+                                  transforms=transforms_to_apply, tokenize_text=not args.create_dict)
 
     val_dataset = CLEAR_dataset(data_path, film_model_config['input'], 'val', dict_file_path=dict_file_path,
-                                transforms=transforms_to_apply, tokenize_text=not is_preprocessing)
+                                transforms=transforms_to_apply, tokenize_text=not args.create_dict)
 
     test_dataset = CLEAR_dataset(data_path, film_model_config['input'], 'test', dict_file_path=dict_file_path,
-                                 transforms=transforms_to_apply, tokenize_text=not is_preprocessing)
+                                 transforms=transforms_to_apply, tokenize_text=not args.create_dict)
 
     #trickytest_dataset = CLEAR_dataset(data_path, film_model_config['input'], 'trickytest',
     #                             dict_file_path=args.dict_file_path,
@@ -574,7 +566,7 @@ def main(args):
     #   Model Definition
     ####################################
 
-    if not is_preprocessing:
+    if not args.create_dict and not args.feature_extract:
         print("Creating model")
         # Retrieve informations to instantiate model
         nb_words, nb_answers = train_dataset.get_token_counts()
@@ -589,7 +581,7 @@ def main(args):
             torch.backends.cudnn.deterministic = True
             film_model.cuda()
 
-        print("Ready to run")
+        print("Model ready to run")
 
         summary(film_model, [(22,), (1,), input_image_torch_shape], device=device)
 
@@ -610,17 +602,23 @@ def main(args):
     elif task == "create_dict":
         create_dict_from_questions(train_dataset, force_all_answers=args.force_dict_all_answer)
 
+    elif task == "feature_extract":
+        feature_extractor = CLEAR_feature_extractor()
+
+        feature_extractor.cuda()
+
+        for batch in train_dataloader:
+            images = batch['image'].to(device)
+
+            with torch.set_grad_enabled(False):  # FIXME : Do we need to set this to false when evaluating validation ?
+                output = feature_extractor(images)
+
+            print("YOLO")
+
+        #preextract_features(sess, dataset, network_wrapper, args.resnet_ckpt_path)
+
     elif task == "visualize_grad_cam":
         grad_cam_visualization(sess, network_wrapper, args.film_ckpt_path, args.resnet_ckpt_path)
-
-    elif task == "feature_extract":
-        preextract_features(sess, dataset, network_wrapper, args.resnet_ckpt_path)
-
-
-
-    elif task == "full_preprocessing":
-        create_dict_from_questions(dataset, force_all_answers=args.force_dict_all_answer)
-        preextract_features(sess, dataset, network_wrapper, args.resnet_ckpt_path)
 
     time_elapsed = str(datetime.now() - current_datetime)
 

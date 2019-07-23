@@ -79,7 +79,8 @@ class CLEARTokenizer:
     def tokenize_question(self, question):
         return self.tokenizer.tokenize(question)
 
-    def pad_tokens(self, list_of_tokens, seq_length=None, max_seq_length=0):
+    @staticmethod
+    def pad_tokens(list_of_tokens, padding_token=0, seq_length=None, max_seq_length=0):
 
         if seq_length is None:
             seq_length = np.array([len(q) for q in list_of_tokens], dtype=np.int32)
@@ -89,7 +90,7 @@ class CLEARTokenizer:
 
         batch_size = len(list_of_tokens)
 
-        padded_tokens = np.full(shape=(batch_size, max_seq_length), fill_value=self.padding_token)
+        padded_tokens = np.full(shape=(batch_size, max_seq_length), fill_value=padding_token)
 
         for i, seq in enumerate(list_of_tokens):
             seq = seq[:max_seq_length]

@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import torchvision.models.resnet
+import torchvision
 
 
 # Replicate tensorflow 'SAME' padding (Taken from https://github.com/mlperf/inference/blob/master/others/edge/object_detection/ssd_mobilenet/pytorch/utils.py#L40)
@@ -227,6 +227,53 @@ class CLEAR_FiLM_model(nn.Module):
 
         return gammas, betas
 
+
+class CLEAR_feature_extractor(nn.Module):
+    def __init__(self, layer_index=6):
+        super(CLEAR_feature_extractor, self).__init__()
+        # FIXME : Try with other ResNet
+
+        # Resnet 101 layers
+        # 0 -> Conv2d
+        # 1 -> BatchNorm2d
+        # 2 -> ReLU
+        # 3 -> MaxPool2d
+        # 4 -> First Block
+            # 0 -> First Bottleneck
+                # conv1
+                # bn1
+                # conv2
+                # bn2
+                # conv 3
+                # bn3
+                # relu
+                # downsample (Only in first block)
+                    # 0 -> Conv2d
+                    # 1 -> BatchNorm2d
+            # 1 -> Second Bottleneck
+            # 2 -> Third Bottleneck
+
+        # 5 -> Second Block
+            # 0 to 2 -> Bottlenecks
+
+        # 6 -> Third Block
+            # 0 to 22 -> Bottlenecks
+
+        # 7 -> Fourth Block
+            # 0 to 2 -> Bottlenecks
+
+        # 8 -> AdaptiveAvgPool2d
+        # 9 -> Linear
+
+        resnet = torchvision.models.resnet101(pretrained=True)
+
+        self.extractor = nn.Sequential(*list(resnet.children())[:layer_index+1])
+
+        for param in self.extractor.parameters():
+            param.require_grad = False
+
+    def forward(self, image):
+        return self.extractor(image)
 
 
 if __name__ == "__main__":
