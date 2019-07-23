@@ -66,7 +66,7 @@ def preextract_features(sess, dataset, network_wrapper, resnet_ckpt_path, sets=[
 # >>> Dictionary Creation (For word tokenization)
 def create_dict_from_questions(dataset, word_min_occurence=1, dict_filename='dict.json', force_all_answers=False):
     # FIXME : Should we use the whole dataset to create the dictionary ?
-    games = dataset.games['train']
+    games = dataset.games
 
     word2i = {'<padding>': 0,
               '<unk>': 1
@@ -78,14 +78,14 @@ def create_dict_from_questions(dataset, word_min_occurence=1, dict_filename='dic
     }
     answer_index = max(answer2i.values()) + 1
 
-    answer2occ = dataset.answer_counter['train']
+    answer2occ = dataset.answer_counter
     word2occ = defaultdict(int)
 
     tokenizer = CLEARTokenizer.get_tokenizer_inst()
 
     # Tokenize questions
     for game in games:
-        input_tokens = tokenizer.tokenize(game.question)
+        input_tokens = tokenizer.tokenize(game['question'])
         for tok in input_tokens:
             word2occ[tok] += 1
 

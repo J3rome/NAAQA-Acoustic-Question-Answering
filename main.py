@@ -511,33 +511,35 @@ def main(args):
         # Copy dictionary file used
         shutil.copyfile(args.dict_file_path, "%s/dict.json" % output_dated_folder)
 
-    # Torch Tests
-
     device = 'cuda:0' if torch.cuda.is_available() and not args.use_cpu else 'cpu'
+
+    ####################################
+    #   Dataloading
+    ####################################
 
     transforms_list = []
     if film_model_config['input']['type'] == 'raw':
-        transforms_list = [ResizeImg((14, 14))]     # FIXME : Find a way to increase this
+        transforms_list = [ResizeImg((14, 14))]     # TODO : Take size as parameter ?
+
+    transforms_to_apply = transforms.Compose(transforms_list + [ToTensor()])
 
     print("Creating Datasets")
+    dict_file_path = None if is_preprocessing else args.dict_file_path
 
-    train_dataset = CLEAR_dataset(data_path, film_model_config['input'], 'train',
-                            dict_file_path=args.dict_file_path,
-                            transforms=transforms.Compose(transforms_list + [ToTensor()]))
+    transforms_to_apply = None if is_preprocessing else transforms_to_apply
 
-    val_dataset = CLEAR_dataset(data_path, film_model_config['input'], 'val',
-                                  dict_file_path=args.dict_file_path,
-                                  transforms=transforms.Compose(transforms_list + [ToTensor()]))
+    train_dataset = CLEAR_dataset(data_path, film_model_config['input'], 'train', dict_file_path=dict_file_path,
+                                  transforms=transforms_to_apply, tokenize_text=not is_preprocessing)
 
-    test_dataset = CLEAR_dataset(data_path, film_model_config['input'], 'test',
-                                dict_file_path=args.dict_file_path,
-                                transforms=transforms.Compose(transforms_list + [ToTensor()]))
+    val_dataset = CLEAR_dataset(data_path, film_model_config['input'], 'val', dict_file_path=dict_file_path,
+                                transforms=transforms_to_apply, tokenize_text=not is_preprocessing)
+
+    test_dataset = CLEAR_dataset(data_path, film_model_config['input'], 'test', dict_file_path=dict_file_path,
+                                 transforms=transforms_to_apply, tokenize_text=not is_preprocessing)
 
     #trickytest_dataset = CLEAR_dataset(data_path, film_model_config['input'], 'trickytest',
     #                             dict_file_path=args.dict_file_path,
     #                             transforms=transforms.Compose(transforms_list + [ToTensor()]))
-
-    nb_words, nb_answers = train_dataset.get_token_counts()
 
     print("Creating Dataloaders")
     train_dataloader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True,
@@ -552,86 +554,62 @@ def main(args):
     #trickytest_dataloader = DataLoader(trickytest_dataset, batch_size=args.batch_size, shuffle=False,
     #                             num_workers=4, collate_fn=train_dataset.CLEAR_collate_fct)
 
-    input_image_shape = train_dataset[0]['image'].size()
 
-    # FIXME : Should not query the tokenizer directly. Won't work in preprocessing mode
-    # FIXME : (Actually, should not instantiate the whole model if in preprocessing. Could use a wrapper or If-Else)
-    print("Creating model")
-    film_model = CLEAR_FiLM_model(film_model_config, input_image_channels=input_image_shape[0],
-                                  nb_words=nb_words, nb_answers=nb_answers,
-                                  sequence_padding_idx=train_dataset.tokenizer.padding_token)
+    ####################################
+    #   Model Definition
+    ####################################
 
-    if device != 'cpu':
-        torch.backends.cudnn.benchmark = True
-        torch.backends.cudnn.deterministic = True
-        film_model.cuda()
+    if not is_preprocessing:
+        print("Creating model")
+        # Retrieve informations to instantiate model
+        nb_words, nb_answers = train_dataset.get_token_counts()
+        input_image_torch_shape = train_dataset.get_input_shape(channel_first=True)  # Torch size have Channel as first dimension
+        padding_token = train_dataset.get_padding_token()
+        film_model = CLEAR_FiLM_model(film_model_config, input_image_channels=input_image_torch_shape[0],
+                                      nb_words=nb_words, nb_answers=nb_answers,
+                                      sequence_padding_idx=padding_token)
 
-    print("Ready to run")
+        if device != 'cpu':
+            torch.backends.cudnn.benchmark = True
+            torch.backends.cudnn.deterministic = True
+            film_model.cuda()
 
-    summary(film_model, [(22,), (1,), input_image_shape], device=device)
+        print("Ready to run")
 
-    # Training
-    # FIXME : Not sure what is the current behavious when specifying weight decay to Adam Optimizer. INVESTIGATE THIS
-    optimizer = torch.optim.Adam(film_model.parameters(), lr=film_model_config['optimizer']['learning_rate'],
-                                 weight_decay=film_model_config['optimizer']['weight_decay'])
-    #scheduler = torch.optim.lr_scheduler   # FIXME : Using a scheduler give the ability to decay only each N epoch.
+        summary(film_model, [(22,), (1,), input_image_torch_shape], device=device)
 
-    train_model(device=device, model=film_model, dataloaders={'train': train_dataloader, 'val': val_dataloader},
-                output_folder=output_dated_folder, criterion=nn.CrossEntropyLoss(), optimizer=optimizer,
-                nb_epoch=args.nb_epoch, nb_epoch_to_keep=args.nb_epoch_stats_to_keep)
+    if task == "train_film":
+        # FIXME : Not sure what is the current behavious when specifying weight decay to Adam Optimizer. INVESTIGATE THIS
+        optimizer = torch.optim.Adam(film_model.parameters(), lr=film_model_config['optimizer']['learning_rate'],
+                                     weight_decay=film_model_config['optimizer']['weight_decay'])
 
-    print("All Done for now")
-    exit(0)
+        # scheduler = torch.optim.lr_scheduler   # FIXME : Using a scheduler give the ability to decay only each N epoch.
 
-    ########################################################
-    ################### Data Loading #######################
-    ########################################################
-    dataset = CLEARDataset(data_path, film_model_config['input'], batch_size=args.batch_size,
-                           tokenize_text=not is_preprocessing, dict_file_path=args.dict_file_path)
+        train_model(device=device, model=film_model, dataloaders={'train': train_dataloader, 'val': val_dataloader},
+                    output_folder=output_dated_folder, criterion=nn.CrossEntropyLoss(), optimizer=optimizer,
+                    nb_epoch=args.nb_epoch, nb_epoch_to_keep=args.nb_epoch_stats_to_keep)
 
-    ########################################################
-    ################## Network Setup #######################
-    ########################################################
-    network_wrapper = FiLM_Network_Wrapper(film_model_config, dataset, preprocessing=is_preprocessing)
+    elif task == "inference":
+        set_inference(device=device, model=film_model, dataloader=test_dataloader, output_folder=output_dated_folder)
 
-    with tf.Session(config=tf.ConfigProto(gpu_options=tf.GPUOptions(allow_growth=True), allow_soft_placement=True)) as sess:
-        # Debugging Tools
-        #sess = tf_debug.TensorBoardDebugWrapperSession(sess, "T480s:8076")
-        train_writer = tf.summary.FileWriter(train_writer_folder, sess.graph)  # FIXME : Make the path parametrable ?
-        val_writer = tf.summary.FileWriter(val_writer_folder, sess.graph)  # FIXME : Make the path parametrable ?
+    elif task == "create_dict":
+        create_dict_from_questions(train_dataset, force_all_answers=args.force_dict_all_answer)
 
-        #beholder = Beholder(beholder_folder)
-        beholder = None
+    elif task == "visualize_grad_cam":
+        grad_cam_visualization(sess, network_wrapper, args.film_ckpt_path, args.resnet_ckpt_path)
 
-        if task == "train_film":
-            do_film_training_TF(sess, dataset, network_wrapper, film_model_config['optimizer'],
-                             args.resnet_ckpt_path, args.nb_epoch, output_dated_folder,
-                             train_writer=train_writer, val_writer=val_writer, beholder=beholder,
-                             nb_epoch_to_keep=args.nb_epoch_stats_to_keep)
+    elif task == "feature_extract":
+        preextract_features(sess, dataset, network_wrapper, args.resnet_ckpt_path)
 
-        elif task == "inference":
-            do_batch_inference_TF(sess, dataset, network_wrapper, output_dated_folder,
-                              args.film_ckpt_path, args.resnet_ckpt_path, set_name=args.inference_set)
 
-        elif task == "visualize_grad_cam":
-            grad_cam_visualization(sess, network_wrapper, args.film_ckpt_path, args.resnet_ckpt_path)
 
-        elif task == "feature_extract":
-            preextract_features(sess, dataset, network_wrapper, args.resnet_ckpt_path)
+    elif task == "full_preprocessing":
+        create_dict_from_questions(dataset, force_all_answers=args.force_dict_all_answer)
+        preextract_features(sess, dataset, network_wrapper, args.resnet_ckpt_path)
 
-        elif task == "create_dict":
-            create_dict_from_questions(dataset, force_all_answers=args.force_dict_all_answer)
+    time_elapsed = str(datetime.now() - current_datetime)
 
-        elif task == "full_preprocessing":
-            create_dict_from_questions(dataset, force_all_answers=args.force_dict_all_answer)
-            preextract_features(sess, dataset, network_wrapper, args.resnet_ckpt_path)
-
-        time_elapsed = str(datetime.now() - current_datetime)
-
-        print("Execution took %s" % time_elapsed)
-
-        # TODO : Export Gamma & Beta
-        # TODO : Export visualizations
+    print("Execution took %s" % time_elapsed)
 
     if create_output_folder:
         save_json({'time_elapsed': time_elapsed}, output_dated_folder, filename='timing.json')

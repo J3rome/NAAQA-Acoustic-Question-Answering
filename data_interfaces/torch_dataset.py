@@ -157,6 +157,20 @@ class CLEAR_dataset(Dataset):
             return self.tokenizer.no_words, self.tokenizer.no_answers
         return None, None
 
+    def get_padding_token(self):
+        if self.tokenizer:
+            return self.tokenizer.padding_token
+        return 0
+
+    def get_input_shape(self, channel_first=True):
+        # Regular images : H x W x C
+        # Torch images : C x H x W
+        # Our input_shape is in the "regular image" format
+        if channel_first:
+            return [self.input_shape[2]] + self.input_shape[:2]
+
+        return self.input_shape
+
     # FIXME : We should probably pad the sequence using torch methods
     # FIXME : Investigate the Packing Method.
     # See https://stackoverflow.com/questions/51030782/why-do-we-pack-the-sequences-in-pytorch
