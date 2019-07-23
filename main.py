@@ -365,6 +365,21 @@ def process_dataloader(is_training, device, model, dataloader, criterion=None, o
     return epoch_loss, epoch_acc, processed_predictions, processed_gammas_betas
 
 
+def set_inference(device, model, dataloader, output_folder):
+    set_type = dataloader.dataset.set
+
+    # TODO : load pretrained weights
+
+    _, acc, predictions, gammas_betas = process_dataloader(False, device, model, dataloader)
+
+    save_json(predictions, output_folder, filename='%s_predictions.json' % set_type)
+    save_json(gammas_betas, output_folder, filename='%s_predictions.json' % set_type)
+
+    print("%s Accuracy : %.5f" % (set_type, acc))
+
+    # TODO : Write results to disk
+
+
 def train_model(device, model, dataloaders, output_folder, criterion=None, optimizer=None, scheduler=None,
                 nb_epoch=25, nb_epoch_to_keep=None):
 
@@ -398,8 +413,8 @@ def train_model(device, model, dataloaders, output_folder, criterion=None, optim
 
         stats = save_training_stats(stats_file_path, epoch, train_acc, train_loss, val_acc, val_loss, epoch_train_time)
 
-        save_json(train_predictions, epoch_output_folder_path, filename="train_inferences.json")
-        save_json(val_predictions, epoch_output_folder_path, filename="val_inferences.json")
+        save_json(train_predictions, epoch_output_folder_path, filename="train_predictions.json")
+        save_json(val_predictions, epoch_output_folder_path, filename="val_predictions.json")
         save_json(train_gammas_betas, epoch_output_folder_path, filename="train_gamma_beta.json")
         save_json(val_gammas_betas, epoch_output_folder_path, filename="val_gamma_beta.json")
 
@@ -427,7 +442,7 @@ def train_model(device, model, dataloaders, output_folder, criterion=None, optim
 
     time_elapsed = time.time() - since
     print('Training complete in {:.0f}m {:.0f}s'.format(time_elapsed // 60, time_elapsed % 60))
-    print('Best val Acc: {:4f}'.format(best_epoch['val_acc']))
+    print('Best val Acc: {}'.format(best_epoch['val_acc']))
 
     # TODO : load best model weights ?
     #model.load_state_dict(best_model_state)
