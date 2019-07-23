@@ -180,7 +180,7 @@ class CLEAR_FiLM_model(nn.Module):
 
         self.linear_out = nn.Linear(config['classifier']['no_mlp_units'], nb_answers)
 
-        self.softmax = nn.Softmax()
+        self.softmax = nn.Softmax(dim=1)
 
     def forward(self, question, question_lengths, input_image, pack_sequence=True):
         # Question Pipeline
