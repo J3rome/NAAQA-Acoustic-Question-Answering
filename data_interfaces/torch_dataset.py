@@ -25,7 +25,7 @@ class ToTensor(object):
         # torch image: C X H X W
         image = np.array(sample['image']).transpose((2, 0, 1))      # FIXME : Transpose in pytorch
         return {
-            'image': torch.from_numpy(image).float().div(255),      # FIXME : Normalization should be done in an independent transform
+            'image': torch.from_numpy(image).float(),#.div(255),      # FIXME : Normalization should be done in an independent transform
             'question': torch.from_numpy(sample['question']).int(),
             'answer': torch.from_numpy(sample['answer']),
             'id': sample['id'],             # Not processed by the network, no need to transform to tensor.. Seems to be transfered to tensor in collate function anyways
