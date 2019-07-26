@@ -120,8 +120,10 @@ class FiLMed_resblock(nn.Module):
 
 
 class CLEAR_FiLM_model(nn.Module):
-    def __init__(self, config, input_image_channels, nb_words, nb_answers, sequence_padding_idx=0):
+    def __init__(self, config, input_image_channels, nb_words, nb_answers, feature_extraction_config=None,    # FIXME : The index should probably be in the config
+                 sequence_padding_idx=0, save_features=True):
         super(CLEAR_FiLM_model, self).__init__()
+        # FIXME: Add dropout
 
         # Question Pipeline
         self.word_emb = nn.Embedding(num_embeddings=nb_words,
@@ -136,7 +138,13 @@ class CLEAR_FiLM_model(nn.Module):
 
         #### Image Pipeline
 
-        # TODO : If RAW img, should pass through ResNet Feature Extractor Before
+        # Assume
+        if feature_extraction_config is not None:
+            self.feature_extractor = Resnet_feature_extractor(resnet_version=feature_extraction_config['version'],
+                                                              layer_index=feature_extraction_config['layer_index'])
+            input_image_channels = self.feature_extractor.get_out_channels()
+        else:
+            self.feature_extractor = None
 
         ## Stem
         # TODO : Add spatial location
@@ -199,10 +207,14 @@ class CLEAR_FiLM_model(nn.Module):
         rnn_hidden_state = rnn_out.gather(1, last_token_indexes).view(-1, self.rnn_state.hidden_size)       # FIXME : Is rnn_hidden_state the correct name here ?
 
         # Image Pipeline
-        # TODO : If RAW img, should pass through ResNet Feature Extractor Before
-        conv_out = self.stem_conv(input_image)
+        conv_out = input_image
+        if self.feature_extractor:
+            # Extract features using pretrained network
+            conv_out = self.feature_extractor(conv_out)
 
-        for resblock in self.resblocks:
+        conv_out = self.stem_conv(conv_out)
+
+        for i, resblock in enumerate(self.resblocks):
             conv_out = resblock(conv_out, rnn_hidden_state)
 
         # Classification
@@ -228,9 +240,9 @@ class CLEAR_FiLM_model(nn.Module):
         return gammas, betas
 
 
-class CLEAR_feature_extractor(nn.Module):
-    def __init__(self, layer_index=6):
-        super(CLEAR_feature_extractor, self).__init__()
+class Resnet_feature_extractor(nn.Module):
+    def __init__(self, resnet_version=101, layer_index=6, no_grads=True):      # TODO : Add Parameter to unfreeze some layers
+        super(Resnet_feature_extractor, self).__init__()
         # FIXME : Try with other ResNet
 
         # Resnet 101 layers
@@ -265,15 +277,28 @@ class CLEAR_feature_extractor(nn.Module):
         # 8 -> AdaptiveAvgPool2d
         # 9 -> Linear
 
-        resnet = torchvision.models.resnet101(pretrained=True)
+        if resnet_version == 101:
+            resnet = torchvision.models.resnet101(pretrained=True)
+        else:
+            assert resnet_version != 101
 
         self.extractor = nn.Sequential(*list(resnet.children())[:layer_index+1])
 
-        for param in self.extractor.parameters():
-            param.require_grad = False
+        if no_grads:
+            for param in self.extractor.parameters():
+                param.requires_grad = False
 
     def forward(self, image):
         return self.extractor(image)
+
+    def get_out_channels(self):
+        last_elem = self.extractor[-1]
+
+        # The chosen layer must be a bottleneck layer, otherwise this will result in an infinite loop
+        while not isinstance(last_elem, torchvision.models.resnet.Bottleneck):
+            last_elem = last_elem[-1]
+
+        return last_elem.bn3.num_features
 
 
 if __name__ == "__main__":

@@ -20,7 +20,7 @@ from visualization import grad_cam_visualization
 from preprocessing import preextract_features, create_dict_from_questions
 
 # NEW IMPORTS
-from models.torch_film_model import CLEAR_FiLM_model, CLEAR_feature_extractor
+from models.torch_film_model import CLEAR_FiLM_model
 from data_interfaces.torch_dataset import CLEAR_dataset, ToTensor, ResizeImg  # FIXME : ToTensor should be imported from somewhere else. Utils ?
 from models.torchsummary import summary     # Custom version of torchsummary to fix bugs with input
 import torch
@@ -526,7 +526,10 @@ def main(args):
     transforms_list = []
     # FIXME : When preprocessing features, we should force input type to raw
     if film_model_config['input']['type'] == 'raw':
+        feature_extractor_config = {'version': 101, 'layer_index': 6}   # Idx 6 -> Block3/unit22
         transforms_list = [ResizeImg((224, 224))]     # TODO : Take size as parameter ?
+    else:
+        feature_extractor_config = None
 
     transforms_to_apply = transforms.Compose(transforms_list + [ToTensor()])
 
@@ -572,9 +575,11 @@ def main(args):
         nb_words, nb_answers = train_dataset.get_token_counts()
         input_image_torch_shape = train_dataset.get_input_shape(channel_first=True)  # Torch size have Channel as first dimension
         padding_token = train_dataset.get_padding_token()
+
         film_model = CLEAR_FiLM_model(film_model_config, input_image_channels=input_image_torch_shape[0],
                                       nb_words=nb_words, nb_answers=nb_answers,
-                                      sequence_padding_idx=padding_token)
+                                      sequence_padding_idx=padding_token,
+                                      feature_extraction_config=feature_extractor_config)
 
         if device != 'cpu':
             torch.backends.cudnn.benchmark = True
