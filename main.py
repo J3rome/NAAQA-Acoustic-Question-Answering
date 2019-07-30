@@ -11,7 +11,7 @@ import numpy as np
 import ujson
 
 from utils import set_random_seed, create_folder_if_necessary, get_config, process_predictions, process_gamma_beta
-from utils import create_symlink_to_latest_folder, save_training_stats, save_json
+from utils import create_symlink_to_latest_folder, save_training_stats, save_json, sort_stats
 from utils import is_tensor_optimizer, is_tensor_prediction, is_tensor_scalar, is_tensor_beta_list, is_tensor_gamma_list, is_tensor_summary
 
 from models.film_network_wrapper import FiLM_Network_Wrapper
@@ -423,7 +423,7 @@ def train_model(device, model, dataloaders, output_folder, criterion=None, optim
 
         if nb_epoch_to_keep is not None:
             # FIXME : Definitely not the most efficient way to do this
-            sorted_stats = sorted(stats, key=lambda s: float(s['val_acc']), reverse=True)
+            sorted_stats = sort_stats(stats, reverse=True)
 
             epoch_to_remove = sorted_stats[nb_epoch_to_keep:]
 
@@ -434,8 +434,12 @@ def train_model(device, model, dataloaders, output_folder, criterion=None, optim
                     shutil.rmtree("%s/%s" % (output_folder, epoch_stat['epoch']))
         print()
 
+    # FIXME : Should probably keep the symlink updated at each epoch in case we shutdown the process midway
     # Create a symlink to best epoch output folder
-    best_epoch = sorted(stats, key=lambda s: float(s['val_acc']), reverse=True)[0]
+    if nb_epoch_to_keep is None:
+        sorted_stats = sort_stats(stats, reverse=True)
+
+    best_epoch = sorted_stats[0]
     subprocess.run("cd %s && ln -s %s best" % (output_folder, best_epoch['epoch']), shell=True)
 
     time_elapsed = time.time() - since

@@ -83,6 +83,10 @@ def process_gamma_beta(processed_predictions, gamma_vectors_per_resblock, beta_v
     return processed_gamma_beta_vectors
 
 
+def sort_stats(stats, reverse=False):
+    return sorted(stats, key=lambda e: float(e['val_acc']), reverse=reverse)
+
+
 def save_training_stats(stats_output_file, epoch_nb, train_accuracy, train_loss, val_accuracy,
                         val_loss, epoch_train_time):
     """
@@ -99,11 +103,11 @@ def save_training_stats(stats_output_file, epoch_nb, train_accuracy, train_loss,
         'train_time': str(epoch_train_time),
         'train_acc': '%.5f' % train_accuracy,
         'train_loss': '%.5f' % train_loss,
-        'val_acc': '%.5f' %val_accuracy,
+        'val_acc': '%.5f' % val_accuracy,
         'val_loss': '%.5f' % val_loss
     })
 
-    stats = sorted(stats, key=lambda e: float(e['val_acc']))
+    stats = sort_stats(stats)
 
     with open(stats_output_file, 'w') as f:
         ujson.dump(stats, f, indent=2, sort_keys=True)
