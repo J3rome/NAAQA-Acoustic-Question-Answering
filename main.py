@@ -17,7 +17,7 @@ from utils import is_tensor_optimizer, is_tensor_prediction, is_tensor_scalar, i
 from models.film_network_wrapper import FiLM_Network_Wrapper
 from data_interfaces.CLEAR_dataset import CLEARDataset
 from visualization import grad_cam_visualization
-from preprocessing import preextract_features, create_dict_from_questions
+from preprocessing import create_dict_from_questions, extract_features
 
 # NEW IMPORTS
 from models.torch_film_model import CLEAR_FiLM_model
@@ -454,7 +454,7 @@ def main(args):
 
     if 0 < sum(mutually_exclusive_params) > 1:
         print("[ERROR] Can only do one task at a time (--training, --inference, --visualize," +
-              " --preprocessing, --create_dict, --feature_extract)")
+              " --create_dict, --feature_extract)")
         exit(1)
 
     if args.training:
@@ -536,8 +536,6 @@ def main(args):
     print("Creating Datasets")
     dict_file_path = None if not args.create_dict else args.dict_file_path
 
-    #transforms_to_apply = None if is_preprocessing else transforms_to_apply
-
     train_dataset = CLEAR_dataset(data_path, film_model_config['input'], 'train', dict_file_path=dict_file_path,
                                   transforms=transforms_to_apply, tokenize_text=not args.create_dict)
 
@@ -569,7 +567,7 @@ def main(args):
     #   Model Definition
     ####################################
 
-    if not args.create_dict and not args.feature_extract:
+    if not args.create_dict:
         print("Creating model")
         # Retrieve informations to instantiate model
         nb_words, nb_answers = train_dataset.get_token_counts()
@@ -608,19 +606,8 @@ def main(args):
         create_dict_from_questions(train_dataset, force_all_answers=args.force_dict_all_answer)
 
     elif task == "feature_extract":
-        feature_extractor = CLEAR_feature_extractor()
-
-        feature_extractor.cuda()
-
-        for batch in train_dataloader:
-            images = batch['image'].to(device)
-
-            with torch.set_grad_enabled(False):  # FIXME : Do we need to set this to false when evaluating validation ?
-                output = feature_extractor(images)
-
-            print("YOLO")
-
-        #preextract_features(sess, dataset, network_wrapper, args.resnet_ckpt_path)
+        extract_features(device=device, feature_extractor=film_model.feature_extractor,
+                         dataloaders={'train': train_dataloader, 'val': val_dataloader, 'test': test_dataloader})
 
     elif task == "visualize_grad_cam":
         grad_cam_visualization(sess, network_wrapper, args.film_ckpt_path, args.resnet_ckpt_path)

@@ -1,7 +1,5 @@
-import ujson
 import os
 import h5py
-import tensorflow as tf
 import numpy as np
 from tqdm import tqdm
 from collections import defaultdict
@@ -10,57 +8,66 @@ from random import shuffle
 from data_interfaces.CLEAR_tokenizer import CLEARTokenizer
 from utils import create_folder_if_necessary, save_json, read_json
 
+from torch.utils.data import DataLoader
+import torch
+
 
 # >>> Feature Extraction
-def preextract_features(sess, dataset, network_wrapper, resnet_ckpt_path, sets=['train', 'val', 'test'], output_folder_name="preprocessed"):
+def extract_features(device, feature_extractor, dataloaders, output_folder_name='preprocessed'):
+    dataloaders_first_key = list(dataloaders.keys())[0]
+    first_dataloader = dataloaders[dataloaders_first_key]
 
-    # FIXME: Config should be set automatically to raw when this option is used
-    assert dataset.is_raw_img(), "Config must be set to raw image"
+    assert first_dataloader.dataset.is_raw_img(), 'Input must be set to RAW in config to pre extract features.'
 
-    input_image = network_wrapper.get_input_image()
-    feature_extractor = network_wrapper.get_feature_extractor()
-    feature_extractor_output_shape = [int(dim) for dim in feature_extractor.get_shape()[1:]]
-    output_folder = "%s/%s" % (dataset.root_folder_path, output_folder_name)
+    data_path = first_dataloader.dataset.root_folder_path
+    batch_size = first_dataloader.batch_size
+    output_folder_path = '%s/%s' % (data_path, output_folder_name)
+    create_folder_if_necessary(output_folder_path)
 
-    create_folder_if_necessary(output_folder)
+    # Set model to eval mode
+    feature_extractor.eval()
 
-    # We want to process each scene only one time (Keep only game per scene)
-    dataset.keep_1_game_per_scene()
+    # In order to retrieve the output size, we run one example through the model. We first create a new dataloader
+    temp_dataloader = DataLoader(dataloaders[dataloaders_first_key].dataset, batch_size=1)
+    temp_sample = next(iter(temp_dataloader))['image'].to(device)
+    feature_extractor_output_shape = feature_extractor.get_output_shape(temp_sample, channel_first=False)
 
-    sess.run(tf.global_variables_initializer())
+    for set_type, dataloader in dataloaders.items():
+        print("Extracting features from '%s' set" % set_type)
+        output_filepath = '%s/%s_features.h5' % (output_folder_path, set_type)
 
-    network_wrapper.restore_feature_extractor_weights(sess, resnet_ckpt_path)
+        # Keep only 1 game per scene (We want to process every image only once)
+        dataloader.dataset.keep_1_game_per_scene()
 
-    for set_type in sets:
-        print("Extracting feature for set '%s'" % set_type)
-        batches = dataset.get_batches(set_type)
-        nb_games = batches.get_nb_games()
-        output_filepath = "%s/%s_features.h5" % (output_folder, set_type)
-        batch_size = batches.batch_size
+        nb_games = len(dataloader.dataset)
 
-        # TODO : Add check to see if file already exist
         with h5py.File(output_filepath, 'w') as f:
             h5_dataset = f.create_dataset('features', shape=[nb_games] + feature_extractor_output_shape, dtype=np.float32)
             h5_idx2img = f.create_dataset('idx2img', shape=[nb_games], dtype=np.int32)
             h5_idx = 0
+            for batch in tqdm(dataloader):
+                images = batch['image'].to(device)
 
-            for batch in tqdm(batches):
-                feed_dict = {
-                    input_image: np.array(batch['image'])
-                }
-                features = sess.run(feature_extractor, feed_dict=feed_dict)
+                with torch.set_grad_enabled(False):
+                    features = feature_extractor(images).detach().cpu().numpy()
+
+                # swap color axis because (RGB/BGR)
+                # numpy image: H x W x C
+                # torch image: C X H X W
+                # We want to save in numpy format
+                features = features.transpose((0, 2, 3, 1))
 
                 h5_dataset[h5_idx: h5_idx + batch_size] = features
 
-                for i, game in enumerate(batch['raw']):
-                    h5_idx2img[h5_idx + i] = game.image.id
+                for i, scene_id in enumerate(batch['scene_id']):
+                    h5_idx2img[h5_idx + i] = scene_id
 
                 h5_idx += batch_size
+        print("Features extracted succesfully to '%s'" % output_filepath)
 
-        print("%s set features extracted to '%s'." % (set_type, output_filepath))
-
-    save_json({"extracted_feature_shape" : feature_extractor_output_shape},
-              output_folder, 'feature_shape.json', indented=True)
+    # Save the extracted feature shape
+    save_json({"extracted_feature_shape": feature_extractor_output_shape}, output_folder_path,
+              filename='feature_shape.json')
 
 
 # >>> Dictionary Creation (For word tokenization)
