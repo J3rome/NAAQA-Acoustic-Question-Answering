@@ -589,8 +589,10 @@ def main(args):
         summary(film_model, [(22,), (1,), input_image_torch_shape], device=device)
 
     if task == "train_film":
+        trainable_parameters = filter(lambda p: p.requires_grad, film_model.parameters())
+        
         # FIXME : Not sure what is the current behavious when specifying weight decay to Adam Optimizer. INVESTIGATE THIS
-        optimizer = torch.optim.Adam(film_model.parameters(), lr=film_model_config['optimizer']['learning_rate'],
+        optimizer = torch.optim.Adam(trainable_parameters, lr=film_model_config['optimizer']['learning_rate'],
                                      weight_decay=film_model_config['optimizer']['weight_decay'])
 
         # scheduler = torch.optim.lr_scheduler   # FIXME : Using a scheduler give the ability to decay only each N epoch.
