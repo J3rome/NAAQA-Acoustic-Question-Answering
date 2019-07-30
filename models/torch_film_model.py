@@ -144,6 +144,10 @@ class CLEAR_FiLM_model(nn.Module):
                                                               layer_index=feature_extraction_config['layer_index'])
             input_image_channels = self.feature_extractor.get_out_channels()
         else:
+            # This is a ugly HACK..
+            # Instantiating Resnet make use of random module.
+            # We must use the same operations to keep the random state identical between RAW and Pre-Extracted features
+            Resnet_feature_extractor(resnet_version=101, layer_index=6)
             self.feature_extractor = None
 
         ## Stem
