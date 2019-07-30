@@ -612,6 +612,8 @@ def main(args):
 
         print("Model ready to run")
 
+        # FIXME : Printing summary affect the output of the model (RAW vs Conv)
+        #         Doesn't seem to be a random state problem (At least not torch.randn())
         summary(film_model, [(22,), (1,), input_image_torch_shape], device=device)
 
     if task == "train_film":
