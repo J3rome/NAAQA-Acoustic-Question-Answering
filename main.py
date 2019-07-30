@@ -607,7 +607,8 @@ def main(args):
         if device != 'cpu':
             torch.backends.cudnn.benchmark = True
             torch.backends.cudnn.deterministic = True
-            film_model.cuda()
+
+        film_model.to(device)
 
         print("Model ready to run")
 
@@ -661,7 +662,6 @@ if __name__ == "__main__":
 
         # TODO : Extract Beta And Gamma Parameters + T-SNE
         # TODO : Feed RAW image directly to the FiLM network
-        # TODO : Quantify time cost of using raw images vs preprocessed conv features
         # TODO : Resize images ? Do we absolutely need 224x224 for the resnet preprocessing ?
         #        Since we extract a layer in resnet, we can feed any size, its fully convolutional up to that point
         #        When feeding directly to FiLM, we can use original size ?
