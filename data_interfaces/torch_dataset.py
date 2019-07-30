@@ -171,6 +171,16 @@ class CLEAR_dataset(Dataset):
 
         return self.input_shape
 
+    def keep_1_game_per_scene(self):
+        id_list = collections.defaultdict(lambda: False)
+        unique_scene_games = []
+        for game in self.games:
+            if not id_list[game['image']['id']]:
+                unique_scene_games.append(game)
+                id_list[game['image']['id']] = True
+
+        self.games = unique_scene_games
+
     # FIXME : We should probably pad the sequence using torch methods
     # FIXME : Investigate the Packing Method.
     # See https://stackoverflow.com/questions/51030782/why-do-we-pack-the-sequences-in-pytorch
