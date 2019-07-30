@@ -5,6 +5,7 @@ import tensorflow as tf
 import subprocess
 import ujson
 from collections import defaultdict
+from dateutil.parser import parse as date_parse
 
 import torch
 
@@ -123,6 +124,14 @@ def save_json(results, output_folder, filename, indented=True):
 def read_json(folder, filename):
     with open('%s/%s' % (folder, filename), 'r') as f:
         return ujson.load(f)
+
+
+def is_date_string(string):
+    try:
+        date_parse(string, fuzzy=True)  # Fuzzy parsing ignore unknown tokens
+        return True
+    except ValueError:
+        return False
 
 
 def is_tensor_optimizer(x):
