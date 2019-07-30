@@ -246,6 +246,14 @@ class CLEAR_FiLM_model(nn.Module):
         if self.feature_extractor:
             self.feature_extractor.eval()
 
+    def get_cleaned_state_dict(self):
+        state_dict = self.state_dict()
+
+        if self.feature_extractor is not None:
+            state_dict = {k : p for k,p in state_dict.items() if 'feature_extractor' not in k}
+
+        return state_dict
+
 
 class Resnet_feature_extractor(nn.Module):
     def __init__(self, resnet_version=101, layer_index=6, no_grads=True):      # TODO : Add Parameter to unfreeze some layers
