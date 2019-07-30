@@ -295,7 +295,7 @@ def run_one_game(device, model, games, data_path, input_config, transforms_list=
     test_dataloader = DataLoader(test_dataset, batch_size=1, shuffle=False,
                                   num_workers=1, collate_fn=test_dataset.CLEAR_collate_fct)
 
-    _, accuracy = process_dataloader(False, device, model, test_dataloader)
+    _, accuracy, predictions, gamma_beta = process_dataloader(False, device, model, test_dataloader)
 
     print("Accuracy is : %f" % accuracy)
 
