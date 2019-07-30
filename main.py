@@ -11,7 +11,7 @@ import numpy as np
 import ujson
 
 from utils import set_random_seed, create_folder_if_necessary, get_config, process_predictions, process_gamma_beta
-from utils import create_symlink_to_latest_folder, save_training_stats, save_json, sort_stats
+from utils import create_symlink_to_latest_folder, save_training_stats, save_json, sort_stats, is_date_string
 from utils import is_tensor_optimizer, is_tensor_prediction, is_tensor_scalar, is_tensor_beta_list, is_tensor_gamma_list, is_tensor_summary
 
 from models.film_network_wrapper import FiLM_Network_Wrapper
@@ -41,8 +41,7 @@ parser.add_argument("--create_dict", help="Create word dictionary (for tokenizat
 # Input parameters
 parser.add_argument("--data_root_path", type=str, default='data', help="Directory with data")
 parser.add_argument("--version_name", type=str, help="Name of the dataset version")
-parser.add_argument("--resnet_ckpt_path", type=str, default=None, help="Path to resnet-101 ckpt file")
-parser.add_argument("--film_ckpt_path", type=str, default=None, help="Path to Film pretrained ckpt file")
+parser.add_argument("--film_model_weight_path", type=str, default=None, help="Path to Film pretrained weight file")
 parser.add_argument("--config_path", type=str, default='config/film.json', help="Path to Film pretrained ckpt file")         # FIXME : Add default value
 parser.add_argument("--inference_set", type=str, default='test', help="Define on which set the inference should be runned")
 parser.add_argument("--dict_file_path", type=str, default=None, help="Define what dictionnary file should be used")
@@ -56,6 +55,8 @@ parser.add_argument("-output_root_path", type=str, default='output', help="Direc
 parser.add_argument("--nb_epoch", type=int, default=15, help="Nb of epoch for training")
 parser.add_argument("--nb_epoch_stats_to_keep", type=int, default=5, help="Nb of epoch stats to keep for training")
 parser.add_argument("--batch_size", type=int, default=32, help="Batch size (For training and inference)")
+parser.add_argument("--continue_training", help="Will use the --film_model_weight_path as  training starting point",
+                    action='store_true')
 parser.add_argument("--random_seed", type=int, default=None, help="Random seed used for the experiment")
 parser.add_argument("--use_cpu", help="Model will be run/train on CPU", action='store_true')
 parser.add_argument("--force_dict_all_answer", help="Will make sure that all answers are included in the dict" +
@@ -375,21 +376,19 @@ def set_inference(device, model, dataloader, output_folder):
 
     print("%s Accuracy : %.5f" % (set_type, acc))
 
-    # TODO : Write results to disk
-
 
 def train_model(device, model, dataloaders, output_folder, criterion=None, optimizer=None, scheduler=None,
-                nb_epoch=25, nb_epoch_to_keep=None):
+                nb_epoch=25, nb_epoch_to_keep=None, start_epoch=0):
 
     stats_file_path = "%s/stats.json" % output_folder
     removed_epoch = []
 
     since = time.time()
 
-    for epoch in range(nb_epoch):
+    for epoch in range(start_epoch, start_epoch + nb_epoch):
         epoch_output_folder_path = "%s/Epoch_%.2d" % (output_folder, epoch)
         create_folder_if_necessary(epoch_output_folder_path)
-        print('Epoch {}/{}'.format(epoch, nb_epoch - 1))
+        print('Epoch {}/{}'.format(epoch, start_epoch + nb_epoch - 1))
         print('-' * 10)
 
         time_before_train = datetime.now()
@@ -419,7 +418,12 @@ def train_model(device, model, dataloaders, output_folder, criterion=None, optim
         print("Training took %s" % str(epoch_train_time))
 
         # Save training weights
-        torch.save(model.state_dict(), '%s/model.pt' % epoch_output_folder_path)
+        torch.save({
+            'epoch': epoch,
+            'model_state_dict': model.get_cleaned_state_dict(),
+            'optimizer_state_dict': optimizer.state_dict(),
+            'loss': train_loss
+        }, '%s/model.pt.tar' % epoch_output_folder_path)
 
         if nb_epoch_to_keep is not None:
             # FIXME : Definitely not the most efficient way to do this
@@ -491,13 +495,22 @@ def main(args):
     test_writer_folder = '%s/test/%s' % (tensorboard_folder, current_datetime_str)
     beholder_folder = '%s/beholder' % tensorboard_folder
 
-    if args.resnet_ckpt_path is None:
-        args.resnet_ckpt_path = "%s/resnet/resnet_v1_101.ckpt" % args.data_root_path
+    # If path specified is a date, we construct the path to the best model weights for the specified run
+    if args.film_model_weight_path is not None:
 
-    if args.film_ckpt_path is None:
-        #experiment_date = "2019-06-23_16h37"
-        experiment_date = "latest"
-        args.film_ckpt_path = "%s/train_film/%s/%s/best/checkpoint.ckpt" % (args.output_root_path, args.version_name, experiment_date)
+        base_path = "%s/train_film/%s/%s" % (args.output_root_path, args.version_name, args.film_model_weight_path)
+        suffix = "best/model.pt.tar"        # FIXME : We might redo some epoch when continuing training because the 'best' epoch is not necessarely the last
+
+        if is_date_string(args.film_model_weight_path):
+            args.film_model_weight_path = "%s/%s" % (base_path, suffix)
+        elif args.film_model_weight_path == 'latest':
+            # The 'latest' symlink will be overriden by this run (If continuing training).
+            # Use real path of latest experiment
+            symlink_value = os.readlink(base_path)
+            clean_base_path = base_path[:-(len(args.film_model_weight_path) + 1)]
+            args.film_model_weight_path = '%s/%s/%s' % (clean_base_path, symlink_value, suffix)
+
+    restore_model_weights = args.inference or (args.training and args.continue_training)
 
     if args.dict_file_path is None:
         args.dict_file_path = "%s/preprocessed/dict.json" % data_path
@@ -583,6 +596,14 @@ def main(args):
                                       sequence_padding_idx=padding_token,
                                       feature_extraction_config=feature_extractor_config)
 
+        if restore_model_weights:
+            assert args.film_model_weight_path is not None, 'Must provide path to model weights to ' \
+                                                            'do inference or to continue training.'
+
+            checkpoint = torch.load(args.film_model_weight_path, map_location=device)
+            # We need non-strict because feature extractor weight are not included in the saved state dict
+            film_model.load_state_dict(checkpoint['model_state_dict'], strict=False)
+
         if device != 'cpu':
             torch.backends.cudnn.benchmark = True
             torch.backends.cudnn.deterministic = True
@@ -594,16 +615,22 @@ def main(args):
 
     if task == "train_film":
         trainable_parameters = filter(lambda p: p.requires_grad, film_model.parameters())
-        
+
         # FIXME : Not sure what is the current behavious when specifying weight decay to Adam Optimizer. INVESTIGATE THIS
         optimizer = torch.optim.Adam(trainable_parameters, lr=film_model_config['optimizer']['learning_rate'],
                                      weight_decay=film_model_config['optimizer']['weight_decay'])
+
+        start_epoch = 0
+        if args.continue_training:
+            optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+            start_epoch = checkpoint['epoch'] + 1
 
         # scheduler = torch.optim.lr_scheduler   # FIXME : Using a scheduler give the ability to decay only each N epoch.
 
         train_model(device=device, model=film_model, dataloaders={'train': train_dataloader, 'val': val_dataloader},
                     output_folder=output_dated_folder, criterion=nn.CrossEntropyLoss(), optimizer=optimizer,
-                    nb_epoch=args.nb_epoch, nb_epoch_to_keep=args.nb_epoch_stats_to_keep)
+                    nb_epoch=args.nb_epoch, nb_epoch_to_keep=args.nb_epoch_stats_to_keep,
+                    start_epoch=start_epoch)
 
     elif task == "inference":
         set_inference(device=device, model=film_model, dataloader=test_dataloader, output_folder=output_dated_folder)
