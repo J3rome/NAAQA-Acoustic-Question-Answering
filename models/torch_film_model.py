@@ -246,6 +246,7 @@ class CLEAR_FiLM_model(nn.Module):
         if self.feature_extractor:
             self.feature_extractor.eval()
 
+
 class Resnet_feature_extractor(nn.Module):
     def __init__(self, resnet_version=101, layer_index=6, no_grads=True):      # TODO : Add Parameter to unfreeze some layers
         super(Resnet_feature_extractor, self).__init__()
@@ -297,15 +298,28 @@ class Resnet_feature_extractor(nn.Module):
     def forward(self, image):
         return self.extractor(image)
 
-    def get_out_channels(self):
+    def get_last_bottleneck(self):
         last_elem = self.extractor[-1]
 
         # The chosen layer must be a bottleneck layer, otherwise this will result in an infinite loop
         while not isinstance(last_elem, torchvision.models.resnet.Bottleneck):
             last_elem = last_elem[-1]
 
-        return last_elem.bn3.num_features
+        return last_elem
 
+    def get_out_channels(self):
+        last_bottleneck = self.get_last_bottleneck()
+
+        return last_bottleneck.bn3.num_features
+
+    def get_output_shape(self, input_image, channel_first=True):
+        output = self(input_image)
+        output_size = output.size()[1:]     # Remove batch size dimension
+
+        if channel_first:
+            return output_size
+
+        return [output_size[1], output_size[2], output_size[0]]
 
 if __name__ == "__main__":
     print("Main")
