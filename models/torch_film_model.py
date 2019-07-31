@@ -56,10 +56,11 @@ class Conv2d_tf(nn.Conv2d):
 def append_spatial_location(features, start=-1, end=1):
 
     batch_size, _, width, height = features.size()
+    device = features.device
 
-    x_coords = torch.linspace(start, end, steps=height).unsqueeze(0).expand(width, height).unsqueeze(0)
+    x_coords = torch.linspace(start, end, steps=height, device=device).unsqueeze(0).expand(width, height).unsqueeze(0)
     x_coords = x_coords.unsqueeze(0).expand(batch_size, -1, width, height)
-    y_coords = torch.linspace(start, end, steps=width).unsqueeze(1).expand(width, height).unsqueeze(0)
+    y_coords = torch.linspace(start, end, steps=width, device=device).unsqueeze(1).expand(width, height).unsqueeze(0)
     y_coords = y_coords.unsqueeze(0).expand(batch_size, -1, -1, -1)
 
     return torch.cat([features, x_coords, y_coords], 1)
