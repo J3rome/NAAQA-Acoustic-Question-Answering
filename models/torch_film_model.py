@@ -96,13 +96,11 @@ class FiLM_layer(nn.Module):
 
 
 class FiLMed_resblock(nn.Module):
-    def __init__(self, out_channels, context_size, first_kernel=(1, 1), second_kernel=(3, 3), spatial_location=True):
+    def __init__(self, in_channels, out_channels, context_size, first_kernel=(1, 1), second_kernel=(3, 3), spatial_location=True):
         super(FiLMed_resblock, self).__init__()
 
-        # TODO : Add spatial location --> Adding spatial location will change the number of input channel for the first convolution
-
         self.conv1 = nn.Sequential(
-            Conv2d_tf(in_channels=out_channels, out_channels=out_channels,
+            Conv2d_tf(in_channels=in_channels, out_channels=out_channels,
                       kernel_size=first_kernel, stride=1, padding='SAME', dilation=1),
 
             nn.ReLU(inplace=True),
@@ -158,8 +156,6 @@ class CLEAR_FiLM_model(nn.Module):
                                 dropout=0)
 
         #### Image Pipeline
-
-        # Assume
         if feature_extraction_config is not None:
             self.feature_extractor = Resnet_feature_extractor(resnet_version=feature_extraction_config['version'],
                                                               layer_index=feature_extraction_config['layer_index'])
@@ -174,42 +170,40 @@ class CLEAR_FiLM_model(nn.Module):
         ## Stem
         self.stem_conv = nn.Sequential(
             Conv2d_tf(in_channels=input_image_channels + spatial_location_extra_channels['stem'],
-                      out_channels=config['stem']['conv_out'] + spatial_location_extra_channels['stem'],
+                      out_channels=config['stem']['conv_out'],
                       kernel_size=config['stem']['conv_kernel'], stride=1, padding='SAME', dilation=1),
 
-            nn.BatchNorm2d(config['stem']['conv_out'] + spatial_location_extra_channels['stem']),
+            nn.BatchNorm2d(config['stem']['conv_out']),
 
             nn.ReLU(inplace=True)
         )
 
         ## Resblocks
-        resblock_out_channels = config['stem']['conv_out'] + spatial_location_extra_channels['stem']
+        resblock_out_channels = config['stem']['conv_out']
+        resblock_in_channels = resblock_out_channels + spatial_location_extra_channels['resblock']
         self.resblocks = nn.ModuleList()
         self.nb_resblock = config['resblock']['no_resblock']
         for i in range(self.nb_resblock):
-            resblock_out_channels += spatial_location_extra_channels['resblock']
-
-            self.resblocks.append(FiLMed_resblock(resblock_out_channels,
+            self.resblocks.append(FiLMed_resblock(in_channels=resblock_in_channels,
+                                                  out_channels=resblock_out_channels,
                                                   context_size=config["question"]["rnn_state_size"],
                                                   first_kernel=config['resblock']['kernel1'],
                                                   second_kernel=config['resblock']['kernel2'],
                                                   spatial_location=config['resblock']['spatial_location']))
 
         #### Classification
-        classif_conv_out_channels = config['classifier']['conv_out'] + spatial_location_extra_channels['stem']
-        classif_conv_out_channels += spatial_location_extra_channels['resblock'] * self.nb_resblock
         self.classif_conv = nn.Sequential(
             Conv2d_tf(in_channels=resblock_out_channels + spatial_location_extra_channels['classifier'],
-                      out_channels=classif_conv_out_channels,
+                      out_channels=config['classifier']['conv_out'],
                       kernel_size=config['classifier']['conv_kernel'], stride=1, padding="SAME", dilation=1),
 
-            nn.BatchNorm2d(classif_conv_out_channels),
+            nn.BatchNorm2d(config['classifier']['conv_out']),
 
             nn.ReLU(inplace=True),
         )
 
         self.classif_hidden = nn.Sequential(
-            nn.Linear(classif_conv_out_channels, config['classifier']['no_mlp_units']),
+            nn.Linear(config['classifier']['conv_out'], config['classifier']['no_mlp_units']),
 
             nn.BatchNorm1d(config['classifier']['no_mlp_units']),
 
