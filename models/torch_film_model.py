@@ -254,6 +254,8 @@ class CLEAR_FiLM_model(nn.Module):
         classif_out, _ = classif_out.max(dim=2)
         classif_out, _ = classif_out.max(dim=2)
 
+        # TODO : Concat globalAvgPool ?
+
         classif_out = self.classif_hidden(classif_out)
         classif_out = self.linear_out(classif_out)
         classif_out = self.softmax(classif_out)
