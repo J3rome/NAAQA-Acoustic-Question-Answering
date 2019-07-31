@@ -30,6 +30,7 @@ from torch.utils.data import DataLoader
 import torch.nn as nn
 from torchvision import transforms
 
+# TODO : Add option for custom test file
 parser = argparse.ArgumentParser('FiLM model for CLEAR Dataset (Acoustic Question Answering)', fromfile_prefix_chars='@')
 
 parser.add_argument("--training", help="FiLM model training", action='store_true')
@@ -45,9 +46,10 @@ parser.add_argument("--film_model_weight_path", type=str, default=None, help="Pa
 parser.add_argument("--config_path", type=str, default='config/film.json', help="Path to Film pretrained ckpt file")         # FIXME : Add default value
 parser.add_argument("--inference_set", type=str, default='test', help="Define on which set the inference should be runned")
 parser.add_argument("--dict_file_path", type=str, default=None, help="Define what dictionnary file should be used")
-
-# TODO : Add option for custom test file
-
+parser.add_argument("--no_img_resize", help="Disable RAW image resizing", action='store_true')
+parser.add_argument("--raw_img_resize", type=str, default='224,224', help="Specify the size to which the image will be"
+                                                                          "resized (when working with RAW img)"
+                                                                          "Format : width,height")
 # Output parameters
 parser.add_argument("-output_root_path", type=str, default='output', help="Directory with image")
 
@@ -534,6 +536,11 @@ def main(args):
         # Copy dictionary file used
         shutil.copyfile(args.dict_file_path, "%s/dict.json" % output_dated_folder)
 
+    if args.no_img_resize:
+        args.raw_img_resize = None
+    else:
+        args.raw_img_resize = tuple(args.raw_img_resize.split(','))
+
     device = 'cuda:0' if torch.cuda.is_available() and not args.use_cpu else 'cpu'
 
     ####################################
@@ -541,10 +548,12 @@ def main(args):
     ####################################
 
     transforms_list = []
-    # FIXME : When preprocessing features, we should force input type to raw
     if film_model_config['input']['type'] == 'raw':
         feature_extractor_config = {'version': 101, 'layer_index': 6}   # Idx 6 -> Block3/unit22
-        transforms_list = [ResizeImg((224, 224))]     # TODO : Take size as parameter ?
+        if args.raw_img_resize:
+            transforms_list.append(ResizeImg(args.raw_img_resize))
+        # TODO : Add mean substract transform
+        # TODO : Add normalize transform
     else:
         feature_extractor_config = None
 
