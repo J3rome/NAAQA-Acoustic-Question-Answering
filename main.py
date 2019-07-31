@@ -2,6 +2,7 @@ import argparse
 from _datetime import datetime
 import subprocess
 import shutil
+import os
 
 from tqdm import tqdm
 import numpy as np
@@ -259,8 +260,8 @@ def main(args):
         task = "train_film"
     elif args.inference:
         task = "inference"
-    elif args.visualize:
-        task = "visualize_grad_cam"
+    #elif args.visualize:
+    #    task = "visualize_grad_cam"
     elif args.feature_extract:
         task = "feature_extract"
     elif args.create_dict:
@@ -441,9 +442,6 @@ def main(args):
     elif task == "feature_extract":
         extract_features(device=device, feature_extractor=film_model.feature_extractor,
                          dataloaders={'train': train_dataloader, 'val': val_dataloader, 'test': test_dataloader})
-
-    elif task == "visualize_grad_cam":
-        grad_cam_visualization(sess, network_wrapper, args.film_ckpt_path, args.resnet_ckpt_path)
 
     time_elapsed = str(datetime.now() - current_datetime)
 
