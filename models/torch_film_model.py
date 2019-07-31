@@ -53,8 +53,17 @@ class Conv2d_tf(nn.Conv2d):
         )
 
 
+def append_spatial_location(features, start=-1, end=1):
 
-# TODO : Get size of tensor dynamically
+    batch_size, _, width, height = features.size()
+
+    x_coords = torch.linspace(start, end, steps=height).unsqueeze(0).expand(width, height).unsqueeze(0)
+    x_coords = x_coords.unsqueeze(0).expand(batch_size, -1, width, height)
+    y_coords = torch.linspace(start, end, steps=width).unsqueeze(1).expand(width, height).unsqueeze(0)
+    y_coords = y_coords.unsqueeze(0).expand(batch_size, -1, -1, -1)
+
+    return torch.cat([features, x_coords, y_coords], 1)
+
 
 class FiLM_layer(nn.Module):
     def __init__(self, in_channels, out_channels, save_gammas_betas=True):
@@ -109,7 +118,10 @@ class FiLMed_resblock(nn.Module):
 
         self.conv2_relu = nn.ReLU(inplace=True)
 
-    def forward(self, input_features, rnn_state):
+    def forward(self, input_features, rnn_state, spatial_location):
+        if spatial_location:
+            input_features = append_spatial_location(input_features)
+
         conv1_out = self.conv1(input_features)
         out = self.conv2(conv1_out)
         out = self.conv2_bn(out)
@@ -123,6 +135,15 @@ class CLEAR_FiLM_model(nn.Module):
     def __init__(self, config, input_image_channels, nb_words, nb_answers, feature_extraction_config=None,    # FIXME : The index should probably be in the config
                  sequence_padding_idx=0, save_features=True):
         super(CLEAR_FiLM_model, self).__init__()
+
+        self.config = config
+
+        spatial_location_extra_channels = {
+            'stem': 2 if config['stem']['spatial_location'] else 0,
+            'resblock': 2 if config['resblock']['spatial_location'] else 0,
+            'classifier': 2 if config['classifier']['spatial_location'] else 0
+        }
+
         # FIXME: Add dropout
 
         # Question Pipeline
@@ -151,20 +172,23 @@ class CLEAR_FiLM_model(nn.Module):
             self.feature_extractor = None
 
         ## Stem
-        # TODO : Add spatial location
         self.stem_conv = nn.Sequential(
-            Conv2d_tf(in_channels=input_image_channels, out_channels=config['stem']['conv_out'],
+            Conv2d_tf(in_channels=input_image_channels + spatial_location_extra_channels['stem'],
+                      out_channels=config['stem']['conv_out'] + spatial_location_extra_channels['stem'],
                       kernel_size=config['stem']['conv_kernel'], stride=1, padding='SAME', dilation=1),
 
-            nn.BatchNorm2d(config['stem']['conv_out']),
+            nn.BatchNorm2d(config['stem']['conv_out'] + spatial_location_extra_channels['stem']),
 
             nn.ReLU(inplace=True)
         )
 
         ## Resblocks
-        resblock_out_channels = config['stem']['conv_out']
+        resblock_out_channels = config['stem']['conv_out'] + spatial_location_extra_channels['stem']
         self.resblocks = nn.ModuleList()
-        for i in range(config['resblock']['no_resblock']):
+        self.nb_resblock = config['resblock']['no_resblock']
+        for i in range(self.nb_resblock):
+            resblock_out_channels += spatial_location_extra_channels['resblock']
+
             self.resblocks.append(FiLMed_resblock(resblock_out_channels,
                                                   context_size=config["question"]["rnn_state_size"],
                                                   first_kernel=config['resblock']['kernel1'],
@@ -172,18 +196,20 @@ class CLEAR_FiLM_model(nn.Module):
                                                   spatial_location=config['resblock']['spatial_location']))
 
         #### Classification
-        # TODO : Spatial location
+        classif_conv_out_channels = config['classifier']['conv_out'] + spatial_location_extra_channels['stem']
+        classif_conv_out_channels += spatial_location_extra_channels['resblock'] * self.nb_resblock
         self.classif_conv = nn.Sequential(
-            Conv2d_tf(in_channels=resblock_out_channels, out_channels=config['classifier']['conv_out'],
+            Conv2d_tf(in_channels=resblock_out_channels + spatial_location_extra_channels['classifier'],
+                      out_channels=classif_conv_out_channels,
                       kernel_size=config['classifier']['conv_kernel'], stride=1, padding="SAME", dilation=1),
 
-            nn.BatchNorm2d(config['classifier']['conv_out']),
+            nn.BatchNorm2d(classif_conv_out_channels),
 
             nn.ReLU(inplace=True),
         )
 
         self.classif_hidden = nn.Sequential(
-            nn.Linear(config['classifier']['conv_out'], config['classifier']['no_mlp_units']),
+            nn.Linear(classif_conv_out_channels, config['classifier']['no_mlp_units']),
 
             nn.BatchNorm1d(config['classifier']['no_mlp_units']),
 
@@ -216,12 +242,18 @@ class CLEAR_FiLM_model(nn.Module):
             # Extract features using pretrained network
             conv_out = self.feature_extractor(conv_out)
 
+        if self.config['stem']['spatial_location']:
+            conv_out = append_spatial_location(conv_out)
+
         conv_out = self.stem_conv(conv_out)
 
         for i, resblock in enumerate(self.resblocks):
-            conv_out = resblock(conv_out, rnn_hidden_state)
+            conv_out = resblock(conv_out, rnn_hidden_state, spatial_location=self.config['resblock']['spatial_location'])
 
         # Classification
+        if self.config["classifier"]["spatial_location"]:
+           conv_out = append_spatial_location(conv_out)
+
         classif_out = self.classif_conv(conv_out)
 
         # Global Max Pooling (Max pooling over whole dimensions 3,4)
