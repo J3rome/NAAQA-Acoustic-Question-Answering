@@ -25,12 +25,24 @@ class ToTensor(object):
         # torch image: C X H X W
         image = np.array(sample['image']).transpose((2, 0, 1))      # FIXME : Transpose in pytorch
         return {
-            'image': torch.from_numpy(image).float(),#.div(255),      # FIXME : Normalization should be done in an independent transform
+            'image': torch.from_numpy(image).float(),
             'question': torch.from_numpy(sample['question']).int(),
             'answer': torch.from_numpy(sample['answer']),
             'id': sample['id'],             # Not processed by the network, no need to transform to tensor.. Seems to be transfered to tensor in collate function anyways
             'scene_id': sample['scene_id']  # Not processed by the network, no need to transform to tensor
         }
+
+
+class ImgBetweenZeroOne(object):
+    """Normalize the image between 0 and 1"""
+
+    def __init__(self, max=255):
+        self.max = max
+
+    def __call__(self, sample):
+        sample['image'] /= self.max
+
+        return sample
 
 
 class ResizeImg(object):

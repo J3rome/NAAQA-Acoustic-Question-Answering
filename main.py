@@ -15,7 +15,7 @@ from preprocessing import create_dict_from_questions, extract_features
 
 # NEW IMPORTS
 from models.torch_film_model import CLEAR_FiLM_model
-from data_interfaces.torch_dataset import CLEAR_dataset, ToTensor, ResizeImg  # FIXME : ToTensor should be imported from somewhere else. Utils ?
+from data_interfaces.torch_dataset import CLEAR_dataset, ToTensor, ResizeImg, ImgBetweenZeroOne  # FIXME : ToTensor should be imported from somewhere else. Utils ?
 from models.torchsummary import summary     # Custom version of torchsummary to fix bugs with input
 import torch
 import time
@@ -38,12 +38,17 @@ parser.add_argument("--data_root_path", type=str, default='data', help="Director
 parser.add_argument("--version_name", type=str, help="Name of the dataset version")
 parser.add_argument("--film_model_weight_path", type=str, default=None, help="Path to Film pretrained weight file")
 parser.add_argument("--config_path", type=str, default='config/film.json', help="Path to Film pretrained ckpt file")
-parser.add_argument("--inference_set", type=str, default='test', help="Define on which set the inference should be runned")
+parser.add_argument("--inference_set", type=str, default='test', help="Define on which set the inference will run")
 parser.add_argument("--dict_file_path", type=str, default=None, help="Define what dictionnary file should be used")
+parser.add_argument("--normalize_with_imagenet_stats", help="Will normalize input images according to"
+                                                       "ImageNet mean & std (Only with RAW input)", action='store_true')
+parser.add_argument("--normalize_with_clear_stats", help="Will normalize input images according to"
+                                                         "CLEAR mean & std (Only with RAW input)", action='store_true')
 parser.add_argument("--no_img_resize", help="Disable RAW image resizing", action='store_true')
 parser.add_argument("--raw_img_resize", type=str, default='224,224', help="Specify the size to which the image will be"
                                                                           "resized (when working with RAW img)"
                                                                           "Format : width,height")
+parser.add_argument("--keep_image_range", help="Will NOT scale the image between 0-1 (RAW img)", action='store_true')
 # Output parameters
 parser.add_argument("-output_root_path", type=str, default='output', help="Directory with image")
 
@@ -339,14 +344,26 @@ def main(args):
     transforms_list = []
     if film_model_config['input']['type'] == 'raw':
         feature_extractor_config = {'version': 101, 'layer_index': 6}   # Idx 6 -> Block3/unit22
+
         if args.raw_img_resize:
             transforms_list.append(ResizeImg(args.raw_img_resize))
-        # TODO : Add mean substract transform
-        # TODO : Add normalize transform
+
+        transforms_list.append(ToTensor())
+
+        if not args.keep_image_range:
+            transforms_list.append(ImgBetweenZeroOne())
+
+        if args.normalize_with_imagenet_stats:
+            imagenet_stats = film_model_config['feature_extractor']['imagenet_stats']
+            transforms_list.append(transforms.Normalize(mean=imagenet_stats['mean'], std=imagenet_stats['std']))
+        elif args.normalize_with_clear_stats:
+            assert False, "Normalization with CLEAR stats not implemented"
+
     else:
+        transforms_list.append(ToTensor())
         feature_extractor_config = None
 
-    transforms_to_apply = transforms.Compose(transforms_list + [ToTensor()])
+    transforms_to_apply = transforms.Compose(transforms_list)
 
     print("Creating Datasets")
     dict_file_path = None if not args.create_dict else args.dict_file_path
