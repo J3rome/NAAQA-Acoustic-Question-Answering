@@ -336,6 +336,7 @@ def main(args):
         args.raw_img_resize = tuple([int(s) for s in args.raw_img_resize.split(',')])
 
     device = 'cuda:0' if torch.cuda.is_available() and not args.use_cpu else 'cpu'
+    print("Using device '%s'" % device)
 
     ####################################
     #   Dataloading
