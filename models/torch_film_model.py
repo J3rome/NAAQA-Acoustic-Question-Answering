@@ -97,7 +97,7 @@ class FiLM_layer(nn.Module):
 
 
 class FiLMed_resblock(nn.Module):
-    def __init__(self, in_channels, out_channels, context_size, first_kernel=(1, 1), second_kernel=(3, 3), spatial_location=True):
+    def __init__(self, in_channels, out_channels, context_size, first_kernel=(1, 1), second_kernel=(3, 3)):
         super(FiLMed_resblock, self).__init__()
 
         self.conv1 = nn.Sequential(
@@ -189,8 +189,7 @@ class CLEAR_FiLM_model(nn.Module):
                                                   out_channels=resblock_out_channels,
                                                   context_size=config["question"]["rnn_state_size"],
                                                   first_kernel=config['resblock']['kernel1'],
-                                                  second_kernel=config['resblock']['kernel2'],
-                                                  spatial_location=config['resblock']['spatial_location']))
+                                                  second_kernel=config['resblock']['kernel2']))
 
         #### Classification
         self.classif_conv = nn.Sequential(
@@ -359,6 +358,7 @@ class Resnet_feature_extractor(nn.Module):
             return output_size
 
         return [output_size[1], output_size[2], output_size[0]]
+
 
 if __name__ == "__main__":
     print("Main")
