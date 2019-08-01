@@ -133,13 +133,8 @@ def train_model(device, model, dataloaders, output_folder, criterion=None, optim
         print('\n{} Loss: {:.4f} Acc: {:.4f}'.format('Train', train_loss, train_acc))
 
         val_loss, val_acc, val_predictions, val_gammas_betas = process_dataloader(False, device, model,
-                                                                                  dataloaders['val'], criterion,
-                                                                                  optimizer)
+                                                                                  dataloaders['val'], criterion)
         print('\n{} Loss: {:.4f} Acc: {:.4f}'.format('Val', val_loss, val_acc))
-
-        # TODO : Resnet Preprocessing
-        # TODO : Visualize gradcam
-        # TODO : T-SNE plots
 
         stats = save_training_stats(stats_file_path, epoch, train_acc, train_loss, val_acc, val_loss, epoch_train_time)
 
@@ -189,8 +184,8 @@ def train_model(device, model, dataloaders, output_folder, criterion=None, optim
 
 
 def process_dataloader(is_training, device, model, dataloader, criterion=None, optimizer=None):
-    # Model should already be copied to GPU at this point
-    #assert (is_training and criterion and optimizer)
+    # Model should already have been copied to the GPU at this point (If using GPU)
+    assert (is_training and criterion is not None and optimizer is not None) or not is_training
 
     if is_training and not model.training:
         model.train()
