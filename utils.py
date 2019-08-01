@@ -41,9 +41,11 @@ def create_symlink_to_latest_folder(experiment_folder, dated_folder_name, symlin
     subprocess.run('cd %s && ln -s %s %s' % (experiment_folder, dated_folder_name, symlink_name), shell=True)
 
 
-def process_predictions(dataset, predictions, ground_truths, questions_id, scenes_id):
+def process_predictions(dataset, predictions, ground_truths, questions_id, scenes_id, predictions_probs):
     processed_predictions = []
-    for prediction, ground_truth, question_id, scene_id in zip(predictions, ground_truths, questions_id, scenes_id):
+
+    iterator = zip(predictions, ground_truths, questions_id, scenes_id, predictions_probs)
+    for prediction, ground_truth, question_id, scene_id, prediction_probs in iterator:
         decoded_prediction = dataset.tokenizer.decode_answer(prediction)
         decoded_ground_truth = dataset.tokenizer.decode_answer(ground_truth)
         prediction_answer_family = dataset.answer_to_family[decoded_prediction]
@@ -55,8 +57,10 @@ def process_predictions(dataset, predictions, ground_truths, questions_id, scene
             'correct_answer_family': bool(prediction_answer_family == ground_truth_answer_family),
             'prediction': decoded_prediction,
             'ground_truth': decoded_ground_truth,
+            'confidence': prediction_probs[prediction],
             'prediction_answer_family': prediction_answer_family,
-            'ground_truth_answer_family': ground_truth_answer_family
+            'ground_truth_answer_family': ground_truth_answer_family,
+            'prediction_probs': prediction_probs
         })
 
     return processed_predictions

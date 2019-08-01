@@ -215,7 +215,7 @@ def process_dataloader(is_training, device, model, dataloader, criterion=None, o
             optimizer.zero_grad()
 
         with torch.set_grad_enabled(is_training):
-            outputs = model(questions, seq_lengths, images)
+            outputs, outputs_softmax = model(questions, seq_lengths, images)
             _, preds = torch.max(outputs, 1)
             if criterion:
                 loss = criterion(outputs, answers)
@@ -226,7 +226,8 @@ def process_dataloader(is_training, device, model, dataloader, criterion=None, o
                 optimizer.step()
 
         batch_processed_predictions = process_predictions(dataloader.dataset, preds.tolist(), answers.tolist(),
-                                                          questions_id.tolist(), scenes_id.tolist())
+                                                          questions_id.tolist(), scenes_id.tolist(),
+                                                          outputs_softmax.tolist())
 
         processed_predictions += batch_processed_predictions
 
