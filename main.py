@@ -206,10 +206,9 @@ def process_dataloader(is_training, device, model, dataloader, criterion=None, o
 
     for batch in tqdm(dataloader):
         #mem_trace.report('Batch %d/%d - Epoch %d' % (i, dataloader.batch_size, epoch))
-        #mem_trace.report('Batch')
-        images = batch['image'].to(device)  # .type(torch.cuda.FloatTensor)
-        questions = batch['question'].to(device)  # .type(torch.cuda.LongTensor)
-        answers = batch['answer'].to(device)  # .type(torch.cuda.LongTensor)
+        images = batch['image'].to(device)
+        questions = batch['question'].to(device)
+        answers = batch['answer'].to(device)
         seq_lengths = batch['seq_length'].to(device)
 
         # Those are not processed by the network, only used to create statistics. Therefore, no need to copy to GPU
@@ -220,7 +219,7 @@ def process_dataloader(is_training, device, model, dataloader, criterion=None, o
             # zero the parameter gradients
             optimizer.zero_grad()
 
-        with torch.set_grad_enabled(is_training):  # FIXME : Do we need to set this to false when evaluating validation ?
+        with torch.set_grad_enabled(is_training):
             outputs = model(questions, seq_lengths, images)
             _, preds = torch.max(outputs, 1)
             if criterion:
@@ -243,8 +242,6 @@ def process_dataloader(is_training, device, model, dataloader, criterion=None, o
         if criterion:
             running_loss += loss.item() * dataloader.batch_size
         running_corrects += torch.sum(preds == answers.data).item()
-
-    # Todo : accumulate preds & create processed result
 
     epoch_loss = running_loss / dataset_size
     epoch_acc = running_corrects / dataset_size
