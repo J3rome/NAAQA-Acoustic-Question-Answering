@@ -153,10 +153,10 @@ def train_model(device, model, dataloaders, output_folder, criterion=None, optim
             'loss': train_loss
         }, '%s/model.pt.tar' % epoch_output_folder_path)
 
-        if nb_epoch_to_keep is not None:
-            # FIXME : Definitely not the most efficient way to do this
-            sorted_stats = sort_stats(stats, reverse=True)
+        sorted_stats = sort_stats(stats)
 
+        if nb_epoch_to_keep is not None:
+            # FIXME : Probably not the most efficient way to do this
             epoch_to_remove = sorted_stats[nb_epoch_to_keep:]
 
             for epoch_stat in epoch_to_remove:
@@ -164,15 +164,14 @@ def train_model(device, model, dataloaders, output_folder, criterion=None, optim
                     removed_epoch.append(epoch_stat['epoch'])
 
                     shutil.rmtree("%s/%s" % (output_folder, epoch_stat['epoch']))
+
+        # Create a symlink to best epoch output folder
+        best_epoch = sorted_stats[0]
+        print("Best Epoch is %s" % best_epoch['epoch'])
+        best_epoch_symlink_path = '%s/best' % output_folder
+        subprocess.run("ln -snf %s %s" % (best_epoch['epoch'], best_epoch_symlink_path), shell=True)
+
         print()
-
-    # FIXME : Should probably keep the symlink updated at each epoch in case we shutdown the process midway
-    # Create a symlink to best epoch output folder
-    if nb_epoch_to_keep is None:
-        sorted_stats = sort_stats(stats, reverse=True)
-
-    best_epoch = sorted_stats[0]
-    subprocess.run("cd %s && ln -s %s best" % (output_folder, best_epoch['epoch']), shell=True)
 
     time_elapsed = time.time() - since
     print('Training complete in {:.0f}m {:.0f}s'.format(time_elapsed // 60, time_elapsed % 60))
