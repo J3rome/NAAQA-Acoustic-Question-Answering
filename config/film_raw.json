@@ -37,6 +37,6 @@
             "learning_rate": 3e-4,
             "clip_val": 0.0,
             "weight_decay": 1e-5,
-            "dropout_keep_prob": 0.6
+            "dropout_keep_prob": 1.0
         }
     }
