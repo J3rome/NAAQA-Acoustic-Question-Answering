@@ -15,7 +15,8 @@ from preprocessing import create_dict_from_questions, extract_features
 
 # NEW IMPORTS
 from models.torch_film_model import CLEAR_FiLM_model
-from data_interfaces.torch_dataset import CLEAR_dataset, CLEAR_collate_fct, ToTensor, ResizeImg, ImgBetweenZeroOne  # FIXME : ToTensor should be imported from somewhere else. Utils ?
+from data_interfaces.torch_dataset import CLEAR_dataset, CLEAR_collate_fct
+from data_interfaces.transforms import ToTensor, ResizeImg, ImgBetweenZeroOne
 from models.torchsummary import summary     # Custom version of torchsummary to fix bugs with input
 import torch
 import time
