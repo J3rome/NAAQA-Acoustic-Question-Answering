@@ -7,51 +7,9 @@ import torch
 from torch.utils.data import Dataset
 from torch.utils.data import DataLoader
 
-import torchvision.transforms.functional as F
-
 from data_interfaces.CLEAR_tokenizer import CLEARTokenizer
 from data_interfaces.CLEAR_image_loader import get_img_builder, CLEARImage
 from utils import read_json
-
-
-# FIXME : Move transforms out of here
-# Transforms
-class ToTensor(object):
-    """Convert ndarrays in sample to Tensors."""
-
-    def __call__(self, sample):
-        # swap color axis because (RGB/BGR)
-        # numpy image: H x W x C
-        # torch image: C X H X W
-        image = np.array(sample['image']).transpose((2, 0, 1))      # FIXME : Transpose in pytorch
-        return {
-            'image': torch.from_numpy(image).float(),
-            'question': torch.from_numpy(sample['question']).int(),
-            'answer': torch.from_numpy(sample['answer']),
-            'id': sample['id'],             # Not processed by the network, no need to transform to tensor.. Seems to be transfered to tensor in collate function anyways
-            'scene_id': sample['scene_id']  # Not processed by the network, no need to transform to tensor
-        }
-
-
-class ImgBetweenZeroOne(object):
-    """Normalize the image between 0 and 1"""
-
-    def __init__(self, max=255):
-        self.max = max
-
-    def __call__(self, sample):
-        sample['image'] /= self.max
-
-        return sample
-
-
-class ResizeImg(object):
-    def __init__(self, output_shape):
-        self.output_shape = output_shape
-
-    def __call__(self, sample):
-        sample['image'] = F.resize(sample['image'], self.output_shape)
-        return sample
 
 
 class CLEAR_dataset(Dataset):
@@ -193,14 +151,19 @@ class CLEAR_dataset(Dataset):
 
         self.games = unique_scene_games
 
-    # FIXME : We should probably pad the sequence using torch methods
-    # FIXME : Investigate the Packing Method.
-    # See https://stackoverflow.com/questions/51030782/why-do-we-pack-the-sequences-in-pytorch
-    #     https://discuss.pytorch.org/t/simple-working-example-how-to-use-packing-for-variable-length-sequence-inputs-for-rnn/2120/33
-    def CLEAR_collate_fct(self, batch):
+
+# FIXME : We should probably pad the sequence using torch methods
+# FIXME : Investigate the Packing Method.
+# See https://stackoverflow.com/questions/51030782/why-do-we-pack-the-sequences-in-pytorch
+#     https://discuss.pytorch.org/t/simple-working-example-how-to-use-packing-for-variable-length-sequence-inputs-for-rnn/2120/33
+class CLEAR_collate_fct(object):
+    def __init__(self, padding_token):
+        self.padding_token = padding_token
+
+    def __call__(self, batch):
         batch_questions = [b['question'] for b in batch]
 
-        padded_questions, seq_lengths = CLEARTokenizer.pad_tokens(batch_questions, padding_token=self.get_padding_token())
+        padded_questions, seq_lengths = CLEARTokenizer.pad_tokens(batch_questions, padding_token=self.padding_token)
 
         # FIXME : Investigate why this doesnt work
         #seq_lengths = torch.tensor([len(q) for q in batch_questions])
@@ -212,18 +175,5 @@ class CLEAR_dataset(Dataset):
 
         return torch.utils.data.dataloader.default_collate(batch)
 
-
 if __name__ == "__main__":
-    image_config = {
-            "type": "raw",
-            "dim": [224, 224, 3]
-        }
-
-    test_dataset = CLEAR_dataset('data/v2.0.0_1k_scenes_1_inst_per_scene', image_config, 'train', transforms=ToTensor())
-
-    dataloader = DataLoader(test_dataset, batch_size=16, shuffle=False, num_workers=4, collate_fn=test_dataset.CLEAR_collate_fct)
-
-
-    batch = next(iter(dataloader))
-
-    print("done")
+    print("Please use main.py")

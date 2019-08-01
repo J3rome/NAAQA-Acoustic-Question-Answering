@@ -85,7 +85,7 @@ def process_gamma_beta(processed_predictions, gamma_vectors_per_resblock, beta_v
 
 
 def sort_stats(stats, reverse=False):
-    return sorted(stats, key=lambda e: float(e['val_acc']), reverse=reverse)
+    return sorted(stats, key=lambda e: float(e['val_loss']), reverse=reverse)
 
 
 def save_training_stats(stats_output_file, epoch_nb, train_accuracy, train_loss, val_accuracy,

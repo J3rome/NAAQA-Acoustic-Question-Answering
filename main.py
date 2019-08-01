@@ -16,7 +16,8 @@ from preprocessing import create_dict_from_questions, extract_features
 
 # NEW IMPORTS
 from models.torch_film_model import CLEAR_FiLM_model
-from data_interfaces.torch_dataset import CLEAR_dataset, ToTensor, ResizeImg, ImgBetweenZeroOne  # FIXME : ToTensor should be imported from somewhere else. Utils ?
+from data_interfaces.torch_dataset import CLEAR_dataset, CLEAR_collate_fct
+from data_interfaces.transforms import ToTensor, ResizeImg, ImgBetweenZeroOne
 from models.torchsummary import summary     # Custom version of torchsummary to fix bugs with input
 import torch
 import time
@@ -133,13 +134,8 @@ def train_model(device, model, dataloaders, output_folder, criterion=None, optim
         print('\n{} Loss: {:.4f} Acc: {:.4f}'.format('Train', train_loss, train_acc))
 
         val_loss, val_acc, val_predictions, val_gammas_betas = process_dataloader(False, device, model,
-                                                                                  dataloaders['val'], criterion,
-                                                                                  optimizer)
+                                                                                  dataloaders['val'], criterion)
         print('\n{} Loss: {:.4f} Acc: {:.4f}'.format('Val', val_loss, val_acc))
-
-        # TODO : Resnet Preprocessing
-        # TODO : Visualize gradcam
-        # TODO : T-SNE plots
 
         stats = save_training_stats(stats_file_path, epoch, train_acc, train_loss, val_acc, val_loss, epoch_train_time)
 
@@ -158,10 +154,10 @@ def train_model(device, model, dataloaders, output_folder, criterion=None, optim
             'loss': train_loss
         }, '%s/model.pt.tar' % epoch_output_folder_path)
 
-        if nb_epoch_to_keep is not None:
-            # FIXME : Definitely not the most efficient way to do this
-            sorted_stats = sort_stats(stats, reverse=True)
+        sorted_stats = sort_stats(stats)
 
+        if nb_epoch_to_keep is not None:
+            # FIXME : Probably not the most efficient way to do this
             epoch_to_remove = sorted_stats[nb_epoch_to_keep:]
 
             for epoch_stat in epoch_to_remove:
@@ -169,15 +165,14 @@ def train_model(device, model, dataloaders, output_folder, criterion=None, optim
                     removed_epoch.append(epoch_stat['epoch'])
 
                     shutil.rmtree("%s/%s" % (output_folder, epoch_stat['epoch']))
+
+        # Create a symlink to best epoch output folder
+        best_epoch = sorted_stats[0]
+        print("Best Epoch is %s" % best_epoch['epoch'])
+        best_epoch_symlink_path = '%s/best' % output_folder
+        subprocess.run("ln -snf %s %s" % (best_epoch['epoch'], best_epoch_symlink_path), shell=True)
+
         print()
-
-    # FIXME : Should probably keep the symlink updated at each epoch in case we shutdown the process midway
-    # Create a symlink to best epoch output folder
-    if nb_epoch_to_keep is None:
-        sorted_stats = sort_stats(stats, reverse=True)
-
-    best_epoch = sorted_stats[0]
-    subprocess.run("cd %s && ln -s %s best" % (output_folder, best_epoch['epoch']), shell=True)
 
     time_elapsed = time.time() - since
     print('Training complete in {:.0f}m {:.0f}s'.format(time_elapsed // 60, time_elapsed % 60))
@@ -189,12 +184,12 @@ def train_model(device, model, dataloaders, output_folder, criterion=None, optim
 
 
 def process_dataloader(is_training, device, model, dataloader, criterion=None, optimizer=None):
-    # Model should already be copied to GPU at this point
-    #assert (is_training and criterion and optimizer)
+    # Model should already have been copied to the GPU at this point (If using GPU)
+    assert (is_training and criterion is not None and optimizer is not None) or not is_training
 
-    if is_training:
-        model.train()       #FIXME :Verify, is there a cost to calling train multiple time ? Is there a way to check if already set ?
-    else:
+    if is_training and not model.training:
+        model.train()
+    elif model.training:
         model.eval()
 
     dataset_size = len(dataloader.dataset)
@@ -206,10 +201,9 @@ def process_dataloader(is_training, device, model, dataloader, criterion=None, o
 
     for batch in tqdm(dataloader):
         #mem_trace.report('Batch %d/%d - Epoch %d' % (i, dataloader.batch_size, epoch))
-        #mem_trace.report('Batch')
-        images = batch['image'].to(device)  # .type(torch.cuda.FloatTensor)
-        questions = batch['question'].to(device)  # .type(torch.cuda.LongTensor)
-        answers = batch['answer'].to(device)  # .type(torch.cuda.LongTensor)
+        images = batch['image'].to(device)
+        questions = batch['question'].to(device)
+        answers = batch['answer'].to(device)
         seq_lengths = batch['seq_length'].to(device)
 
         # Those are not processed by the network, only used to create statistics. Therefore, no need to copy to GPU
@@ -220,7 +214,7 @@ def process_dataloader(is_training, device, model, dataloader, criterion=None, o
             # zero the parameter gradients
             optimizer.zero_grad()
 
-        with torch.set_grad_enabled(is_training):  # FIXME : Do we need to set this to false when evaluating validation ?
+        with torch.set_grad_enabled(is_training):
             outputs = model(questions, seq_lengths, images)
             _, preds = torch.max(outputs, 1)
             if criterion:
@@ -243,8 +237,6 @@ def process_dataloader(is_training, device, model, dataloader, criterion=None, o
         if criterion:
             running_loss += loss.item() * dataloader.batch_size
         running_corrects += torch.sum(preds == answers.data).item()
-
-    # Todo : accumulate preds & create processed result
 
     epoch_loss = running_loss / dataset_size
     epoch_acc = running_corrects / dataset_size
@@ -337,22 +329,28 @@ def main(args):
         args.raw_img_resize = tuple([int(s) for s in args.raw_img_resize.split(',')])
 
     device = 'cuda:0' if torch.cuda.is_available() and not args.use_cpu else 'cpu'
+    print("Using device '%s'" % device)
 
     ####################################
     #   Dataloading
     ####################################
 
     transforms_list = []
+
+    # Bundle together ToTensor and ImgBetweenZeroOne, need to be one after the other for other transforms to work
+    to_tensor_transform = [ToTensor()]
+    if not args.keep_image_range:
+        to_tensor_transform.append(ImgBetweenZeroOne())
+
     if film_model_config['input']['type'] == 'raw':
         feature_extractor_config = {'version': 101, 'layer_index': 6}   # Idx 6 -> Block3/unit22
 
         if args.raw_img_resize:
             transforms_list.append(ResizeImg(args.raw_img_resize))
 
-        transforms_list.append(ToTensor())
+        # TODO : Add data augmentation ?
 
-        if not args.keep_image_range:
-            transforms_list.append(ImgBetweenZeroOne())
+        transforms_list += to_tensor_transform
 
         if args.normalize_with_imagenet_stats:
             imagenet_stats = film_model_config['feature_extractor']['imagenet_stats']
@@ -361,7 +359,7 @@ def main(args):
             assert False, "Normalization with CLEAR stats not implemented"
 
     else:
-        transforms_list.append(ToTensor())
+        transforms_list += to_tensor_transform
         feature_extractor_config = None
 
     transforms_to_apply = transforms.Compose(transforms_list)
@@ -383,14 +381,15 @@ def main(args):
     #                             transforms=transforms.Compose(transforms_list + [ToTensor()]))
 
     print("Creating Dataloaders")
+    collate_fct = CLEAR_collate_fct(padding_token=train_dataset.get_padding_token())
     train_dataloader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True,
-                                  num_workers=4, collate_fn=train_dataset.CLEAR_collate_fct)
+                                  num_workers=4, collate_fn=collate_fct)
 
     val_dataloader = DataLoader(val_dataset, batch_size=args.batch_size, shuffle=True,
-                                  num_workers=4, collate_fn=train_dataset.CLEAR_collate_fct)
+                                  num_workers=4, collate_fn=collate_fct)
 
     test_dataloader = DataLoader(test_dataset, batch_size=args.batch_size, shuffle=False,
-                                  num_workers=4, collate_fn=train_dataset.CLEAR_collate_fct)
+                                  num_workers=4, collate_fn=collate_fct)
 
     #trickytest_dataloader = DataLoader(trickytest_dataset, batch_size=args.batch_size, shuffle=False,
     #                             num_workers=4, collate_fn=train_dataset.CLEAR_collate_fct)

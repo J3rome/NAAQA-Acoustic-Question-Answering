@@ -1,6 +1,6 @@
 <component name="ProjectRunConfigurationManager">
   <configuration default="false" name="Conv Training" type="PythonConfigurationType" factoryName="Python">
-    <module name="film-aqa" />
+    <module name="film-clevr" />
     <option name="INTERPRETER_OPTIONS" value="" />
     <option name="PARENT_ENVS" value="true" />
     <envs>
@@ -13,7 +13,7 @@
     <option name="ADD_SOURCE_ROOTS" value="true" />
     <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
     <option name="SCRIPT_NAME" value="main.py" />
-    <option name="PARAMETERS" value="--training --nb_epoch 5 --nb_epoch_stats_to_keep 2 --version_name v2.0.0_1k_scenes_1_inst_per_scene --config_path config/film.json --batch_size 32 --random_seed 667" />
+    <option name="PARAMETERS" value="--training --nb_epoch 5 --nb_epoch_stats_to_keep 2 --version_name v2.0.0_1k_scenes_1_inst_per_scene --config_path config/film.json --keep_image_range --batch_size 32 --random_seed 667" />
     <option name="SHOW_COMMAND_LINE" value="false" />
     <option name="EMULATE_TERMINAL" value="false" />
     <option name="MODULE_MODE" value="false" />

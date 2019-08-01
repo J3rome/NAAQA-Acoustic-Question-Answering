@@ -6,7 +6,11 @@
         "feature_extractor": {
             "type": "resnet",
             "version": 101,
-            "output_layer": "block3/unit_22/bottleneck_v1"
+            "output_layer": "block3/unit_22/bottleneck_v1",
+            "imagenet_stats" : {
+                "mean" : [0.485, 0.456, 0.406],
+                "std" : [0.229, 0.224, 0.225]
+              }
         },
         "question": {
             "word_embedding_dim": 200,
@@ -32,6 +36,7 @@
         "optimizer" : {
             "learning_rate": 3e-4,
             "clip_val": 0.0,
-            "weight_decay": 1e-5
+            "weight_decay": 1e-5,
+            "dropout_keep_prob": 0.6
         }
     }
