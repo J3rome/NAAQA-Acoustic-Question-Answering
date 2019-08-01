@@ -194,21 +194,25 @@ class CLEAR_dataset(Dataset):
 
         self.games = unique_scene_games
 
-    # FIXME : We should probably pad the sequence using torch methods
-    # FIXME : Investigate the Packing Method.
-    # See https://stackoverflow.com/questions/51030782/why-do-we-pack-the-sequences-in-pytorch
-    #     https://discuss.pytorch.org/t/simple-working-example-how-to-use-packing-for-variable-length-sequence-inputs-for-rnn/2120/33
-    def CLEAR_collate_fct(self, batch):
+
+# FIXME : We should probably pad the sequence using torch methods
+# FIXME : Investigate the Packing Method.
+# See https://stackoverflow.com/questions/51030782/why-do-we-pack-the-sequences-in-pytorch
+#     https://discuss.pytorch.org/t/simple-working-example-how-to-use-packing-for-variable-length-sequence-inputs-for-rnn/2120/33
+class CLEAR_collate_fct(object):
+    def __init__(self, padding_token):
+        self.padding_token = padding_token
+
+    def __call__(self, batch):
         batch_questions = [b['question'] for b in batch]
 
-        padded_questions, seq_lengths = CLEARTokenizer.pad_tokens(batch_questions, padding_token=self.get_padding_token())
+        padded_questions, seq_lengths = CLEARTokenizer.pad_tokens(batch_questions, padding_token=self.padding_token)
 
         for sample, padded_question, seq_length in zip(batch, padded_questions, seq_lengths):
             sample['question'] = padded_question
             sample['seq_length'] = seq_length
 
         return torch.utils.data.dataloader.default_collate(batch)
-
 
 if __name__ == "__main__":
     image_config = {

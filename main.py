@@ -15,7 +15,7 @@ from preprocessing import create_dict_from_questions, extract_features
 
 # NEW IMPORTS
 from models.torch_film_model import CLEAR_FiLM_model
-from data_interfaces.torch_dataset import CLEAR_dataset, ToTensor, ResizeImg, ImgBetweenZeroOne  # FIXME : ToTensor should be imported from somewhere else. Utils ?
+from data_interfaces.torch_dataset import CLEAR_dataset, CLEAR_collate_fct, ToTensor, ResizeImg, ImgBetweenZeroOne  # FIXME : ToTensor should be imported from somewhere else. Utils ?
 from models.torchsummary import summary     # Custom version of torchsummary to fix bugs with input
 import torch
 import time
@@ -388,14 +388,15 @@ def main(args):
     #                             transforms=transforms.Compose(transforms_list + [ToTensor()]))
 
     print("Creating Dataloaders")
+    collate_fct = CLEAR_collate_fct(padding_token=train_dataset.get_padding_token())
     train_dataloader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True,
-                                  num_workers=4, collate_fn=train_dataset.CLEAR_collate_fct)
+                                  num_workers=4, collate_fn=collate_fct)
 
     val_dataloader = DataLoader(val_dataset, batch_size=args.batch_size, shuffle=True,
-                                  num_workers=4, collate_fn=train_dataset.CLEAR_collate_fct)
+                                  num_workers=4, collate_fn=collate_fct)
 
     test_dataloader = DataLoader(test_dataset, batch_size=args.batch_size, shuffle=False,
-                                  num_workers=4, collate_fn=train_dataset.CLEAR_collate_fct)
+                                  num_workers=4, collate_fn=collate_fct)
 
     #trickytest_dataloader = DataLoader(trickytest_dataset, batch_size=args.batch_size, shuffle=False,
     #                             num_workers=4, collate_fn=train_dataset.CLEAR_collate_fct)
