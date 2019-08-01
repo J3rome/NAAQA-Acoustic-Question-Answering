@@ -269,7 +269,7 @@ class CLEAR_FiLM_model(nn.Module):
         if self.config["classifier"]["spatial_location"]:
            conv_out = append_spatial_location(conv_out)
 
-        # FIXME : Up to date Film network doesnt have this layer
+        # FIXME : Up to date Film network doesnt have this layer ---> FALSE... It does but it is in the FilmStack class
         classif_out = self.classif_conv(conv_out)
 
         # Global Max Pooling (Max pooling over whole dimensions 3,4)
