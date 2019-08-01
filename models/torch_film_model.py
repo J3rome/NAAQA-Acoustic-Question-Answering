@@ -67,7 +67,7 @@ def append_spatial_location(features, start=-1, end=1):
 
 
 class FiLM_layer(nn.Module):
-    def __init__(self, in_channels, out_channels, save_gammas_betas=True):
+    def __init__(self, in_channels, out_channels, dropout_keep_prob=1.0, save_gammas_betas=True):
         super(FiLM_layer, self).__init__()
 
         self.in_channels = in_channels
@@ -80,9 +80,13 @@ class FiLM_layer(nn.Module):
 
         self.params_vector = nn.Linear(self.in_channels, 2 * self.out_channels)     # FIXME : Original film have another multiplier : num_modules (which is 4 --> Number of resblock)
                                                                                     # FIXME : The linear layer is not in here on the original tho. This might be why we don't have *4 for the number of resblock (We are inside the resblock here)
+        self.dropout = nn.Dropout(p=dropout_keep_prob)
 
     def forward(self, input_features, rnn_last_hidden_state):
         film_params = self.params_vector(rnn_last_hidden_state)
+
+        # FIXME : Is it a good idea to have dropout here ?
+        film_params = self.dropout(film_params)
 
         gammas, betas = film_params.split(self.out_channels, dim=-1)
 
@@ -97,18 +101,21 @@ class FiLM_layer(nn.Module):
 
 
 class FiLMed_resblock(nn.Module):
-    def __init__(self, in_channels, out_channels, context_size, first_kernel=(1, 1), second_kernel=(3, 3)):
+    def __init__(self, in_channels, out_channels, context_size, dropout_keep_prob=1.0, kernel1=(1, 1), kernel2=(3, 3)):
+
         super(FiLMed_resblock, self).__init__()
 
         self.conv1 = nn.Sequential(
             Conv2d_tf(in_channels=in_channels, out_channels=out_channels,
-                      kernel_size=first_kernel, stride=1, padding='SAME', dilation=1),
+                      kernel_size=kernel1, stride=1, padding='SAME', dilation=1),
 
             nn.ReLU(inplace=True),
         )
 
+        self.dropout = nn.Dropout(p=dropout_keep_prob)
+
         self.conv2 = Conv2d_tf(in_channels=out_channels, out_channels=out_channels,
-                               kernel_size=second_kernel, stride=1, padding='SAME', dilation=1)
+                               kernel_size=kernel2, stride=1, padding='SAME', dilation=1)
 
         self.conv2_bn = nn.BatchNorm2d(out_channels)
 
@@ -122,7 +129,9 @@ class FiLMed_resblock(nn.Module):
             input_features = append_spatial_location(input_features)
 
         conv1_out = self.conv1(input_features)
+        conv1_out = self.dropout(conv1_out)
         out = self.conv2(conv1_out)
+        out = self.dropout(out)
         out = self.conv2_bn(out)
         out = self.conv2_filmed(out, rnn_state)
         out = self.conv2_relu(out)
@@ -136,6 +145,11 @@ class CLEAR_FiLM_model(nn.Module):
         super(CLEAR_FiLM_model, self).__init__()
 
         self.config = config
+
+        dropout_keep_prob = float(config['optimizer'].get('dropout_keep_prob', 1.0))
+
+        # FIXME : Is it really ok to reuse the same dropout layer multiple time ?
+        self.dropout = nn.Dropout(p=dropout_keep_prob)
 
         spatial_location_extra_channels = {
             'stem': 2 if config['stem']['spatial_location'] else 0,
@@ -188,8 +202,9 @@ class CLEAR_FiLM_model(nn.Module):
             self.resblocks.append(FiLMed_resblock(in_channels=resblock_in_channels,
                                                   out_channels=resblock_out_channels,
                                                   context_size=config["question"]["rnn_state_size"],
-                                                  first_kernel=config['resblock']['kernel1'],
-                                                  second_kernel=config['resblock']['kernel2']))
+                                                  kernel1=config['resblock']['kernel1'],
+                                                  kernel2=config['resblock']['kernel2'],
+                                                  dropout_keep_prob=dropout_keep_prob))
 
         #### Classification
         self.classif_conv = nn.Sequential(
@@ -217,9 +232,13 @@ class CLEAR_FiLM_model(nn.Module):
     def forward(self, question, question_lengths, input_image, pack_sequence=True):
         # Question Pipeline
         word_emb = self.word_emb(question)
+
+        word_emb = self.dropout(word_emb)
+
         if pack_sequence:
             word_emb = torch.nn.utils.rnn.pack_padded_sequence(word_emb, question_lengths, batch_first=True,
                                                                enforce_sorted=False)        # FIXME : Verify implication of enforce_sorted
+
         rnn_out, rnn_hidden = self.rnn_state(word_emb)
 
         if pack_sequence:
@@ -229,6 +248,8 @@ class CLEAR_FiLM_model(nn.Module):
         question_lengths = question_lengths - 1
         last_token_indexes = question_lengths.view(-1, 1, 1).expand(-1, 1, self.rnn_state.hidden_size).long()
         rnn_hidden_state = rnn_out.gather(1, last_token_indexes).view(-1, self.rnn_state.hidden_size)       # FIXME : Is rnn_hidden_state the correct name here ?
+
+        rnn_hidden_state = self.dropout(rnn_hidden_state)
 
         # Image Pipeline
         conv_out = input_image
@@ -248,6 +269,7 @@ class CLEAR_FiLM_model(nn.Module):
         if self.config["classifier"]["spatial_location"]:
            conv_out = append_spatial_location(conv_out)
 
+        # FIXME : Up to date Film network doesnt have this layer
         classif_out = self.classif_conv(conv_out)
 
         # Global Max Pooling (Max pooling over whole dimensions 3,4)
