@@ -172,16 +172,4 @@ class CLEAR_collate_fct(object):
         return torch.utils.data.dataloader.default_collate(batch)
 
 if __name__ == "__main__":
-    image_config = {
-            "type": "raw",
-            "dim": [224, 224, 3]
-        }
-
-    test_dataset = CLEAR_dataset('data/v2.0.0_1k_scenes_1_inst_per_scene', image_config, 'train', transforms=ToTensor())
-
-    dataloader = DataLoader(test_dataset, batch_size=16, shuffle=False, num_workers=4, collate_fn=test_dataset.CLEAR_collate_fct)
-
-
-    batch = next(iter(dataloader))
-
-    print("done")
+    print("Please use main.py")
