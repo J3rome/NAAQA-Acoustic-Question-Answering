@@ -36,11 +36,12 @@ class ToTensor(object):
 class ImgBetweenZeroOne(object):
     """Normalize the image between 0 and 1"""
 
-    def __init__(self, max=255):
-        self.max = max
+    def __init__(self, max_val=255, min_val=0):
+        self.max_val = max_val
+        self.min_val = min_val
 
     def __call__(self, sample):
-        sample['image'] /= self.max
+        sample['image'] = (sample['image'] - self.min_val) / (self.max_val - self.min_val)
 
         return sample
 

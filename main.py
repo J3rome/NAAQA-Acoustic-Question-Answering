@@ -343,16 +343,21 @@ def main(args):
     ####################################
 
     transforms_list = []
+
+    # Bundle together ToTensor and ImgBetweenZeroOne, need to be one after the other for other transforms to work
+    to_tensor_transform = [ToTensor()]
+    if not args.keep_image_range:
+        to_tensor_transform.append(ImgBetweenZeroOne())
+
     if film_model_config['input']['type'] == 'raw':
         feature_extractor_config = {'version': 101, 'layer_index': 6}   # Idx 6 -> Block3/unit22
 
         if args.raw_img_resize:
             transforms_list.append(ResizeImg(args.raw_img_resize))
 
-        transforms_list.append(ToTensor())
+        # TODO : Add data augmentation ?
 
-        if not args.keep_image_range:
-            transforms_list.append(ImgBetweenZeroOne())
+        transforms_list += to_tensor_transform
 
         if args.normalize_with_imagenet_stats:
             imagenet_stats = film_model_config['feature_extractor']['imagenet_stats']
@@ -361,7 +366,7 @@ def main(args):
             assert False, "Normalization with CLEAR stats not implemented"
 
     else:
-        transforms_list.append(ToTensor())
+        transforms_list += to_tensor_transform
         feature_extractor_config = None
 
     transforms_to_apply = transforms.Compose(transforms_list)
