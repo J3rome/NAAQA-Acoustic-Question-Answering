@@ -192,9 +192,9 @@ def process_dataloader(is_training, device, model, dataloader, criterion=None, o
     # Model should already be copied to GPU at this point
     #assert (is_training and criterion and optimizer)
 
-    if is_training:
-        model.train()       #FIXME :Verify, is there a cost to calling train multiple time ? Is there a way to check if already set ?
-    else:
+    if is_training and not model.training:
+        model.train()
+    elif model.training:
         model.eval()
 
     dataset_size = len(dataloader.dataset)
