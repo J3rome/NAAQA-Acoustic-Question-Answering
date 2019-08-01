@@ -294,13 +294,6 @@ class CLEAR_FiLM_model(nn.Module):
 
         return gammas, betas
 
-    def train(self, mode=True):
-        super(CLEAR_FiLM_model, self).train(mode)
-
-        # Keep the feature extractor in eval mode
-        if self.feature_extractor:
-            self.feature_extractor.eval()
-
     def get_cleaned_state_dict(self):
         state_dict = self.state_dict()
 
@@ -308,6 +301,20 @@ class CLEAR_FiLM_model(nn.Module):
             state_dict = {k : p for k,p in state_dict.items() if 'feature_extractor' not in k}
 
         return state_dict
+
+    def train(self, mode=True):
+        # Only call train if model is in eval mode
+        if not self.training:
+            super(CLEAR_FiLM_model, self).train(mode)
+
+        # Keep the feature extractor in eval mode
+        if self.feature_extractor and self.feature_extractor.training:
+            self.feature_extractor.eval()
+
+    def eval(self):
+        # Only call eval if model is already in training mode
+        if self.training:
+            super(CLEAR_FiLM_model, self).eval()
 
 
 class Resnet_feature_extractor(nn.Module):

@@ -187,9 +187,9 @@ def process_dataloader(is_training, device, model, dataloader, criterion=None, o
     # Model should already have been copied to the GPU at this point (If using GPU)
     assert (is_training and criterion is not None and optimizer is not None) or not is_training
 
-    if is_training and not model.training:
+    if is_training:
         model.train()
-    elif model.training:
+    else:
         model.eval()
 
     dataset_size = len(dataloader.dataset)
