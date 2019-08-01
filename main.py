@@ -9,6 +9,7 @@ import numpy as np
 
 from utils import set_random_seed, create_folder_if_necessary, get_config, process_predictions, process_gamma_beta
 from utils import create_symlink_to_latest_folder, save_training_stats, save_json, sort_stats, is_date_string
+from utils import calc_mean_and_std
 
 from visualization import grad_cam_visualization
 from preprocessing import create_dict_from_questions, extract_features
@@ -392,6 +393,10 @@ def main(args):
 
     #trickytest_dataloader = DataLoader(trickytest_dataset, batch_size=args.batch_size, shuffle=False,
     #                             num_workers=4, collate_fn=train_dataset.CLEAR_collate_fct)
+
+    # This should only be used once to get the dataset mean & std. We could write it to the data folder in json format
+    # FIXME : THIS IS AFFECTING THE RESULTS --> Changing the seed. Could be a preprocessing step ?
+    #mean, std = calc_mean_and_std(train_test_dataloader, device=device)
 
 
     ####################################

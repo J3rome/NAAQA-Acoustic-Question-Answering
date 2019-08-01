@@ -165,6 +165,10 @@ class CLEAR_collate_fct(object):
 
         padded_questions, seq_lengths = CLEARTokenizer.pad_tokens(batch_questions, padding_token=self.padding_token)
 
+        # FIXME : Investigate why this doesnt work
+        #seq_lengths = torch.tensor([len(q) for q in batch_questions])
+        #padded_questions = torch.nn.utils.rnn.pad_sequence(batch_questions, batch_first=True)
+
         for sample, padded_question, seq_length in zip(batch, padded_questions, seq_lengths):
             sample['question'] = padded_question
             sample['seq_length'] = seq_length
