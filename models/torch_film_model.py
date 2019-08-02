@@ -67,7 +67,7 @@ def append_spatial_location(features, start=-1, end=1):
 
 
 class FiLM_layer(nn.Module):
-    def __init__(self, in_channels, out_channels, dropout_keep_prob=1.0, save_gammas_betas=True):
+    def __init__(self, in_channels, out_channels, dropout_drop_prob=0.0, save_gammas_betas=True):
         super(FiLM_layer, self).__init__()
 
         self.in_channels = in_channels
@@ -80,7 +80,7 @@ class FiLM_layer(nn.Module):
 
         self.params_vector = nn.Linear(self.in_channels, 2 * self.out_channels)     # FIXME : Original film have another multiplier : num_modules (which is 4 --> Number of resblock)
                                                                                     # FIXME : The linear layer is not in here on the original tho. This might be why we don't have *4 for the number of resblock (We are inside the resblock here)
-        self.dropout = nn.Dropout(p=dropout_keep_prob)
+        self.dropout = nn.Dropout(p=dropout_drop_prob)
 
     def forward(self, input_features, rnn_last_hidden_state):
         film_params = self.params_vector(rnn_last_hidden_state)
@@ -101,7 +101,7 @@ class FiLM_layer(nn.Module):
 
 
 class FiLMed_resblock(nn.Module):
-    def __init__(self, in_channels, out_channels, context_size, dropout_keep_prob=1.0, kernel1=(1, 1), kernel2=(3, 3)):
+    def __init__(self, in_channels, out_channels, context_size, dropout_drop_prob=0.0, kernel1=(1, 1), kernel2=(3, 3)):
 
         super(FiLMed_resblock, self).__init__()
 
@@ -112,7 +112,7 @@ class FiLMed_resblock(nn.Module):
             nn.ReLU(inplace=True),
         )
 
-        self.dropout = nn.Dropout(p=dropout_keep_prob)
+        self.dropout = nn.Dropout(p=dropout_drop_prob)
 
         self.conv2 = Conv2d_tf(in_channels=out_channels, out_channels=out_channels,
                                kernel_size=kernel2, stride=1, padding='SAME', dilation=1)
@@ -146,10 +146,10 @@ class CLEAR_FiLM_model(nn.Module):
 
         self.config = config
 
-        dropout_keep_prob = float(config['optimizer'].get('dropout_keep_prob', 1.0))
+        dropout_drop_prob = float(config['optimizer'].get('dropout_drop_prob', 0.0))
 
         # FIXME : Is it really ok to reuse the same dropout layer multiple time ?
-        self.dropout = nn.Dropout(p=dropout_keep_prob)
+        self.dropout = nn.Dropout(p=dropout_drop_prob)
 
         spatial_location_extra_channels = {
             'stem': 2 if config['stem']['spatial_location'] else 0,
@@ -204,7 +204,7 @@ class CLEAR_FiLM_model(nn.Module):
                                                   context_size=config["question"]["rnn_state_size"],
                                                   kernel1=config['resblock']['kernel1'],
                                                   kernel2=config['resblock']['kernel2'],
-                                                  dropout_keep_prob=dropout_keep_prob))
+                                                  dropout_keep_prob=dropout_drop_prob))
 
         #### Classification
         self.classif_conv = nn.Sequential(
