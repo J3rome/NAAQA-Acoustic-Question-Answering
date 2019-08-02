@@ -204,7 +204,7 @@ class CLEAR_FiLM_model(nn.Module):
                                                   context_size=config["question"]["rnn_state_size"],
                                                   kernel1=config['resblock']['kernel1'],
                                                   kernel2=config['resblock']['kernel2'],
-                                                  dropout_keep_prob=dropout_drop_prob))
+                                                  dropout_drop_prob=dropout_drop_prob))
 
         #### Classification
         self.classif_conv = nn.Sequential(
