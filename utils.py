@@ -151,13 +151,25 @@ def calc_mean_and_std(dataloader, zero_one_range=True, device='cpu'):
     return fst_moment, snd_moment
 
 
-def save_json(results, output_folder, filename, indented=True):
-    with open("%s/%s" % (output_folder, filename), 'w') as f:
+def save_json(results, output_folder, filename=None, indented=True):
+    if filename is None:
+        # First parameter is full path
+        path = output_folder
+    else:
+        path = '%s/%s' % (output_folder, filename)
+
+    with open(path, 'w') as f:
         ujson.dump(results, f, indent=2 if indented else None, escape_forward_slashes=False)
 
 
-def read_json(folder, filename):
-    with open('%s/%s' % (folder, filename), 'r') as f:
+def read_json(folder, filename=None):
+    if filename is None:
+        # First parameter is full path
+        path = folder
+    else:
+        path = '%s/%s' % (folder, filename)
+        
+    with open(path, 'r') as f:
         return ujson.load(f)
 
 
