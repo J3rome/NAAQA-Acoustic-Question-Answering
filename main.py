@@ -9,7 +9,7 @@ import numpy as np
 
 from utils import set_random_seed, create_folder_if_necessary, get_config, process_predictions, process_gamma_beta
 from utils import create_symlink_to_latest_folder, save_training_stats, save_json, sort_stats, is_date_string
-from utils import calc_mean_and_std
+from utils import calc_mean_and_std, save_gamma_beta_h5
 
 from visualization import grad_cam_visualization
 from preprocessing import create_dict_from_questions, extract_features
@@ -141,8 +141,8 @@ def train_model(device, model, dataloaders, output_folder, criterion=None, optim
 
         save_json(train_predictions, epoch_output_folder_path, filename="train_predictions.json")
         save_json(val_predictions, epoch_output_folder_path, filename="val_predictions.json")
-        save_json(train_gammas_betas, epoch_output_folder_path, filename="train_gamma_beta.json")
-        save_json(val_gammas_betas, epoch_output_folder_path, filename="val_gamma_beta.json")
+        save_gamma_beta_h5(train_gammas_betas, epoch_output_folder_path, filename="train_gamma_beta.h5")
+        save_gamma_beta_h5(val_gammas_betas, epoch_output_folder_path, filename="val_gamma_beta.h5")
 
         print("Training took %s" % str(epoch_train_time))
 

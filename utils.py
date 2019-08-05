@@ -4,6 +4,7 @@ import numpy as np
 import tensorflow as tf
 import subprocess
 import ujson
+import h5py
 from collections import defaultdict
 from dateutil.parser import parse as date_parse
 
@@ -171,6 +172,75 @@ def read_json(folder, filename=None):
         
     with open(path, 'r') as f:
         return ujson.load(f)
+
+
+def read_gamma_beta_h5(filepath):
+    gammas_betas = []
+
+    with h5py.File(filepath, 'r') as f:
+        nb_val = f['question_index'].shape[0]
+
+        for idx in range(nb_val):
+            gamma_beta = {
+                'question_index': f['question_index'][idx]
+            }
+
+            for resblock_key in f['gamma']:
+                gamma_beta[resblock_key] = {
+                    'gamma_vector': f['gamma'][resblock_key][idx].tolist(),
+                    'beta_vector': f['beta'][resblock_key][idx].tolist()
+                }
+
+            gammas_betas.append(gamma_beta)
+
+    return gammas_betas
+
+
+def save_gamma_beta_h5(gammas_betas, folder, filename=None):
+    """
+    This is a PATCH, couldn't write huge JSON files.
+    The data structure could be better, just a quick hack to make it work without changing the structure
+    """
+
+    nb_vals = len(gammas_betas)
+    nb_resblock = len(set(gammas_betas[0].keys()) - {'question_index'})
+    nb_dim_resblock = len(gammas_betas[0]['resblock_0']['gamma_vector'])
+
+    if filename is None:
+        # First parameter is full path
+        path = folder
+    else:
+        path = '%s/%s' % (folder, filename)
+
+    with h5py.File(path, 'w') as f:
+        question_ids = f.create_dataset('question_index', (nb_vals,), dtype='i')
+
+        gammas = f.create_group('gamma')
+        betas = f.create_group('beta')
+
+        datasets = {
+            gammas.name: {},
+            betas.name: {}
+        }
+
+        groups = [betas, gammas]
+
+        # Create datasets
+        for group in groups:
+            for resblock_i in range(nb_resblock):
+                dataset_name = 'resblock_%d' % resblock_i
+                dataset = group.create_dataset(dataset_name, (nb_vals, nb_dim_resblock), dtype='f')
+                datasets[group.name][dataset_name] = dataset
+
+        # Write data
+        for h5_idx, gamma_beta in enumerate(gammas_betas):
+            question_ids[h5_idx] = gamma_beta['question_index']
+
+            for dataset_name, dataset in datasets[gammas.name].items():
+                dataset[h5_idx] = gamma_beta[dataset_name]['gamma_vector']
+
+            for dataset_name, dataset in datasets[betas.name].items():
+                dataset[h5_idx] = gamma_beta[dataset_name]['beta_vector']
 
 
 def is_date_string(string):
