@@ -11,6 +11,9 @@ from data_interfaces.CLEAR_tokenizer import CLEARTokenizer
 from data_interfaces.CLEAR_image_loader import get_img_builder, CLEARImage
 from utils import read_json
 
+import multiprocessing
+import ctypes
+
 
 class CLEAR_dataset(Dataset):
 
@@ -47,10 +50,6 @@ class CLEAR_dataset(Dataset):
                 if answer not in self.answer_to_family:
                     self.answer_to_family[answer] = family
 
-        self.games = []
-        self.answer_counter = collections.Counter()
-        self.answers = []
-
         # Questions can either be read from file or provided as an array
         if questions is None:
             question_file_path = '{}/questions/CLEAR_{}_questions.json'.format(folder, self.set)
@@ -60,7 +59,12 @@ class CLEAR_dataset(Dataset):
         else:
             samples = questions
 
-        for sample in samples:
+        nb_games = len(samples)
+        self.games = multiprocessing.Array(ctypes.c_wchar_p, [""]*nb_games)
+        self.answer_counter = collections.Counter()
+        self.answers = []
+
+        for i, sample in enumerate(samples):
             question_id = int(sample["question_index"])
             question = self.tokenizer.encode_question(sample["question"]) if tokenize_text else sample['question']
 
@@ -81,7 +85,7 @@ class CLEAR_dataset(Dataset):
                 # Backward compatibility with older CLEVR format
                 image_filename = sample["image_filename"].replace('AQA_', 'CLEAR_')
 
-            self.games.append({
+            self.games[i] = ujson.dumps({
                 'id': question_id,
                 'image': {'id': image_id, 'filename': image_filename, 'set': self.set},
                 'question': question,
@@ -96,7 +100,7 @@ class CLEAR_dataset(Dataset):
         return len(self.games)
 
     def __getitem__(self, idx):
-        requested_game = self.games[idx]
+        requested_game = ujson.loads(self.games[idx])
 
         # Reference to H5py file must be shared between workers (when dataloader.num_workers > 0)
         # We create the image here since it will create the img_builder which contain the h5 file ref
@@ -144,7 +148,8 @@ class CLEAR_dataset(Dataset):
     def keep_1_game_per_scene(self):
         id_list = collections.defaultdict(lambda: False)
         unique_scene_games = []
-        for game in self.games:
+        for game_str in self.games:
+            game = ujson.loads(game_str)
             if not id_list[game['image']['id']]:
                 unique_scene_games.append(game)
                 id_list[game['image']['id']] = True
