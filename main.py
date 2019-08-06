@@ -126,23 +126,23 @@ def train_model(device, model, dataloaders, output_folder, criterion=None, optim
         print('-' * 10)
 
         time_before_train = datetime.now()
-        train_loss, train_acc, train_predictions, train_gammas_betas = process_dataloader(True, device, model,
-                                                                                          dataloaders['train'],
-                                                                                          criterion, optimizer)
+        train_loss, train_acc, train_predictions = process_dataloader(True, device, model,
+                                                                      dataloaders['train'],
+                                                                      criterion, optimizer,
+                                                                      gamma_beta_path="%s/train_gamma_beta.h5" % epoch_output_folder_path)
         epoch_train_time = datetime.now() - time_before_train
 
         print('\n{} Loss: {:.4f} Acc: {:.4f}'.format('Train', train_loss, train_acc))
 
-        val_loss, val_acc, val_predictions, val_gammas_betas = process_dataloader(False, device, model,
-                                                                                  dataloaders['val'], criterion)
+        val_loss, val_acc, val_predictions = process_dataloader(False, device, model,
+                                                                dataloaders['val'], criterion,
+                                                                gamma_beta_path="%s/train_gamma_beta.h5" % epoch_output_folder_path)
         print('\n{} Loss: {:.4f} Acc: {:.4f}'.format('Val', val_loss, val_acc))
 
         stats = save_training_stats(stats_file_path, epoch, train_acc, train_loss, val_acc, val_loss, epoch_train_time)
 
         save_json(train_predictions, epoch_output_folder_path, filename="train_predictions.json")
         save_json(val_predictions, epoch_output_folder_path, filename="val_predictions.json")
-        save_gamma_beta_h5(train_gammas_betas, epoch_output_folder_path, filename="train_gamma_beta.h5")
-        save_gamma_beta_h5(val_gammas_betas, epoch_output_folder_path, filename="val_gamma_beta.h5")
 
         print("Training took %s" % str(epoch_train_time))
 
@@ -183,7 +183,7 @@ def train_model(device, model, dataloaders, output_folder, criterion=None, optim
     return model
 
 
-def process_dataloader(is_training, device, model, dataloader, criterion=None, optimizer=None):
+def process_dataloader(is_training, device, model, dataloader, criterion=None, optimizer=None, gamma_beta_path=None):
     # Model should already have been copied to the GPU at this point (If using GPU)
     assert (is_training and criterion is not None and optimizer is not None) or not is_training
 
@@ -193,13 +193,14 @@ def process_dataloader(is_training, device, model, dataloader, criterion=None, o
         model.eval()
 
     dataset_size = len(dataloader.dataset)
+    batch_size = dataloader.batch_size
     running_loss = 0.0
     running_corrects = 0
 
     processed_predictions = []
     processed_gammas_betas = []
 
-    for batch in tqdm(dataloader):
+    for batch_idx, batch in enumerate(tqdm(dataloader)):
         #mem_trace.report('Batch %d/%d - Epoch %d' % (i, dataloader.batch_size, epoch))
         images = batch['image'].to(device)
         questions = batch['question'].to(device)
@@ -234,15 +235,25 @@ def process_dataloader(is_training, device, model, dataloader, criterion=None, o
         gammas, betas = model.get_gammas_betas()
         processed_gammas_betas += process_gamma_beta(batch_processed_predictions, gammas, betas)
 
+        if gamma_beta_path is not None and batch_idx % 500 == 0 and batch_idx != 0:
+            save_gamma_beta_h5(processed_gammas_betas, gamma_beta_path, nb_vals=dataset_size,
+                               start_idx=batch_idx * batch_size)
+            processed_gammas_betas = []
+
         # statistics
         if criterion:
             running_loss += loss.item() * dataloader.batch_size
         running_corrects += torch.sum(preds == answers.data).item()
 
+    nb_left_to_write = len(processed_gammas_betas)
+    if gamma_beta_path is not None and nb_left_to_write > 0:
+        save_gamma_beta_h5(processed_gammas_betas, gamma_beta_path, nb_vals=dataset_size,
+                           start_idx=dataset_size - nb_left_to_write)
+
     epoch_loss = running_loss / dataset_size
     epoch_acc = running_corrects / dataset_size
 
-    return epoch_loss, epoch_acc, processed_predictions, processed_gammas_betas
+    return epoch_loss, epoch_acc, processed_predictions
 
 
 def main(args):

@@ -196,15 +196,14 @@ def read_gamma_beta_h5(filepath):
     return gammas_betas
 
 
-def save_gamma_beta_h5(gammas_betas, folder, filename=None):
+def save_gamma_beta_h5(gammas_betas, folder, filename=None, nb_vals=None, start_idx=0):
     """
     This is a PATCH, couldn't write huge JSON files.
     The data structure could be better, just a quick hack to make it work without changing the structure
     """
 
-    nb_vals = len(gammas_betas)
-    nb_resblock = len(set(gammas_betas[0].keys()) - {'question_index'})
-    nb_dim_resblock = len(gammas_betas[0]['resblock_0']['gamma_vector'])
+    if nb_vals is None:
+        nb_vals = len(gammas_betas)
 
     if filename is None:
         # First parameter is full path
@@ -212,35 +211,31 @@ def save_gamma_beta_h5(gammas_betas, folder, filename=None):
     else:
         path = '%s/%s' % (folder, filename)
 
-    with h5py.File(path, 'w') as f:
-        question_ids = f.create_dataset('question_index', (nb_vals,), dtype='i')
+    resblock_keys = list(set(gammas_betas[0].keys()) - {'question_index'})
+    nb_dim_resblock = len(gammas_betas[0]['resblock_0']['gamma_vector'])
 
-        gammas = f.create_group('gamma')
-        betas = f.create_group('beta')
+    file_exist = os.path.isfile(path)
 
-        datasets = {
-            gammas.name: {},
-            betas.name: {}
-        }
+    with h5py.File(path, 'a') as f:
 
-        groups = [betas, gammas]
+        if not file_exist:
+            # Create datasets
+            f.create_dataset('question_index', (nb_vals,), dtype='i')
 
-        # Create datasets
-        for group in groups:
-            for resblock_i in range(nb_resblock):
-                dataset_name = 'resblock_%d' % resblock_i
-                dataset = group.create_dataset(dataset_name, (nb_vals, nb_dim_resblock), dtype='f')
-                datasets[group.name][dataset_name] = dataset
+            for group_name in ['gamma', 'beta']:
+                group = f.create_group(group_name)
+
+                for resblock_key in resblock_keys:
+                    group.create_dataset(resblock_key, (nb_vals, nb_dim_resblock), dtype='f')
 
         # Write data
-        for h5_idx, gamma_beta in enumerate(gammas_betas):
-            question_ids[h5_idx] = gamma_beta['question_index']
+        for idx, gamma_beta in enumerate(gammas_betas):
+            h5_idx = start_idx + idx
+            f['question_index'][h5_idx] = gamma_beta['question_index']
 
-            for dataset_name, dataset in datasets[gammas.name].items():
-                dataset[h5_idx] = gamma_beta[dataset_name]['gamma_vector']
-
-            for dataset_name, dataset in datasets[betas.name].items():
-                dataset[h5_idx] = gamma_beta[dataset_name]['beta_vector']
+            for resblock_key in resblock_keys:
+                f['gamma'][resblock_key][h5_idx] = gamma_beta[resblock_key]['gamma_vector']
+                f['beta'][resblock_key][h5_idx] = gamma_beta[resblock_key]['beta_vector']
 
 
 def is_date_string(string):
