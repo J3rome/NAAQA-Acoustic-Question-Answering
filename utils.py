@@ -1,7 +1,6 @@
 import random
 import os
 import numpy as np
-import tensorflow as tf
 import subprocess
 import ujson
 import h5py
@@ -244,27 +243,3 @@ def is_date_string(string):
         return True
     except ValueError:
         return False
-
-
-def is_tensor_optimizer(x):
-    return hasattr(x, 'op_def')
-
-
-def is_tensor_scalar(x):
-    return isinstance(x, tf.Tensor) and x.dtype is tf.float32 and len(x.shape) == 0
-
-
-def is_tensor_prediction(x):
-    return isinstance(x, tf.Tensor) and 'predicted_answer' in x.name
-
-
-def is_tensor_gamma_list(x):
-    return isinstance(x, list) and isinstance(x[0], tf.Tensor) and 'gamma' in x[0].name
-
-
-def is_tensor_beta_list(x):
-    return isinstance(x, list) and isinstance(x[0], tf.Tensor) and 'beta' in x[0].name
-
-
-def is_tensor_summary(x):
-    return isinstance(x, tf.Tensor) and x.dtype is tf.string
