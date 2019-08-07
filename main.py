@@ -24,6 +24,7 @@ import time
 from torch.utils.data import DataLoader
 import torch.nn as nn
 from torchvision import transforms
+import gc
 
 # TODO : Add option for custom test file --> Already available by specifying different inference_set ? The according dataset & dataloader should be created..
 #       Maybe not a good idea to instantiate everything out of the "task" functions.. Or maybe we could just instantiate it inside for the test inference
@@ -136,7 +137,7 @@ def train_model(device, model, dataloaders, output_folder, criterion=None, optim
 
         val_loss, val_acc, val_predictions = process_dataloader(False, device, model,
                                                                 dataloaders['val'], criterion,
-                                                                gamma_beta_path="%s/train_gamma_beta.h5" % epoch_output_folder_path)
+                                                                gamma_beta_path="%s/val_gamma_beta.h5" % epoch_output_folder_path)
         print('\n{} Loss: {:.4f} Acc: {:.4f}'.format('Val', val_loss, val_acc))
 
         stats = save_training_stats(stats_file_path, epoch, train_acc, train_loss, val_acc, val_loss, epoch_train_time)
@@ -199,6 +200,7 @@ def process_dataloader(is_training, device, model, dataloader, criterion=None, o
 
     processed_predictions = []
     processed_gammas_betas = []
+    nb_written = 0
 
     for batch_idx, batch in enumerate(tqdm(dataloader)):
         #mem_trace.report('Batch %d/%d - Epoch %d' % (i, dataloader.batch_size, epoch))
@@ -236,8 +238,8 @@ def process_dataloader(is_training, device, model, dataloader, criterion=None, o
         processed_gammas_betas += process_gamma_beta(batch_processed_predictions, gammas, betas)
 
         if gamma_beta_path is not None and batch_idx % 500 == 0 and batch_idx != 0:
-            save_gamma_beta_h5(processed_gammas_betas, gamma_beta_path, nb_vals=dataset_size,
-                               start_idx=batch_idx * batch_size)
+            nb_written += save_gamma_beta_h5(processed_gammas_betas, gamma_beta_path, nb_vals=dataset_size,
+                                             start_idx=nb_written)
             processed_gammas_betas = []
 
         # statistics
@@ -245,10 +247,12 @@ def process_dataloader(is_training, device, model, dataloader, criterion=None, o
             running_loss += loss.item() * dataloader.batch_size
         running_corrects += torch.sum(preds == answers.data).item()
 
+        gc.collect()
+
     nb_left_to_write = len(processed_gammas_betas)
     if gamma_beta_path is not None and nb_left_to_write > 0:
         save_gamma_beta_h5(processed_gammas_betas, gamma_beta_path, nb_vals=dataset_size,
-                           start_idx=dataset_size - nb_left_to_write)
+                           start_idx=nb_written)
 
     epoch_loss = running_loss / dataset_size
     epoch_acc = running_corrects / dataset_size

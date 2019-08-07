@@ -216,7 +216,7 @@ def save_gamma_beta_h5(gammas_betas, folder, filename=None, nb_vals=None, start_
 
     file_exist = os.path.isfile(path)
 
-    with h5py.File(path, 'a') as f:
+    with h5py.File(path, 'a', libver='latest') as f:
 
         if not file_exist:
             # Create datasets
@@ -228,14 +228,28 @@ def save_gamma_beta_h5(gammas_betas, folder, filename=None, nb_vals=None, start_
                 for resblock_key in resblock_keys:
                     group.create_dataset(resblock_key, (nb_vals, nb_dim_resblock), dtype='f')
 
-        # Write data
-        for idx, gamma_beta in enumerate(gammas_betas):
-            h5_idx = start_idx + idx
-            f['question_index'][h5_idx] = gamma_beta['question_index']
+            start_idx = 0
+
+        nb_val_to_write = len(gammas_betas)
+        vals = defaultdict(lambda : defaultdict(lambda : []))
+        vals['question_index'] = []
+
+        # Extract all values so we can write them all at once
+        for gamma_beta in gammas_betas:
+            vals['question_index'].append(gamma_beta['question_index'])
 
             for resblock_key in resblock_keys:
-                f['gamma'][resblock_key][h5_idx] = gamma_beta[resblock_key]['gamma_vector']
-                f['beta'][resblock_key][h5_idx] = gamma_beta[resblock_key]['beta_vector']
+                vals['gamma'][resblock_key].append(gamma_beta[resblock_key]['gamma_vector'])
+                vals['beta'][resblock_key].append(gamma_beta[resblock_key]['beta_vector'])
+
+        # Write data to H5 file
+        f['question_index'][start_idx:nb_val_to_write] = vals['question_index']
+
+        for resblock_key in resblock_keys:
+            f['gamma'][resblock_key][start_idx:nb_val_to_write,:] = vals['gamma'][resblock_key] 
+            f['beta'][resblock_key][start_idx:nb_val_to_write,:] = vals['beta'][resblock_key] 
+
+        return nb_val_to_write
 
 
 def is_date_string(string):
