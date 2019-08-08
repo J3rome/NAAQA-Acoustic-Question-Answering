@@ -184,7 +184,8 @@ def train_model(device, model, dataloaders, output_folder, criterion=None, optim
     return model
 
 
-def process_dataloader(is_training, device, model, dataloader, criterion=None, optimizer=None, gamma_beta_path=None):
+def process_dataloader(is_training, device, model, dataloader, criterion=None, optimizer=None, gamma_beta_path=None,
+                       write_to_file_every=500):
     # Model should already have been copied to the GPU at this point (If using GPU)
     assert (is_training and criterion is not None and optimizer is not None) or not is_training
 
@@ -237,7 +238,7 @@ def process_dataloader(is_training, device, model, dataloader, criterion=None, o
         gammas, betas = model.get_gammas_betas()
         processed_gammas_betas += process_gamma_beta(batch_processed_predictions, gammas, betas)
 
-        if gamma_beta_path is not None and batch_idx % 500 == 0 and batch_idx != 0:
+        if gamma_beta_path is not None and batch_idx % write_to_file_every == 0 and batch_idx != 0:
             nb_written += save_gamma_beta_h5(processed_gammas_betas, gamma_beta_path, nb_vals=dataset_size,
                                              start_idx=nb_written)
             processed_gammas_betas = []
@@ -383,13 +384,13 @@ def main(args):
     print("Creating Datasets")
     dict_file_path = None if not args.create_dict else args.dict_file_path
 
-    train_dataset = CLEAR_dataset(data_path, film_model_config['input'], 'train', dict_file_path=dict_file_path,
+    train_dataset = CLEAR_dataset(args.data_root_path, args.version_name, film_model_config['input'], 'train', dict_file_path=dict_file_path,
                                   transforms=transforms_to_apply, tokenize_text=not args.create_dict)
 
-    val_dataset = CLEAR_dataset(data_path, film_model_config['input'], 'val', dict_file_path=dict_file_path,
+    val_dataset = CLEAR_dataset(args.data_root_path, args.version_name, film_model_config['input'], 'val', dict_file_path=dict_file_path,
                                 transforms=transforms_to_apply, tokenize_text=not args.create_dict)
 
-    test_dataset = CLEAR_dataset(data_path, film_model_config['input'], 'test', dict_file_path=dict_file_path,
+    test_dataset = CLEAR_dataset(args.data_root_path, args.version_name, film_model_config['input'], 'test', dict_file_path=dict_file_path,
                                  transforms=transforms_to_apply, tokenize_text=not args.create_dict)
 
     #trickytest_dataset = CLEAR_dataset(data_path, film_model_config['input'], 'trickytest',
