@@ -178,6 +178,7 @@ def read_gamma_beta_h5(filepath):
 
     with h5py.File(filepath, 'r') as f:
         nb_val = f['question_index'].shape[0]
+        set_type = f['question_index'].attrs['set_type']
 
         for idx in range(nb_val):
             gamma_beta = {
@@ -192,10 +193,10 @@ def read_gamma_beta_h5(filepath):
 
             gammas_betas.append(gamma_beta)
 
-    return gammas_betas
+    return set_type, gammas_betas
 
 
-def save_gamma_beta_h5(gammas_betas, folder, filename=None, nb_vals=None, start_idx=0):
+def save_gamma_beta_h5(gammas_betas, set_type, folder, filename=None, nb_vals=None, start_idx=0):
     """
     This is a PATCH, couldn't write huge JSON files.
     The data structure could be better, just a quick hack to make it work without changing the structure
@@ -220,6 +221,8 @@ def save_gamma_beta_h5(gammas_betas, folder, filename=None, nb_vals=None, start_
         if not file_exist:
             # Create datasets
             f.create_dataset('question_index', (nb_vals,), dtype='i')
+
+            f['question_index'].attrs['set_type'] = set_type
 
             for group_name in ['gamma', 'beta']:
                 group = f.create_group(group_name)

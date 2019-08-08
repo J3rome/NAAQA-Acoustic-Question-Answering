@@ -239,8 +239,8 @@ def process_dataloader(is_training, device, model, dataloader, criterion=None, o
         processed_gammas_betas += process_gamma_beta(batch_processed_predictions, gammas, betas)
 
         if gamma_beta_path is not None and batch_idx % write_to_file_every == 0 and batch_idx != 0:
-            nb_written += save_gamma_beta_h5(processed_gammas_betas, gamma_beta_path, nb_vals=dataset_size,
-                                             start_idx=nb_written)
+            nb_written += save_gamma_beta_h5(processed_gammas_betas, dataloader.dataset.set, gamma_beta_path,
+                                             nb_vals=dataset_size, start_idx=nb_written)
             processed_gammas_betas = []
 
         # statistics
@@ -252,7 +252,7 @@ def process_dataloader(is_training, device, model, dataloader, criterion=None, o
 
     nb_left_to_write = len(processed_gammas_betas)
     if gamma_beta_path is not None and nb_left_to_write > 0:
-        save_gamma_beta_h5(processed_gammas_betas, gamma_beta_path, nb_vals=dataset_size,
+        save_gamma_beta_h5(processed_gammas_betas, dataloader.dataset.set, gamma_beta_path, nb_vals=dataset_size,
                            start_idx=nb_written)
 
     epoch_loss = running_loss / dataset_size
