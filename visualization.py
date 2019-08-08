@@ -2,6 +2,7 @@ import cv2
 import tensorflow as tf
 import numpy as np
 
+from utils import read_gamma_beta_h5
 
 def grad_cam_visualization(sess, network_wrapper, film_ckpt_path, resnet_ckpt_path):
     activated_class_index = 0
@@ -56,3 +57,11 @@ def grad_cam_visualization(sess, network_wrapper, film_ckpt_path, resnet_ckpt_pa
     cv2.imshow('heatmap', (heatmap * 255.0).astype(np.uint8))
     cv2.imshow('segmentation', (heatmap[:, :, None].astype(np.float) * image).astype(np.uint8))
     cv2.waitKey(0)
+
+
+def visualize_gamma_beta(gamma_beta_path, datasets):
+    set_type, gammas_betas = read_gamma_beta_h5(gamma_beta_path)
+
+    dataset = datasets[set_type]
+
+    print("Gamma beta")

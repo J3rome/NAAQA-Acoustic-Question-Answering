@@ -11,7 +11,7 @@ from utils import set_random_seed, create_folder_if_necessary, get_config, proce
 from utils import create_symlink_to_latest_folder, save_training_stats, save_json, sort_stats, is_date_string
 from utils import calc_mean_and_std, save_gamma_beta_h5
 
-from visualization import grad_cam_visualization
+from visualization import visualize_gamma_beta
 from preprocessing import create_dict_from_questions, extract_features
 
 # NEW IMPORTS
@@ -32,7 +32,7 @@ parser = argparse.ArgumentParser('FiLM model for CLEAR Dataset (Acoustic Questio
 
 parser.add_argument("--training", help="FiLM model training", action='store_true')
 parser.add_argument("--inference", help="FiLM model inference", action='store_true')
-parser.add_argument("--visualize", help="FiLM model visualization", action='store_true')
+parser.add_argument("--visualize_gamma_beta", help="FiLM model parameters visualization (T-SNE)", action='store_true')
 parser.add_argument("--feature_extract", help="Feature Pre-Extraction", action='store_true')
 parser.add_argument("--create_dict", help="Create word dictionary (for tokenization)", action='store_true')
 
@@ -52,6 +52,10 @@ parser.add_argument("--raw_img_resize", type=str, default='224,224', help="Speci
                                                                           "resized (when working with RAW img)"
                                                                           "Format : width,height")
 parser.add_argument("--keep_image_range", help="Will NOT scale the image between 0-1 (RAW img)", action='store_true')
+parser.add_argument("--gamma_beta_path", type=str, default=None, help="Path where gamma_beta values are stored "
+                                                                          "(when using --visualize_gamma_beta)")
+
+
 # Output parameters
 parser.add_argument("-output_root_path", type=str, default='output', help="Directory with image")
 
@@ -264,19 +268,18 @@ def process_dataloader(is_training, device, model, dataloader, criterion=None, o
 def main(args):
 
     mutually_exclusive_params = [args.training, args.inference,
-                                 args.feature_extract, args.create_dict, args.visualize]
+                                 args.feature_extract, args.create_dict, args.visualize_gamma_beta]
 
-    if 0 < sum(mutually_exclusive_params) > 1:
-        print("[ERROR] Can only do one task at a time (--training, --inference, --visualize," +
-              " --create_dict, --feature_extract)")
-        exit(1)
+    assert sum(mutually_exclusive_params) == 1, \
+        "[ERROR] Can only do one task at a time " \
+        "(--training, --inference, --visualize_gamma_beta, --create_dict, --feature_extract)"
 
     if args.training:
         task = "train_film"
     elif args.inference:
         task = "inference"
-    #elif args.visualize:
-    #    task = "visualize_grad_cam"
+    elif args.visualize_gamma_beta:
+        task = "visualize_gamma_beta"
     elif args.feature_extract:
         task = "feature_extract"
     elif args.create_dict:
@@ -480,6 +483,11 @@ def main(args):
     elif task == "feature_extract":
         extract_features(device=device, feature_extractor=film_model.feature_extractor,
                          dataloaders={'train': train_dataloader, 'val': val_dataloader, 'test': test_dataloader})
+
+    elif task == "visualize_gamma_beta":
+        visualize_gamma_beta(args.gamma_beta_path,
+                             datasets={'train': train_dataset, 'val': val_dataset, 'test': test_dataset},
+                             )
 
     time_elapsed = str(datetime.now() - current_datetime)
 
