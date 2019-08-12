@@ -89,7 +89,7 @@ class CLEAR_dataset(Dataset):
                 # Backward compatibility with older CLEVR format
                 image_filename = sample["image_filename"].replace('AQA_', 'CLEAR_')
 
-            self.games[i] = self.encode_game({
+            self.games[i] = self.prepare_game({
                 'id': question_id,
                 'image': {'id': image_id, 'filename': image_filename, 'set': self.set},
                 'question': question,
@@ -100,10 +100,17 @@ class CLEAR_dataset(Dataset):
 
             self.answer_counter[answer] += 1
 
-    def get_game(self, idx):
-        return ujson.loads(self.games[idx])
+    def get_game(self, idx, decode_tokens=False):
+        game = ujson.loads(self.games[idx])
+        if not decode_tokens:
+            return game
+        else:
+            game['question'] = self.tokenizer.decode_question(game['question'])
+            game['answer'] = self.tokenizer.decode_answer(game['answer'])
 
-    def encode_game(self, game):
+            return game
+
+    def prepare_game(self, game):
         return ujson.dumps(game)
 
     def __len__(self):
@@ -159,9 +166,9 @@ class CLEAR_dataset(Dataset):
         id_list = collections.defaultdict(lambda: False)
         unique_scene_games = []
         for game_idx in range(len(self.games)):
-            game = self.get_game(game)
+            game = self.get_game(game_idx)
             if not id_list[game['image']['id']]:
-                unique_scene_games.append(self.encode_game(game))
+                unique_scene_games.append(self.prepare_game(game))
                 id_list[game['image']['id']] = True
 
         self.games = unique_scene_games
