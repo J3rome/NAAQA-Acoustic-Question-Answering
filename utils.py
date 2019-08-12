@@ -69,8 +69,8 @@ def process_predictions(dataset, predictions, ground_truths, questions_id, scene
 def process_gamma_beta(processed_predictions, gamma_vectors_per_resblock, beta_vectors_per_resblock):
     processed_gamma_beta_vectors = []
 
-    gamma_vectors_per_resblock = [v.tolist() for v in gamma_vectors_per_resblock]
-    beta_vectors_per_resblock = [v.tolist() for v in beta_vectors_per_resblock]
+    gamma_vectors_per_resblock = [v.numpy() for v in gamma_vectors_per_resblock]
+    beta_vectors_per_resblock = [v.numpy() for v in beta_vectors_per_resblock]
 
     for result_index, processed_prediction in enumerate(processed_predictions):
         question_index = processed_prediction['question_id']
@@ -187,8 +187,8 @@ def read_gamma_beta_h5(filepath):
 
             for resblock_key in f['gamma']:
                 gamma_beta[resblock_key] = {
-                    'gamma_vector': f['gamma'][resblock_key][idx].tolist(),
-                    'beta_vector': f['beta'][resblock_key][idx].tolist()
+                    'gamma_vector': f['gamma'][resblock_key][idx],
+                    'beta_vector': f['beta'][resblock_key][idx]
                 }
 
             gammas_betas.append(gamma_beta)
