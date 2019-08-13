@@ -329,6 +329,7 @@ def main(args):
     film_model_config = get_config(args.config_path)
 
     create_output_folder = not args.create_dict and not args.feature_extract
+    instantiate_model = not args.create_dict and 'gamma_beta' not in task
 
     if create_output_folder:
         # TODO : See if this is optimal file structure
@@ -340,10 +341,12 @@ def main(args):
 
         # Save arguments & config to output folder
         save_json(args, output_dated_folder, filename="arguments.json")
-        save_json(film_model_config, output_dated_folder, filename='config_%s.json' % film_model_config['input']['type'])
 
-        # Copy dictionary file used
-        shutil.copyfile(args.dict_file_path, "%s/dict.json" % output_dated_folder)
+        if instantiate_model:
+            save_json(film_model_config, output_dated_folder, filename='config_%s.json' % film_model_config['input']['type'])
+
+            # Copy dictionary file used
+            shutil.copyfile(args.dict_file_path, "%s/dict.json" % output_dated_folder)
 
     if args.no_img_resize:
         args.raw_img_resize = None
@@ -425,7 +428,7 @@ def main(args):
     #   Model Definition
     ####################################
 
-    if not args.create_dict:
+    if instantiate_model:
         print("Creating model")
         # Retrieve informations to instantiate model
         nb_words, nb_answers = train_dataset.get_token_counts()
