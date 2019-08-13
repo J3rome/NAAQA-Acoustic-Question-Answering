@@ -487,7 +487,7 @@ def main(args):
     elif task == "visualize_gamma_beta":
         visualize_gamma_beta(args.gamma_beta_path,
                              datasets={'train': train_dataset, 'val': val_dataset, 'test': test_dataset},
-                             )
+                             output_folder=output_dated_folder)
 
     time_elapsed = str(datetime.now() - current_datetime)
 
