@@ -17,7 +17,7 @@ import ctypes
 
 class CLEAR_dataset(Dataset):
 
-    def __init__(self, folder, version_name, image_config, set, questions=None,
+    def __init__(self, folder, version_name, image_config, set_type, questions=None,
                  transforms=None, dict_file_path=None, tokenize_text=True):
 
         self.root_folder_path = "%s/%s" % (folder, version_name)
@@ -33,7 +33,8 @@ class CLEAR_dataset(Dataset):
         else:
             self.tokenizer = None
 
-        self.set = set
+        self.set = set_type
+        self.image_config = image_config
         self.image_builder = get_img_builder(image_config, self.root_folder_path, bufferize=None)
         self.transforms = transforms
 
