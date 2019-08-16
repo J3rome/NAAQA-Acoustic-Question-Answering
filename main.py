@@ -326,7 +326,7 @@ def main(args):
             clean_base_path = base_path[:-(len(args.film_model_weight_path) + 1)]
             args.film_model_weight_path = '%s/%s/%s' % (clean_base_path, symlink_value, suffix)
 
-    restore_model_weights = args.inference or (args.training and args.continue_training)
+    restore_model_weights = args.inference or (args.training and args.continue_training) or args.visualize_grad_cam
 
     if args.dict_file_path is None:
         args.dict_file_path = "%s/preprocessed/dict.json" % data_path
