@@ -5,7 +5,7 @@ from tqdm import tqdm
 from collections import defaultdict
 from random import shuffle
 
-from data_interfaces.CLEAR_tokenizer import CLEARTokenizer
+from data_interfaces.CLEAR_dataset import CLEARTokenizer
 from utils import create_folder_if_necessary, save_json, read_json
 
 from torch.utils.data import DataLoader

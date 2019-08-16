@@ -1,5 +1,3 @@
-import cv2
-import tensorflow as tf
 import numpy as np
 
 from collections import defaultdict
@@ -7,7 +5,6 @@ from collections import defaultdict
 from utils import read_gamma_beta_h5
 
 import plotly.graph_objects as go
-from plotly.subplots import make_subplots
 from plotly.io import write_html
 
 from sklearn.manifold import TSNE as sk_TSNE
@@ -18,7 +15,7 @@ from torchvision.utils import make_grid
 # FIXME : Should not depend on pytorch-gradcam module
 from gradcam.utils import visualize_cam
 
-from data_interfaces.torch_dataset import CLEAR_dataset
+from data_interfaces.CLEAR_dataset import CLEAR_dataset
 from torch.utils.data import DataLoader
 from torchvision import transforms
 from tqdm import tqdm
