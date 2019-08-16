@@ -13,6 +13,15 @@ from plotly.io import write_html
 from sklearn.manifold import TSNE as sk_TSNE
 from tsnecuda import TSNE as cuda_TSNE
 
+from models.gradcam import GradCAM
+from torchvision.utils import make_grid
+from gradcam.utils import visualize_cam
+
+from data_interfaces.torch_dataset import CLEAR_dataset
+from torch.utils.data import DataLoader
+from torchvision import transforms
+from tqdm import tqdm
+
 special_ending_nodes_correspondence = {
   'add': 'count',
   'relate_filter_count': 'count',
@@ -174,7 +183,75 @@ def plot_tsne_per_resblock(vals, question_types, title="T-SNE"):
     return figs
 
 
-def grad_cam_visualization(sess, network_wrapper, film_ckpt_path, resnet_ckpt_path):
+def grad_cam_visualization(device, model, dataloader, output_folder, nb_game_per_img=10):
+    orig_dataloader = dataloader
+
+    assert orig_dataloader.dataset.is_raw_img(), 'Only support raw img config for now'
+
+    reduced_dataset = CLEAR_dataset.from_dataset_object(orig_dataloader.dataset, orig_dataloader.dataset.questions[:45])
+
+    dataset_to_use = reduced_dataset
+    #dataset_to_use = dataloader.dataset
+
+    dataloader = DataLoader(dataset_to_use, shuffle=False, num_workers=1, collate_fn=orig_dataloader.collate_fn,
+                            batch_size=min(len(dataset_to_use), dataloader.batch_size))
+
+    model.eval()
+
+    cam = GradCAM(model, model.classif_conv)
+    # TODO : GradCam PP
+    # TODO : Guided Backprop ?
+
+    # TODO : Annotate ground truth image - Rectangle over duration of queried sound
+    #        What happen when we have multiple sounds used to answer ? (Ex : count) Put annotation on all sounds ?
+
+    toPILimg_transform = transforms.ToPILImage()
+
+    images = []
+    nb_game_left = nb_game_per_img
+    row_count = 0
+    for batch_idx, batch in enumerate(tqdm(dataloader)):
+        input_images = batch['image'].to(device)
+        questions = batch['question'].to(device)
+        answers = batch['answer'].to(device)
+        seq_lengths = batch['seq_length'].to(device)
+        batch_size = input_images.size(0)
+
+        # TODO : We might want to use something else than ground truths for class_idx (Ex : Highest prob prediction -> Pass class_idx = None)
+        #        Might want to compare ground truth CAM with answer in the case in the case of wrong answers
+        saliency_maps, confidences, model_outputs = cam(questions, seq_lengths, input_images, class_idx=answers)
+
+        for i, saliency_map, input_image, confidence in zip(range(batch_size), saliency_maps, input_images, confidences):
+            # TODO : Save visualization to disk, plotly ?
+            heatmap, result = visualize_cam(saliency_map, input_image)
+            print("Confidence %f" % confidence)
+            # TODO : Add confidence to the graph
+
+            images += [input_image.detach(), heatmap.detach(), result.detach()]
+
+            nb_game_left -= 1
+            if nb_game_left == 0:
+                grid = toPILimg_transform(make_grid(images, nrow=3))
+                current_idx = batch_idx * dataloader.batch_size + i
+                filepath = '%s/gradcam_visualization_%05d-%05d.png' % (output_folder, current_idx - nb_game_per_img + 1, current_idx)
+                grid.save(filepath)
+
+                nb_game_left = nb_game_per_img
+                images = []
+
+    nb_game_to_write_left = len(images) / 3
+    if nb_game_to_write_left > 0:
+        grid = toPILimg_transform(make_grid(images, nrow=3))
+        current_idx = len(dataloader.dataset) - 1
+        filepath = '%s/gradcam_visualization_%05d-%05d.png' % (
+        output_folder, current_idx - nb_game_to_write_left, current_idx)
+        grid.save(filepath)
+
+    print("GradCAM Visualization Done. See %s for results" % output_folder)
+
+
+
+def grad_cam_visualization_TF(sess, network_wrapper, film_ckpt_path, resnet_ckpt_path):
     activated_class_index = 0
 
     network = network_wrapper.get_network()

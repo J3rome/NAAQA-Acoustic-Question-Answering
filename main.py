@@ -11,7 +11,7 @@ from utils import set_random_seed, create_folder_if_necessary, get_config, proce
 from utils import create_symlink_to_latest_folder, save_training_stats, save_json, sort_stats, is_date_string
 from utils import calc_mean_and_std, save_gamma_beta_h5
 
-from visualization import visualize_gamma_beta
+from visualization import visualize_gamma_beta, grad_cam_visualization
 from preprocessing import create_dict_from_questions, extract_features
 
 # NEW IMPORTS
@@ -26,12 +26,15 @@ import torch.nn as nn
 from torchvision import transforms
 import gc
 
+
+
 # TODO : Add option for custom test file --> Already available by specifying different inference_set ? The according dataset & dataloader should be created..
 #       Maybe not a good idea to instantiate everything out of the "task" functions.. Or maybe we could just instantiate it inside for the test inference
 parser = argparse.ArgumentParser('FiLM model for CLEAR Dataset (Acoustic Question Answering)', fromfile_prefix_chars='@')
 
 parser.add_argument("--training", help="FiLM model training", action='store_true')
 parser.add_argument("--inference", help="FiLM model inference", action='store_true')
+parser.add_argument("--visualize_grad_cam", help="Class Activation Maps - GradCAM", action='store_true')
 parser.add_argument("--visualize_gamma_beta", help="FiLM model parameters visualization (T-SNE)", action='store_true')
 parser.add_argument("--feature_extract", help="Feature Pre-Extraction", action='store_true')
 parser.add_argument("--create_dict", help="Create word dictionary (for tokenization)", action='store_true')
@@ -267,8 +270,8 @@ def process_dataloader(is_training, device, model, dataloader, criterion=None, o
 
 def main(args):
 
-    mutually_exclusive_params = [args.training, args.inference,
-                                 args.feature_extract, args.create_dict, args.visualize_gamma_beta]
+    mutually_exclusive_params = [args.training, args.inference, args.feature_extract,
+                                 args.create_dict, args.visualize_gamma_beta, args.visualize_grad_cam]
 
     assert sum(mutually_exclusive_params) == 1, \
         "[ERROR] Can only do one task at a time " \
@@ -280,6 +283,8 @@ def main(args):
         task = "inference"
     elif args.visualize_gamma_beta:
         task = "visualize_gamma_beta"
+    elif args.visualize_grad_cam:
+        task = "visualize_grad_cam"
     elif args.feature_extract:
         task = "feature_extract"
     elif args.create_dict:
@@ -493,6 +498,10 @@ def main(args):
         visualize_gamma_beta(args.gamma_beta_path,
                              datasets={'train': train_dataset, 'val': val_dataset, 'test': test_dataset},
                              output_folder=output_dated_folder)
+
+    elif task == "visualize_grad_cam":
+        grad_cam_visualization(device=device, model=film_model, dataloader=train_dataloader,
+                               output_folder=output_dated_folder)
 
     time_elapsed = str(datetime.now() - current_datetime)
 

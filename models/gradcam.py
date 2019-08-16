@@ -90,7 +90,7 @@ class GradCAM(object):
         saliency_map_min, saliency_map_max = saliency_maps.min(), saliency_maps.max()
         saliency_maps = (saliency_maps - saliency_map_min).div(saliency_map_max - saliency_map_min).data
 
-        return saliency_maps, scores
+        return saliency_maps, scores, logit_softmaxed
 
     def __call__(self, question, question_lengths, input_image, class_idx=None, pack_sequence=True, retain_graph=False):
         return self.forward(question, question_lengths, input_image, class_idx, pack_sequence, retain_graph)
