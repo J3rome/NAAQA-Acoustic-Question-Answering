@@ -304,17 +304,12 @@ class CLEAR_FiLM_model(nn.Module):
 
     def train(self, mode=True):
         # Only call train if model is in eval mode
-        if not self.training:
+        if self.training != mode:
             super(CLEAR_FiLM_model, self).train(mode)
 
         # Keep the feature extractor in eval mode
         if self.feature_extractor and self.feature_extractor.training:
             self.feature_extractor.eval()
-
-    def eval(self):
-        # Only call eval if model is already in training mode
-        if self.training:
-            super(CLEAR_FiLM_model, self).eval()
 
 
 class Resnet_feature_extractor(nn.Module):
