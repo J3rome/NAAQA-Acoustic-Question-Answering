@@ -100,6 +100,14 @@ class CLEAR_dataset(Dataset):
             self.answers.append(answer)
 
             self.answer_counter[answer] += 1
+            
+    @classmethod
+    def from_dataset_object(cls, dataset_obj, questions):
+        folder_path = dataset_obj.root_folder_path.replace('/%s' % dataset_obj.version_name, '')
+        return cls(folder_path, version_name=dataset_obj.version_name,
+                   image_config=dataset_obj.image_config, set_type=dataset_obj.set,
+                   questions=questions, dict_file_path=dataset_obj.tokenizer.dictionary_file,
+                   transforms=dataset_obj.transforms)
 
     def get_game(self, idx, decode_tokens=False):
         game = ujson.loads(self.games[idx])
