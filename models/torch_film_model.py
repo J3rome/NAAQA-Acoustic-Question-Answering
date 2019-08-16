@@ -91,8 +91,8 @@ class FiLM_layer(nn.Module):
         gammas, betas = film_params.split(self.out_channels, dim=-1)
 
         if self.save_gammas_betas:
-            self.gammas = gammas.detach() #.tolist()    # FIXME
-            self.betas = betas.detach()#.tolist()
+            self.gammas = gammas.detach()
+            self.betas = betas.detach()
 
         gammas = gammas.unsqueeze(2).unsqueeze(3).expand_as(input_features)
         betas = betas.unsqueeze(2).unsqueeze(3).expand_as(input_features)

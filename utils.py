@@ -69,8 +69,13 @@ def process_predictions(dataset, predictions, ground_truths, questions_id, scene
 def process_gamma_beta(processed_predictions, gamma_vectors_per_resblock, beta_vectors_per_resblock):
     processed_gamma_beta_vectors = []
 
-    gamma_vectors_per_resblock = [v.numpy() for v in gamma_vectors_per_resblock]
-    beta_vectors_per_resblock = [v.numpy() for v in beta_vectors_per_resblock]
+    if gamma_vectors_per_resblock[0].is_cuda:
+        op_to_apply = lambda x: x.cpu().numpy()
+    else:
+        op_to_apply = lambda x: x.numpy()
+
+    gamma_vectors_per_resblock = [op_to_apply(v) for v in gamma_vectors_per_resblock]
+    beta_vectors_per_resblock = [op_to_apply(v) for v in beta_vectors_per_resblock]
 
     for result_index, processed_prediction in enumerate(processed_predictions):
         question_index = processed_prediction['question_id']
