@@ -15,6 +15,7 @@ from tsnecuda import TSNE as cuda_TSNE
 
 from models.gradcam import GradCAM
 from torchvision.utils import make_grid
+# FIXME : Should not depend on pytorch-gradcam module
 from gradcam.utils import visualize_cam
 
 from data_interfaces.torch_dataset import CLEAR_dataset
