@@ -104,15 +104,17 @@ def run_one_game(device, model, games, data_path, input_config, transforms_list=
     print("Accuracy is : %f" % accuracy)
 
 
-def set_inference(device, model, dataloader, output_folder):
+def set_inference(device, model, dataloader, output_folder, save_gamma_beta=True):
     set_type = dataloader.dataset.set
 
-    # TODO : load pretrained weights
+    if save_gamma_beta:
+        gamma_beta_path = '%s/%s_gamma_beta.h5' % (output_folder, set_type)
+    else:
+        gamma_beta_path = None
 
-    _, acc, predictions, gammas_betas = process_dataloader(False, device, model, dataloader)
+    _, acc, predictions = process_dataloader(False, device, model, dataloader, gamma_beta_path=gamma_beta_path)
 
     save_json(predictions, output_folder, filename='%s_predictions.json' % set_type)
-    save_json(gammas_betas, output_folder, filename='%s_predictions.json' % set_type)
 
     print("%s Accuracy : %.5f" % (set_type, acc))
 
