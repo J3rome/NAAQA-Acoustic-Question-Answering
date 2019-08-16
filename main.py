@@ -24,8 +24,6 @@ import time
 from torch.utils.data import DataLoader
 import torch.nn as nn
 from torchvision import transforms
-import gc
-
 
 
 # TODO : Add option for custom test file --> Already available by specifying different inference_set ? The according dataset & dataloader should be created..
@@ -254,8 +252,6 @@ def process_dataloader(is_training, device, model, dataloader, criterion=None, o
         if criterion:
             running_loss += loss.item() * dataloader.batch_size
         running_corrects += torch.sum(preds == answers.data).item()
-
-        gc.collect()
 
     nb_left_to_write = len(processed_gammas_betas)
     if gamma_beta_path is not None and nb_left_to_write > 0:
