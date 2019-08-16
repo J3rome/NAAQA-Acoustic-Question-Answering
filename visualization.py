@@ -21,6 +21,8 @@ from data_interfaces.torch_dataset import CLEAR_dataset
 from torch.utils.data import DataLoader
 from torchvision import transforms
 from tqdm import tqdm
+import torch
+from utils import process_predictions
 
 special_ending_nodes_correspondence = {
   'add': 'count',
@@ -209,7 +211,6 @@ def grad_cam_visualization(device, model, dataloader, output_folder, nb_game_per
 
     images = []
     nb_game_left = nb_game_per_img
-    row_count = 0
     for batch_idx, batch in enumerate(tqdm(dataloader)):
         input_images = batch['image'].to(device)
         questions = batch['question'].to(device)
@@ -221,10 +222,19 @@ def grad_cam_visualization(device, model, dataloader, output_folder, nb_game_per
         #        Might want to compare ground truth CAM with answer in the case in the case of wrong answers
         saliency_maps, confidences, model_outputs = cam(questions, seq_lengths, input_images, class_idx=answers)
 
-        for i, saliency_map, input_image, confidence in zip(range(batch_size), saliency_maps, input_images, confidences):
+        _, preds = torch.max(model_outputs, 1)
+
+        processed_predictions = process_predictions(dataloader.dataset, preds.tolist(), answers.tolist(),
+                                                          batch['id'].tolist(), batch['scene_id'].tolist(),
+                                                          model_outputs.tolist())
+
+        iterator = zip(range(batch_size), saliency_maps, input_images, confidences, processed_predictions)
+        for i, saliency_map, input_image, confidence, processed_prediction in iterator:
             # TODO : Save visualization to disk, plotly ?
             heatmap, result = visualize_cam(saliency_map, input_image)
-            print("Confidence %f" % confidence)
+            print("Confidence %f -- Correct : %s -- Correct Family : %s" % (confidence,
+                                                                            processed_prediction['correct'],
+                                                                            processed_prediction['correct_answer_family']))
             # TODO : Add confidence to the graph
 
             images += [input_image.detach(), heatmap.detach(), result.detach()]
