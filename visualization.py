@@ -185,18 +185,19 @@ def plot_tsne_per_resblock(vals, question_types, title="T-SNE"):
     return figs
 
 
-def grad_cam_visualization(device, model, dataloader, output_folder, nb_game_per_img=10):
+def grad_cam_visualization(device, model, dataloader, output_folder, nb_game_per_img=10, limit_dataset=45):
     orig_dataloader = dataloader
 
     assert orig_dataloader.dataset.is_raw_img(), 'Only support raw img config for now'
 
-    reduced_dataset = CLEAR_dataset.from_dataset_object(orig_dataloader.dataset, orig_dataloader.dataset.questions[:45])
+    if limit_dataset is None:
+        dataset = dataloader.dataset
+    else:
+        dataset = CLEAR_dataset.from_dataset_object(orig_dataloader.dataset,
+                                                    orig_dataloader.dataset.questions[:limit_dataset])
 
-    dataset_to_use = reduced_dataset
-    #dataset_to_use = dataloader.dataset
-
-    dataloader = DataLoader(dataset_to_use, shuffle=False, num_workers=1, collate_fn=orig_dataloader.collate_fn,
-                            batch_size=min(len(dataset_to_use), dataloader.batch_size))
+    dataloader = DataLoader(dataset, shuffle=False, num_workers=1, collate_fn=orig_dataloader.collate_fn,
+                            batch_size=min(len(dataset), dataloader.batch_size))
 
     model.eval()
 
