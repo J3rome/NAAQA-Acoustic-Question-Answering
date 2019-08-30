@@ -92,7 +92,8 @@ def create_dict_from_questions(dataset, word_min_occurence=1, dict_filename='dic
     tokenizer = CLEARTokenizer.get_tokenizer_inst()
 
     # Tokenize questions
-    for game in games:
+    for i in range(len(games)):
+        game = dataset.get_game(i)
         input_tokens = tokenizer.tokenize(game['question'])
         for tok in input_tokens:
             word2occ[tok] += 1
