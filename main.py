@@ -58,7 +58,9 @@ parser.add_argument("--gamma_beta_path", type=str, default=None, help="Path wher
 
 
 # Output parameters
-parser.add_argument("-output_root_path", type=str, default='output', help="Directory with image")
+parser.add_argument("--output_root_path", type=str, default='output', help="Directory with image")
+parser.add_argument("--preprocessed_folder_name", type=str, default='preprocessed',
+                    help="Directory where to store/are stored extracted features and token dictionary")
 
 # Other parameters
 parser.add_argument("--nb_epoch", type=int, default=15, help="Nb of epoch for training")
@@ -327,7 +329,7 @@ def main(args):
     restore_model_weights = args.inference or (args.training and args.continue_training) or args.visualize_grad_cam
 
     if args.dict_file_path is None:
-        args.dict_file_path = "%s/preprocessed/dict.json" % data_path
+        args.dict_file_path = "%s/%s/dict.json" % (data_path, args.preprocessed_folder_name)
 
     film_model_config = get_config(args.config_path)
 
@@ -393,16 +395,17 @@ def main(args):
     transforms_to_apply = transforms.Compose(transforms_list)
 
     print("Creating Datasets")
-    dict_file_path = None if not args.create_dict else args.dict_file_path
+    train_dataset = CLEAR_dataset(args.data_root_path, args.version_name, film_model_config['input'], 'train',
+                                  dict_file_path=args.dict_file_path, transforms=transforms_to_apply,
+                                  tokenize_text=not args.create_dict)
 
-    train_dataset = CLEAR_dataset(args.data_root_path, args.version_name, film_model_config['input'], 'train', dict_file_path=dict_file_path,
-                                  transforms=transforms_to_apply, tokenize_text=not args.create_dict)
+    val_dataset = CLEAR_dataset(args.data_root_path, args.version_name, film_model_config['input'], 'val',
+                                dict_file_path=args.dict_file_path, transforms=transforms_to_apply,
+                                tokenize_text=not args.create_dict)
 
-    val_dataset = CLEAR_dataset(args.data_root_path, args.version_name, film_model_config['input'], 'val', dict_file_path=dict_file_path,
-                                transforms=transforms_to_apply, tokenize_text=not args.create_dict)
-
-    test_dataset = CLEAR_dataset(args.data_root_path, args.version_name, film_model_config['input'], 'test', dict_file_path=dict_file_path,
-                                 transforms=transforms_to_apply, tokenize_text=not args.create_dict)
+    test_dataset = CLEAR_dataset(args.data_root_path, args.version_name, film_model_config['input'], 'test',
+                                 dict_file_path=args.dict_file_path, transforms=transforms_to_apply,
+                                 tokenize_text=not args.create_dict)
 
     #trickytest_dataset = CLEAR_dataset(data_path, film_model_config['input'], 'trickytest',
     #                             dict_file_path=args.dict_file_path,
@@ -486,11 +489,13 @@ def main(args):
         set_inference(device=device, model=film_model, dataloader=test_dataloader, output_folder=output_dated_folder)
 
     elif task == "create_dict":
-        create_dict_from_questions(train_dataset, force_all_answers=args.force_dict_all_answer)
+        create_dict_from_questions(train_dataset, force_all_answers=args.force_dict_all_answer,
+                                   output_folder_name=args.preprocessed_folder_name)
 
     elif task == "feature_extract":
         extract_features(device=device, feature_extractor=film_model.feature_extractor,
-                         dataloaders={'train': train_dataloader, 'val': val_dataloader, 'test': test_dataloader})
+                         dataloaders={'train': train_dataloader, 'val': val_dataloader, 'test': test_dataloader},
+                         output_folder_name=args.preprocessed_folder_name)
 
     elif task == "visualize_gamma_beta":
         visualize_gamma_beta(args.gamma_beta_path,

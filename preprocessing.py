@@ -71,7 +71,8 @@ def extract_features(device, feature_extractor, dataloaders, output_folder_name=
 
 
 # >>> Dictionary Creation (For word tokenization)
-def create_dict_from_questions(dataset, word_min_occurence=1, dict_filename='dict.json', force_all_answers=False):
+def create_dict_from_questions(dataset, word_min_occurence=1, dict_filename='dict.json', force_all_answers=False,
+                               output_folder_name='preprocessed'):
     # FIXME : Should we use the whole dataset to create the dictionary ?
     games = dataset.games
 
@@ -131,7 +132,7 @@ def create_dict_from_questions(dataset, word_min_occurence=1, dict_filename='dic
     print("Number of words: {}".format(len(word2i)))
     print("Number of answers: {}".format(len(answer2i)))
 
-    preprocessed_folder_path = os.path.join(dataset.root_folder_path, 'preprocessed')
+    preprocessed_folder_path = os.path.join(dataset.root_folder_path, output_folder_name)
 
     if not os.path.isdir(preprocessed_folder_path):
         os.mkdir(preprocessed_folder_path)

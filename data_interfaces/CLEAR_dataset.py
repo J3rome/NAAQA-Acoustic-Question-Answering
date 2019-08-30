@@ -19,12 +19,12 @@ import re
 class CLEAR_dataset(Dataset):
 
     def __init__(self, folder, version_name, image_config, set_type, questions=None,
-                 transforms=None, dict_file_path=None, tokenize_text=True):
+                 preprocessed_folder_name="preprocessed", transforms=None, dict_file_path=None, tokenize_text=True):
 
         self.root_folder_path = "%s/%s" % (folder, version_name)
         self.version_name = version_name
 
-        preprocessed_folder_path = '{}/preprocessed'.format(self.root_folder_path)
+        preprocessed_folder_path = '{}/{}'.format(self.root_folder_path, preprocessed_folder_name)
 
         if tokenize_text:
             if dict_file_path is None:
@@ -36,7 +36,8 @@ class CLEAR_dataset(Dataset):
 
         self.set = set_type
         self.image_config = image_config
-        self.image_builder = get_img_builder(image_config, self.root_folder_path, bufferize=None)
+        self.image_builder = get_img_builder(image_config, self.root_folder_path,
+                                             preprocessed_folder_name=preprocessed_folder_name, bufferize=None)
         self.transforms = transforms
 
         feature_shape_filename = "feature_shape.json"
