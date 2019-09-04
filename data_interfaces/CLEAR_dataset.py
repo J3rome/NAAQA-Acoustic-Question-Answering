@@ -26,13 +26,11 @@ class CLEAR_dataset(Dataset):
 
         preprocessed_folder_path = '{}/{}'.format(self.root_folder_path, preprocessed_folder_name)
 
-        if tokenize_text:
-            if dict_file_path is None:
-                dict_file_path = '{}/dict.json'.format(preprocessed_folder_path)
-
+        if tokenize_text and dict_file_path is not None:
             self.tokenizer = CLEARTokenizer(dict_file_path)
         else:
             self.tokenizer = None
+            tokenize_text = False
 
         self.set = set_type
         self.image_config = image_config
