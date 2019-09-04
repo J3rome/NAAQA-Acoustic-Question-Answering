@@ -61,6 +61,9 @@ parser.add_argument("--gamma_beta_path", type=str, default=None, help="Path wher
 parser.add_argument("--output_root_path", type=str, default='output', help="Directory with image")
 parser.add_argument("--preprocessed_folder_name", type=str, default='preprocessed',
                     help="Directory where to store/are stored extracted features and token dictionary")
+parser.add_argument("--dict_folder", type=str, default=None,
+                    help="Directory where to store/retrieve generated dictionary. "
+                         "If --dict_file_path is used, this will be ignored")
 
 # Other parameters
 parser.add_argument("--nb_epoch", type=int, default=15, help="Nb of epoch for training")
@@ -328,8 +331,9 @@ def main(args):
 
     restore_model_weights = args.inference or (args.training and args.continue_training) or args.visualize_grad_cam
 
+    args.dict_folder = args.preprocessed_folder_name if args.dict_folder is None else args.dict_folder
     if args.dict_file_path is None:
-        args.dict_file_path = "%s/%s/dict.json" % (data_path, args.preprocessed_folder_name)
+        args.dict_file_path = "%s/%s/dict.json" % (data_path, args.dict_folder)
 
     film_model_config = get_config(args.config_path)
 
@@ -490,7 +494,7 @@ def main(args):
 
     elif task == "create_dict":
         create_dict_from_questions(train_dataset, force_all_answers=args.force_dict_all_answer,
-                                   output_folder_name=args.preprocessed_folder_name)
+                                   output_folder_name=args.dict_folder)
 
     elif task == "feature_extract":
         extract_features(device=device, feature_extractor=film_model.feature_extractor,
