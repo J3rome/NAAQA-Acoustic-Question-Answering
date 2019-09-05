@@ -185,7 +185,7 @@ def read_json(folder, filename=None):
         path = folder
     else:
         path = '%s/%s' % (folder, filename)
-        
+
     with open(path, 'r') as f:
         return ujson.load(f)
 
@@ -265,8 +265,8 @@ def save_gamma_beta_h5(gammas_betas, set_type, folder, filename=None, nb_vals=No
         f['question_index'][start_idx:nb_val_to_write] = vals['question_index']
 
         for resblock_key in resblock_keys:
-            f['gamma'][resblock_key][start_idx:nb_val_to_write,:] = vals['gamma'][resblock_key] 
-            f['beta'][resblock_key][start_idx:nb_val_to_write,:] = vals['beta'][resblock_key] 
+            f['gamma'][resblock_key][start_idx:nb_val_to_write,:] = vals['gamma'][resblock_key]
+            f['beta'][resblock_key][start_idx:nb_val_to_write,:] = vals['beta'][resblock_key]
 
         return nb_val_to_write
 
