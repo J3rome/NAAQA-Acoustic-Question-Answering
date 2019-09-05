@@ -293,7 +293,7 @@ def main(args):
     elif args.create_dict:
         task = "create_dict"
 
-    print("Task : %s\n" % task.replace('_', ' ').title())
+    print("Task '%s' for version '%s'\n" % (task.replace('_', ' ').title(), args.version_name))
 
     if args.random_seed is not None:
         set_random_seed(args.random_seed)
