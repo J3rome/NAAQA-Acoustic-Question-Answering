@@ -158,6 +158,16 @@ def calc_mean_and_std(dataloader, zero_one_range=True, device='cpu'):
     return fst_moment, snd_moment
 
 
+def save_git_revision(output_folder, filename='git.revision'):
+    output_path = '%s/%s' % (output_folder, filename)
+
+    command = "git rev-parse HEAD > %s" % output_path
+    command += " && git status | grep '\.py' >> %s" % output_path
+    command += " && git diff '*.py' >> %s" % output_path
+
+    subprocess.run(command, shell=True)
+
+
 def save_json(results, output_folder, filename=None, indented=True):
     if filename is None:
         # First parameter is full path

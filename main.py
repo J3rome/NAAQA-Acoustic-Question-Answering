@@ -9,7 +9,7 @@ import numpy as np
 
 from utils import set_random_seed, create_folder_if_necessary, get_config, process_predictions, process_gamma_beta
 from utils import create_symlink_to_latest_folder, save_training_stats, save_json, sort_stats, is_date_string
-from utils import calc_mean_and_std, save_gamma_beta_h5
+from utils import calc_mean_and_std, save_gamma_beta_h5, save_git_revision
 
 from visualization import visualize_gamma_beta, grad_cam_visualization
 from preprocessing import create_dict_from_questions, extract_features
@@ -350,6 +350,7 @@ def main(args):
 
         # Save arguments & config to output folder
         save_json(args, output_dated_folder, filename="arguments.json")
+        save_git_revision(output_dated_folder)
 
         if instantiate_model:
             save_json(film_model_config, output_dated_folder, filename='config_%s.json' % film_model_config['input']['type'])
