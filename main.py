@@ -164,7 +164,8 @@ def train_model(device, model, dataloaders, output_folder, criterion=None, optim
             'epoch': epoch,
             'model_state_dict': model.get_cleaned_state_dict(),
             'optimizer_state_dict': optimizer.state_dict(),
-            'loss': train_loss
+            'loss': train_loss,
+            'rng_state': torch.get_rng_state(),
         }, '%s/model.pt.tar' % epoch_output_folder_path)
 
         sorted_stats = sort_stats(stats)
@@ -482,6 +483,7 @@ def main(args):
         if args.continue_training:
             optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
             start_epoch = checkpoint['epoch'] + 1
+            torch.set_rng_state(checkpoint['rng_state'])
 
         # scheduler = torch.optim.lr_scheduler   # FIXME : Using a scheduler give the ability to decay only each N epoch.
 
