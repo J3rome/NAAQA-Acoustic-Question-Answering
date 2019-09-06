@@ -248,13 +248,14 @@ def process_dataloader(is_training, device, model, dataloader, criterion=None, o
 
         processed_predictions += batch_processed_predictions
 
-        gammas, betas = model.get_gammas_betas()
-        processed_gammas_betas += process_gamma_beta(batch_processed_predictions, gammas, betas)
+        if gamma_beta_path is not None:
+            gammas, betas = model.get_gammas_betas()
+            processed_gammas_betas += process_gamma_beta(batch_processed_predictions, gammas, betas)
 
-        if gamma_beta_path is not None and batch_idx % write_to_file_every == 0 and batch_idx != 0:
-            nb_written += save_gamma_beta_h5(processed_gammas_betas, dataloader.dataset.set, gamma_beta_path,
-                                             nb_vals=dataset_size, start_idx=nb_written)
-            processed_gammas_betas = []
+            if batch_idx % write_to_file_every == 0 and batch_idx != 0:
+                nb_written += save_gamma_beta_h5(processed_gammas_betas, dataloader.dataset.set, gamma_beta_path,
+                                                 nb_vals=dataset_size, start_idx=nb_written)
+                processed_gammas_betas = []
 
         # statistics
         if criterion:
