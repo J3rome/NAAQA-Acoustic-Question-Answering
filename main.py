@@ -76,6 +76,7 @@ parser.add_argument("--use_cpu", help="Model will be run/train on CPU", action='
 parser.add_argument("--force_dict_all_answer", help="Will make sure that all answers are included in the dict" +
                                                     "(not just the one appearing in the train set)" +
                                                     " -- Preprocessing option" , action='store_true')
+parser.add_argument("--no_model_summary", help="Will hide the model summary", action='store_true')
 
 
 # TODO : Interactive mode
@@ -469,9 +470,10 @@ def main(args):
 
         print("Model ready to run")
 
-        # FIXME : Printing summary affect the output of the model (RAW vs Conv)
-        #         Doesn't seem to be a random state problem (At least not torch.randn())
-        summary(film_model, [(22,), (1,), input_image_torch_shape], device=device)
+        if not args.no_model_summary:
+            # FIXME : Printing summary affect the output of the model (RAW vs Conv)
+            #         Doesn't seem to be a random state problem (At least not torch.randn())
+            summary(film_model, [(22,), (1,), input_image_torch_shape], device=device)
 
     if task == "train_film":
         trainable_parameters = filter(lambda p: p.requires_grad, film_model.parameters())
