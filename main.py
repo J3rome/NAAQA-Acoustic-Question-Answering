@@ -161,13 +161,18 @@ def train_model(device, model, dataloaders, output_folder, criterion=None, optim
         print("Training took %s" % str(epoch_train_time))
 
         # Save training weights
-        torch.save({
+        checkpoint = {
             'epoch': epoch,
             'model_state_dict': model.get_cleaned_state_dict(),
             'optimizer_state_dict': optimizer.state_dict(),
             'loss': train_loss,
             'rng_state': torch.get_rng_state(),
-        }, '%s/model.pt.tar' % epoch_output_folder_path)
+        }
+
+        if device != 'cpu':
+            checkpoint['rng_state_cuda'] = torch.cuda.get_rng_state()
+
+        torch.save(checkpoint, '%s/model.pt.tar' % epoch_output_folder_path)
 
         sorted_stats = sort_stats(stats)
 
@@ -459,6 +464,14 @@ def main(args):
                                                             'do inference or to continue training.'
 
             checkpoint = torch.load(args.film_model_weight_path, map_location=device)
+
+            if device != 'cpu':
+                if 'rng_state' in checkpoint:
+                    checkpoint['rng_state'] = checkpoint['rng_state'].cpu()
+
+                if 'rng_state_cuda' in checkpoint:
+                    checkpoint['rng_state_cuda'] = checkpoint['rng_state_cuda'].cpu()
+
             # We need non-strict because feature extractor weight are not included in the saved state dict
             film_model.load_state_dict(checkpoint['model_state_dict'], strict=False)
 
@@ -487,6 +500,9 @@ def main(args):
             optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
             start_epoch = checkpoint['epoch'] + 1
             torch.set_rng_state(checkpoint['rng_state'])
+
+            if device != 'cpu' and 'rng_state_cuda' in checkpoint:
+                torch.cuda.set_rng_state(checkpoint['rng_state_cuda'])
 
         # scheduler = torch.optim.lr_scheduler   # FIXME : Using a scheduler give the ability to decay only each N epoch.
 
