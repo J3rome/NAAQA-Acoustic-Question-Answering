@@ -133,6 +133,22 @@ def train_model(device, model, dataloaders, output_folder, criterion=None, optim
 
     since = time.time()
 
+    # Early stopping
+    if model.early_stopping is not None:
+        if type(model.early_stopping['wait_first_n_epoch']) == float:
+            wait_first_n_epoch = int(nb_epoch * model.early_stopping['wait_first_n_epoch'])
+        else:
+            wait_first_n_epoch = model.early_stopping['wait_first_n_epoch']
+
+        if type(model.early_stopping['stop_threshold']) == float:
+            stop_threshold = int(nb_epoch*model.early_stopping['stop_threshold'])
+        else:
+            stop_threshold = model.early_stopping['stop_threshold']
+
+        stop_threshold = max(stop_threshold, 1)
+        best_val_loss = 9999
+        early_stop_counter = 0
+
     for epoch in range(start_epoch, start_epoch + nb_epoch):
         epoch_output_folder_path = "%s/Epoch_%.2d" % (output_folder, epoch)
         create_folder_if_necessary(epoch_output_folder_path)
@@ -193,6 +209,18 @@ def train_model(device, model, dataloaders, output_folder, criterion=None, optim
         subprocess.run("ln -snf %s %s" % (best_epoch['epoch'], best_epoch_symlink_path), shell=True)
 
         print()
+
+        # Early Stopping
+        if model.early_stopping is not None:
+            if val_loss < best_val_loss - model.early_stopping['min_step']:
+                best_val_loss = val_loss
+                early_stop_counter = 0
+            elif epoch > wait_first_n_epoch:
+                early_stop_counter += 1
+
+                if early_stop_counter >= stop_threshold:
+                    print("Early Stopping at epoch %d on %d" % (epoch, nb_epoch))
+                    break
 
     time_elapsed = time.time() - since
     print('Training complete in {:.0f}m {:.0f}s'.format(time_elapsed // 60, time_elapsed % 60))

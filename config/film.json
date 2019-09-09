@@ -37,5 +37,11 @@
             "clip_val": 0.0,
             "weight_decay": 1e-5,
             "dropout_drop_prob": 0.4
+        },
+        "early_stopping": {
+            "enable": true,
+            "wait_first_n_epoch": 0.3,
+            "stop_threshold": 0.2,
+            "min_step": 0.001
         }
     }

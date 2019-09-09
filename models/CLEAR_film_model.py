@@ -145,6 +145,8 @@ class CLEAR_FiLM_model(nn.Module):
         super(CLEAR_FiLM_model, self).__init__()
 
         self.config = config
+        self.early_stopping = config.get('early_stopping', None)
+        self.early_stopping = self.early_stopping if self.early_stopping and self.early_stopping['enable'] else None
 
         dropout_drop_prob = float(config['optimizer'].get('dropout_drop_prob', 0.0))
 
