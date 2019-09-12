@@ -45,3 +45,14 @@ class ResizeImg(object):
     def __call__(self, sample):
         sample['image'] = F.resize(sample['image'], self.output_shape)
         return sample
+
+
+class ResizeImgBasedOnHeight(object):
+    """ Resize PIL image to 'output_shape' """
+    def __init__(self, output_height):
+        self.output_height = output_height
+
+    def __call__(self, sample):
+        output_width = int(self.output_height * sample['image'].width / sample['image'].height)
+        sample['image'] = F.resize(sample['image'], (output_width, self.output_height))
+        return sample
