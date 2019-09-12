@@ -67,6 +67,7 @@ class CLEAR_dataset(Dataset):
 
         nb_games = len(self.questions)
         self.games = multiprocessing.Array(ctypes.c_wchar_p, [""]*nb_games)
+        self.scenes = {}
         self.answer_counter = collections.Counter()
         self.answers = []
 
@@ -97,6 +98,9 @@ class CLEAR_dataset(Dataset):
                 'question': question,
                 'answer': answer
             })
+
+            if image_id not in self.scenes:
+                self.scenes[image_id] = image_filename
 
             self.answers.append(answer)
 
