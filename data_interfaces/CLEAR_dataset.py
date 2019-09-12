@@ -5,9 +5,10 @@ import ujson
 import numpy as np
 import torch
 from torch.utils.data import Dataset
+import torch.nn.functional as F
 
 from data_interfaces.CLEAR_image_loader import get_img_builder, CLEARImage
-from utils import read_json
+from utils import read_json, get_size_from_image_header
 
 import multiprocessing
 import ctypes
@@ -121,6 +122,13 @@ class CLEAR_dataset(Dataset):
 
     def prepare_game(self, game):
         return ujson.dumps(game)
+
+    def get_all_image_sizes(self):
+        assert self.is_raw_img(), 'Config must be set to RAW img in order to retrieve images sizes'
+
+        image_folder = "%s/%s" % (self.image_builder.img_dir, self.set)
+
+        return {idx: get_size_from_image_header(image_folder, filepath) for idx, filepath in self.scenes.items()}
 
     def __len__(self):
         return len(self.games)

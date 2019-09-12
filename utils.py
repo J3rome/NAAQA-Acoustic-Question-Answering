@@ -190,6 +190,24 @@ def read_json(folder, filename=None):
         return ujson.load(f)
 
 
+def get_size_from_image_header(folder, filename=None):
+    if filename is None:
+        # First parameter is full path
+        path = folder
+    else:
+        path = '%s/%s' % (folder, filename)
+
+    with open(path, 'rb') as f:
+        image_header = f.read(25)
+
+    assert b'PNG' in image_header[:8], 'Image must be a PNG'
+
+    width = int.from_bytes(image_header[16:20], byteorder='big')
+    height = int.from_bytes(image_header[20:24], byteorder='big')
+
+    return height, width
+
+
 def read_gamma_beta_h5(filepath):
     gammas_betas = []
 
