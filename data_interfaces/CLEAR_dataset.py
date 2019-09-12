@@ -299,6 +299,10 @@ class CLEAR_collate_fct(object):
 
         padded_questions, seq_lengths = CLEARTokenizer.pad_tokens(batch_questions, padding_token=self.padding_token)
 
+        image_dims = [sample['image'].shape[1:] for sample in batch]
+        max_image_width = max(image_dims, key=lambda x: x[1])[1]
+        max_image_height = max(image_dims, key=lambda x: x[0])[0]
+
         # FIXME : Investigate why this doesnt work
         #seq_lengths = torch.tensor([len(q) for q in batch_questions])
         #padded_questions = torch.nn.utils.rnn.pad_sequence(batch_questions, batch_first=True)
@@ -306,6 +310,12 @@ class CLEAR_collate_fct(object):
         for sample, padded_question, seq_length in zip(batch, padded_questions, seq_lengths):
             sample['question'] = padded_question
             sample['seq_length'] = seq_length
+
+            width_to_pad = max_image_width - sample['image'].shape[2]
+            height_to_pad = max_image_height - sample['image'].shape[1]
+
+            if width_to_pad + height_to_pad > 0:
+                sample['image'] = F.pad(sample['image'], [0, width_to_pad, 0, height_to_pad])
 
         return torch.utils.data.dataloader.default_collate(batch)
 
