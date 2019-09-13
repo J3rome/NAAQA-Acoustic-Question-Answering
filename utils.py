@@ -24,6 +24,28 @@ def set_random_seed(seed):
         torch.cuda.manual_seed(seed)
 
 
+def get_random_state():
+    states = {
+        'py': random.getstate(),
+        'np': np.random.get_state(),
+        'torch': torch.random.get_rng_state()
+    }
+
+    if torch.cuda.is_available():
+        states['torch_cuda'] = torch.cuda.get_rng_state()
+
+    return states
+
+
+def set_random_state(states):
+    random.setstate(states['py'])
+    np.random.set_state(states['np'])
+    torch.random.set_rng_state(states['torch'])
+
+    if torch.cuda.is_available() and 'torch_cuda' in states:
+        torch.cuda.set_rng_state(states['torch_cuda'])
+
+
 def create_folder_if_necessary(folder_path, overwrite_folder=False):
     if not os.path.isdir(folder_path):
         os.mkdir(folder_path)

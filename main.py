@@ -9,7 +9,7 @@ import numpy as np
 
 from utils import set_random_seed, create_folder_if_necessary, get_config, process_predictions, process_gamma_beta
 from utils import create_symlink_to_latest_folder, save_training_stats, save_json, sort_stats, is_date_string
-from utils import calc_mean_and_std, save_gamma_beta_h5, save_git_revision
+from utils import calc_mean_and_std, save_gamma_beta_h5, save_git_revision, get_random_state, set_random_state
 
 from visualization import visualize_gamma_beta, grad_cam_visualization
 from preprocessing import create_dict_from_questions, extract_features
@@ -529,9 +529,11 @@ def main(args):
         print("Model ready to run")
 
         if not args.no_model_summary:
-            # FIXME : Printing summary affect the output of the model (RAW vs Conv)
-            #         Doesn't seem to be a random state problem (At least not torch.randn())
+            # Printing summary affects the random state (Raw Vs Pre-Extracted Features).
+            # We restore it to ensure reproducibility between input type
+            random_state = get_random_state()
             summary(film_model, [(22,), (1,), input_image_torch_shape], device=device)
+            set_random_state(random_state)
 
     if task == "train_film":
         trainable_parameters = filter(lambda p: p.requires_grad, film_model.parameters())
