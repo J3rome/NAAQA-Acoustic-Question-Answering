@@ -298,8 +298,10 @@ class CLEARTokenizer:
 # See https://stackoverflow.com/questions/51030782/why-do-we-pack-the-sequences-in-pytorch
 #     https://discuss.pytorch.org/t/simple-working-example-how-to-use-packing-for-variable-length-sequence-inputs-for-rnn/2120/33
 class CLEAR_collate_fct(object):
-    def __init__(self, padding_token):
+    def __init__(self, padding_token, forced_width=None, forced_height=None):
         self.padding_token = padding_token
+        self.forced_width = forced_width
+        self.forced_height = forced_height
 
     def __call__(self, batch):
         batch_questions = [b['question'] for b in batch]
@@ -307,8 +309,16 @@ class CLEAR_collate_fct(object):
         padded_questions, seq_lengths = CLEARTokenizer.pad_tokens(batch_questions, padding_token=self.padding_token)
 
         image_dims = [sample['image'].shape[1:] for sample in batch]
-        max_image_width = max(image_dims, key=lambda x: x[1])[1]
-        max_image_height = max(image_dims, key=lambda x: x[0])[0]
+
+        if self.forced_width is None:
+            target_image_width = max(image_dims, key=lambda x: x[1])[1]
+        else:
+            target_image_width = self.forced_width
+
+        if self.forced_height is None:
+            target_image_height = max(image_dims, key=lambda x: x[0])[0]
+        else:
+            target_image_height = self.forced_height
 
         # FIXME : Investigate why this doesnt work
         #seq_lengths = torch.tensor([len(q) for q in batch_questions])
@@ -318,8 +328,8 @@ class CLEAR_collate_fct(object):
             sample['question'] = padded_question
             sample['seq_length'] = seq_length
 
-            width_to_pad = max_image_width - sample['image'].shape[2]
-            height_to_pad = max_image_height - sample['image'].shape[1]
+            width_to_pad = target_image_width - sample['image'].shape[2]
+            height_to_pad = target_image_height - sample['image'].shape[1]
 
             if width_to_pad + height_to_pad > 0:
                 sample['image'] = F.pad(sample['image'], [0, width_to_pad, 0, height_to_pad])
