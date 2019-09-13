@@ -3,6 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torchvision
 
+from utils import set_random_state, get_random_state
 
 # Replicate tensorflow 'SAME' padding (Taken from https://github.com/mlperf/inference/blob/master/others/edge/object_detection/ssd_mobilenet/pytorch/utils.py#L40)
 class Conv2d_tf(nn.Conv2d):
@@ -174,14 +175,14 @@ class CLEAR_FiLM_model(nn.Module):
 
         #### Image Pipeline
         if feature_extraction_config is not None:
+            # Instantiating the feature extractor affects the random state (Raw Vs Pre-Extracted Features).
+            # We restore it to ensure reproducibility between input type
+            random_state = get_random_state()
             self.feature_extractor = Resnet_feature_extractor(resnet_version=feature_extraction_config['version'],
                                                               layer_index=feature_extraction_config['layer_index'])
             input_image_channels = self.feature_extractor.get_out_channels()
+            set_random_state(random_state)
         else:
-            # This is a ugly HACK..
-            # Instantiating Resnet make use of random module.
-            # We must use the same operations to keep the random state identical between RAW and Pre-Extracted features
-            Resnet_feature_extractor(resnet_version=101, layer_index=6)
             self.feature_extractor = None
 
         ## Stem
