@@ -132,6 +132,25 @@ class CLEAR_dataset(Dataset):
 
         return self.all_image_sizes
 
+    def get_max_image_width(self, resize_height=None):
+        image_sizes = self.get_all_image_sizes()
+
+        max_width = max(image_sizes.values(), key=lambda x: x[1])[1]
+
+        if resize_height is not None:
+            max_height = max(image_sizes.values(), key=lambda x: x[0])[0]
+            max_width = int(resize_height * max_width / max_height)
+
+        return max_width
+
+    def get_max_image_height(self, resize_height=None):
+        if resize_height:
+            return resize_height
+
+        image_sizes = self.get_all_image_sizes()
+
+        return max(image_sizes.values(), key=lambda x: x[0])[0]
+
     def __len__(self):
         return len(self.games)
 
