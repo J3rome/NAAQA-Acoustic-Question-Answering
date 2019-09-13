@@ -38,6 +38,7 @@ class CLEAR_dataset(Dataset):
         self.image_builder = get_img_builder(image_config, self.root_folder_path,
                                              preprocessed_folder_name=preprocessed_folder_name, bufferize=None)
         self.transforms = transforms
+        self.input_shape = None
 
         attributes = read_json(self.root_folder_path, 'attributes.json')
 
@@ -98,10 +99,6 @@ class CLEAR_dataset(Dataset):
             self.answers.append(answer)
 
             self.answer_counter[answer] += 1
-
-        # NOTE : The width might vary (Since we use the shape of the first example).
-        #        To retrieve size of all images use self.get_all_image_sizes()
-        self.input_shape = self[0]['image'].shape
             
     @classmethod
     def from_dataset_object(cls, dataset_obj, questions):
@@ -172,6 +169,11 @@ class CLEAR_dataset(Dataset):
         return 0
 
     def get_input_shape(self, channel_first=True):
+        if self.input_shape is None:
+            # NOTE : The width might vary (Since we use the shape of the first example).
+            #        To retrieve size of all images use self.get_all_image_sizes()
+            self.input_shape = self[0]['image'].shape
+
         # Regular images : H x W x C
         # Torch images : C x H x W
         # Our input_shape is in the "Torch image" format
