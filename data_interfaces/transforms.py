@@ -56,6 +56,6 @@ class ResizeImgBasedOnHeight(object):
         output_width = int(self.output_height * sample['image'].width / sample['image'].height)
 
         if output_width + self.output_height != sample['image'].width + sample['image'].height:
-            sample['image'] = F.resize(sample['image'], (output_width, self.output_height))
+            sample['image'] = F.resize(sample['image'], (self.output_height, output_width))
 
         return sample
