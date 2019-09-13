@@ -54,5 +54,8 @@ class ResizeImgBasedOnHeight(object):
 
     def __call__(self, sample):
         output_width = int(self.output_height * sample['image'].width / sample['image'].height)
-        sample['image'] = F.resize(sample['image'], (output_width, self.output_height))
+
+        if output_width + self.output_height != sample['image'].width + sample['image'].height:
+            sample['image'] = F.resize(sample['image'], (output_width, self.output_height))
+
         return sample
