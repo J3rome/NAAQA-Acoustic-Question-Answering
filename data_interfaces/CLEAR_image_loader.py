@@ -63,48 +63,26 @@ class ErrorImgLoader(AbstractImgLoader):
 
 
 class RawImageBuilder(AbstractImgBuilder):
-    def __init__(self, img_dir, width, height, normalize_image=True, per_channel_mean_to_substract=None):
+    def __init__(self, img_dir):
         AbstractImgBuilder.__init__(self, img_dir, is_raw=True, require_process=True)
-        self.width = width
-        self.height = height
-        self.per_channel_mean_to_substract = per_channel_mean_to_substract
-        self.normalize_image = normalize_image
 
     def build(self, image_id, filename, which_set, **kwargs):
         img_path = os.path.join(self.img_dir, which_set, filename)
-        return RawImageLoader(img_path, self.width, self.height, normalize_image=self.normalize_image,
-                              per_channel_mean_to_substract=self.per_channel_mean_to_substract)
+        return RawImageLoader(img_path)
 
 from skimage import io
 from skimage.color import rgba2rgb
 
 class RawImageLoader(AbstractImgLoader):
-    def __init__(self, img_path, width, height, normalize_image, per_channel_mean_to_substract):
+    def __init__(self, img_path):
         AbstractImgLoader.__init__(self, img_path)
-        self.width = width
-        self.height = height
-        self.per_channel_mean_to_substract = per_channel_mean_to_substract
-        self.normalize_image = normalize_image
 
 
     def get_image(self, **kwargs):
-        #img = Image.open(self.img_path).convert('RGB')
-
         # Our images are saved as RGBA. The A dimension is always 1.
         # We could simply get rid of it instead of converting
         #img = io.imread(self.img_path)[:,:,:3]
         img = Image.open(self.img_path).convert('RGB')
-
-        #img = resize_image(img, self.width , self.height)
-        #img = np.array(img, dtype=np.float32)
-
-        #if self.normalize_image:
-        #    img_min = img.min()
-        #    img = (img - img_min) / (img.max() - img_min)
-            
-        # FIXME : This is clashing with the normalize image
-        #if self.per_channel_mean_to_substract is not None:
-        #    img -= self.per_channel_mean_to_substract[None, None, :]
 
         return img
 
@@ -194,10 +172,7 @@ def get_img_builder(config, data_dir, preprocessed_folder_name='preprocessed', b
         loader = h5FeatureBuilder(os.path.join(data_dir, preprocessed_folder_name), bufferize=bufferize)
     elif input_type == "raw":
         # TODO : Make the 'images' path parametrable
-        loader = RawImageBuilder(os.path.join(data_dir, 'images'),
-                                height=config["dim"][0],
-                                width=config["dim"][1],
-                                per_channel_mean_to_substract=config.get("per_channel_mean_to_substract", None))
+        loader = RawImageBuilder(os.path.join(data_dir, 'images'))
     else:
         assert False, "incorrect image input: {}".format(input_type)
 

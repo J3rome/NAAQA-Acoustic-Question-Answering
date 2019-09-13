@@ -17,13 +17,14 @@ from preprocessing import create_dict_from_questions, extract_features
 # NEW IMPORTS
 from models.CLEAR_film_model import CLEAR_FiLM_model
 from data_interfaces.CLEAR_dataset import CLEAR_dataset, CLEAR_collate_fct
-from data_interfaces.transforms import ToTensor, ResizeImg, ImgBetweenZeroOne
+from data_interfaces.transforms import ToTensor, ImgBetweenZeroOne, ResizeImgBasedOnHeight
 from models.torchsummary import summary     # Custom version of torchsummary to fix bugs with input
 import torch
 import time
 from torch.utils.data import DataLoader
 import torch.nn as nn
 from torchvision import transforms
+from tensorboardX import SummaryWriter
 
 
 # TODO : Add option for custom test file --> Already available by specifying different inference_set ? The according dataset & dataloader should be created..
@@ -49,9 +50,9 @@ parser.add_argument("--normalize_with_imagenet_stats", help="Will normalize inpu
 parser.add_argument("--normalize_with_clear_stats", help="Will normalize input images according to"
                                                          "CLEAR mean & std (Only with RAW input)", action='store_true')
 parser.add_argument("--no_img_resize", help="Disable RAW image resizing", action='store_true')
-parser.add_argument("--raw_img_resize", type=str, default='224,224', help="Specify the size to which the image will be"
-                                                                          "resized (when working with RAW img)"
-                                                                          "Format : width,height")
+parser.add_argument("--raw_img_resize_height", type=int, default=300,
+                    help="Specify the size to which the image will be resized (when working with RAW img)"
+                         "The width is calculated according to the height in order to keep the ratio")
 parser.add_argument("--keep_image_range", help="Will NOT scale the image between 0-1 (RAW img)", action='store_true')
 parser.add_argument("--gamma_beta_path", type=str, default=None, help="Path where gamma_beta values are stored "
                                                                           "(when using --visualize_gamma_beta)")
@@ -394,10 +395,8 @@ def main(args):
             # Copy dictionary file used
             shutil.copyfile(args.dict_file_path, "%s/dict.json" % output_dated_folder)
 
-    if args.no_img_resize:
-        args.raw_img_resize = None
-    else:
-        args.raw_img_resize = tuple([int(s) for s in args.raw_img_resize.split(',')])
+    if args.no_img_resize or film_model_config['input']['type'].lower() != 'raw':
+        args.raw_img_resize_height = None
 
     device = 'cuda:0' if torch.cuda.is_available() and not args.use_cpu else 'cpu'
     print("Using device '%s'" % device)
@@ -416,8 +415,8 @@ def main(args):
     if film_model_config['input']['type'] == 'raw':
         feature_extractor_config = {'version': 101, 'layer_index': 6}   # Idx 6 -> Block3/unit22
 
-        if args.raw_img_resize:
-            transforms_list.append(ResizeImg(args.raw_img_resize))
+        if args.raw_img_resize_height:
+            transforms_list.append(ResizeImgBasedOnHeight(args.raw_img_resize_height))
 
         # TODO : Add data augmentation ?
 
