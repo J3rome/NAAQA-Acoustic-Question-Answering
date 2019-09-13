@@ -54,6 +54,8 @@ parser.add_argument("--raw_img_resize_height", type=int, default=300,
                     help="Specify the size to which the image will be resized (when working with RAW img)"
                          "The width is calculated according to the height in order to keep the ratio")
 parser.add_argument("--keep_image_range", help="Will NOT scale the image between 0-1 (RAW img)", action='store_true')
+parser.add_argument("--pad_to_largest_image", help="If set, images will be padded to meet the largest image in the set."
+                                                   "All input will have the same size.", action='store_true')
 parser.add_argument("--gamma_beta_path", type=str, default=None, help="Path where gamma_beta values are stored "
                                                                           "(when using --visualize_gamma_beta)")
 
@@ -452,15 +454,31 @@ def main(args):
     #                             transforms=transforms.Compose(transforms_list + [ToTensor()]))
 
     print("Creating Dataloaders")
-    collate_fct = CLEAR_collate_fct(padding_token=train_dataset.get_padding_token())
+    if args.pad_to_largest_image:
+        resized_height = args.raw_img_resize_height if args.raw_img_resize_height else None
+        train_collate_fct = CLEAR_collate_fct(padding_token=train_dataset.get_padding_token(),
+                                              forced_height=train_dataset.get_max_image_height(resized_height),
+                                              forced_width=train_dataset.get_max_image_width(resized_height))
+
+        val_collate_fct = CLEAR_collate_fct(padding_token=val_dataset.get_padding_token(),
+                                            forced_height=val_dataset.get_max_image_height(resized_height),
+                                            forced_width=val_dataset.get_max_image_width(resized_height))
+
+        test_collate_fct = CLEAR_collate_fct(padding_token=test_dataset.get_padding_token(),
+                                             forced_height=test_dataset.get_max_image_height(resized_height),
+                                             forced_width=test_dataset.get_max_image_width(resized_height))
+    else:
+        collate_fct = CLEAR_collate_fct(padding_token=train_dataset.get_padding_token())
+        train_collate_fct = val_collate_fct = test_collate_fct = collate_fct
+
     train_dataloader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True,
-                                  num_workers=4, collate_fn=collate_fct)
+                                  num_workers=4, collate_fn=train_collate_fct)
 
     val_dataloader = DataLoader(val_dataset, batch_size=args.batch_size, shuffle=True,
-                                  num_workers=4, collate_fn=collate_fct)
+                                  num_workers=4, collate_fn=val_collate_fct)
 
     test_dataloader = DataLoader(test_dataset, batch_size=args.batch_size, shuffle=False,
-                                  num_workers=4, collate_fn=collate_fct)
+                                  num_workers=4, collate_fn=test_collate_fct)
 
     #trickytest_dataloader = DataLoader(trickytest_dataset, batch_size=args.batch_size, shuffle=False,
     #                             num_workers=4, collate_fn=train_dataset.CLEAR_collate_fct)
