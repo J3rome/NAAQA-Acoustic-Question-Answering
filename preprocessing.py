@@ -6,7 +6,7 @@ from collections import defaultdict
 from random import shuffle
 
 from data_interfaces.CLEAR_dataset import CLEARTokenizer
-from utils import create_folder_if_necessary, save_json, read_json
+from utils import create_folder_if_necessary, save_json, read_json, set_random_state, get_random_state
 
 from torch.utils.data import DataLoader
 import torch
@@ -29,7 +29,13 @@ def extract_features(device, feature_extractor, dataloaders, output_folder_name=
 
     # In order to retrieve the output size, we run one example through the model. We first create a new dataloader
     temp_dataloader = DataLoader(dataloaders[dataloaders_first_key].dataset, batch_size=1)
+
+    # Retrieving element from dataloader affects the random state.
+    # We restore it to ensure reproducibility between Pre-Extracted features & Raw input
+    random_state = get_random_state()
     temp_sample = next(iter(temp_dataloader))['image'].to(device)
+    set_random_state(random_state)
+
     feature_extractor_output_shape = feature_extractor.get_output_shape(temp_sample, channel_first=False)
 
     for set_type, dataloader in dataloaders.items():
