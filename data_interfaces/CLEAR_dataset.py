@@ -39,13 +39,6 @@ class CLEAR_dataset(Dataset):
                                              preprocessed_folder_name=preprocessed_folder_name, bufferize=None)
         self.transforms = transforms
 
-        feature_shape_filename = "feature_shape.json"
-
-        if self.image_builder.is_raw_image():
-            self.input_shape = image_config['dim']
-        elif os.path.isfile("{}/{}".format(preprocessed_folder_path, feature_shape_filename)):
-            self.input_shape = read_json(preprocessed_folder_path, feature_shape_filename)['extracted_feature_shape']
-
         attributes = read_json(self.root_folder_path, 'attributes.json')
 
         self.answer_to_family = {"<unk>": "unknown"}  # FIXME : Quantify what is the impact of having an unknown answer
@@ -105,6 +98,10 @@ class CLEAR_dataset(Dataset):
             self.answers.append(answer)
 
             self.answer_counter[answer] += 1
+
+        # NOTE : The width might vary (Since we use the shape of the first example).
+        #        To retrieve size of all images use self.get_all_image_sizes()
+        self.input_shape = self[0]['image'].shape
             
     @classmethod
     def from_dataset_object(cls, dataset_obj, questions):
@@ -177,9 +174,9 @@ class CLEAR_dataset(Dataset):
     def get_input_shape(self, channel_first=True):
         # Regular images : H x W x C
         # Torch images : C x H x W
-        # Our input_shape is in the "regular image" format
-        if channel_first:
-            return [self.input_shape[2]] + self.input_shape[:2]
+        # Our input_shape is in the "Torch image" format
+        if not channel_first:
+            return self.input_shape[-2:] + [self.input_shape[0]]
 
         return self.input_shape
 
