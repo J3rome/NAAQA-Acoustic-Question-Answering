@@ -352,10 +352,9 @@ class Resnet_feature_extractor(nn.Module):
         # 8 -> AdaptiveAvgPool2d
         # 9 -> Linear
 
-        if resnet_version == 101:
-            resnet = torchvision.models.resnet101(pretrained=True)
-        else:
-            assert resnet_version != 101
+        assert resnet_version == 101, 'Only Resnet-101 is implemented.'
+
+        resnet = torchvision.models.resnet101(pretrained=True)
 
         self.extractor = nn.Sequential(*list(resnet.children())[:layer_index+1])
 

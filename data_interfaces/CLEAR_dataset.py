@@ -25,8 +25,6 @@ class CLEAR_dataset(Dataset):
         self.root_folder_path = "%s/%s" % (folder, version_name)
         self.version_name = version_name
 
-        preprocessed_folder_path = '{}/{}'.format(self.root_folder_path, preprocessed_folder_name)
-
         if tokenize_text and dict_file_path is not None:
             self.tokenizer = CLEARTokenizer(dict_file_path)
         else:

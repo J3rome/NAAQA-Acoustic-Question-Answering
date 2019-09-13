@@ -5,7 +5,6 @@ import shutil
 import os
 
 from tqdm import tqdm
-import numpy as np
 
 from utils import set_random_seed, create_folder_if_necessary, get_config, process_predictions, process_gamma_beta
 from utils import create_symlink_to_latest_folder, save_training_stats, save_json, sort_stats, is_date_string
@@ -491,7 +490,6 @@ def main(args):
     ####################################
     #   Model Definition
     ####################################
-
     if instantiate_model:
         print("Creating model")
         # Retrieve informations to instantiate model

@@ -51,7 +51,7 @@ def extract_features(device, feature_extractor, dataloaders, output_folder_name=
                 with torch.set_grad_enabled(False):
                     features = feature_extractor(images).detach().cpu().numpy()
 
-                # swap color axis because (RGB/BGR)
+                # swap axis
                 # numpy image: H x W x C
                 # torch image: C X H X W
                 # We want to save in numpy format
