@@ -262,6 +262,7 @@ def process_dataloader(is_training, device, model, dataloader, criterion=None, o
         # Those are not processed by the network, only used to create statistics. Therefore, no need to copy to GPU
         questions_id = batch['id']
         scenes_id = batch['scene_id']
+        images_padding = batch['image_padding']
 
         if is_training:
             # zero the parameter gradients
@@ -280,7 +281,7 @@ def process_dataloader(is_training, device, model, dataloader, criterion=None, o
 
         batch_processed_predictions = process_predictions(dataloader.dataset, preds.tolist(), answers.tolist(),
                                                           questions_id.tolist(), scenes_id.tolist(),
-                                                          outputs_softmax.tolist())
+                                                          outputs_softmax.tolist(), images_padding.tolist())
 
         processed_predictions += batch_processed_predictions
 
