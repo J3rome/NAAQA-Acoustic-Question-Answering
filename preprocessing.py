@@ -68,10 +68,6 @@ def extract_features(device, feature_extractor, dataloaders, output_folder_name=
                 h5_idx += batch_size
         print("Features extracted succesfully to '%s'" % output_filepath)
 
-    # Save the extracted feature shape
-    save_json({"extracted_feature_shape": feature_extractor_output_shape}, output_folder_path,
-              filename='feature_shape.json')
-
 
 # >>> Dictionary Creation (For word tokenization)
 def create_dict_from_questions(dataset, word_min_occurence=1, dict_filename='dict.json', force_all_answers=False,
