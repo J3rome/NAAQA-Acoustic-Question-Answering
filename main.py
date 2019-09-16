@@ -478,7 +478,7 @@ def main(args):
     #                             num_workers=4, collate_fn=train_dataset.CLEAR_collate_fct)
 
     # This should only be used once to get the dataset mean & std. We could write it to the data folder in json format
-    # FIXME : THIS IS AFFECTING THE RESULTS --> Changing the seed. Could be a preprocessing step ?
+    # FIXME : THIS IS AFFECTING THE RESULTS --> Should restore rng state if doing this
     #mean, std = calc_mean_and_std(train_test_dataloader, device=device)
 
 
