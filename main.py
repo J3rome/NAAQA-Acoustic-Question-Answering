@@ -16,7 +16,7 @@ from preprocessing import create_dict_from_questions, extract_features
 # NEW IMPORTS
 from models.CLEAR_film_model import CLEAR_FiLM_model
 from data_interfaces.CLEAR_dataset import CLEAR_dataset, CLEAR_collate_fct
-from data_interfaces.transforms import ToTensor, ImgBetweenZeroOne, ResizeImgBasedOnHeight
+from data_interfaces.transforms import ToTensor, ImgBetweenZeroOne, ResizeImgBasedOnHeight, PadTensor
 from models.torchsummary import summary     # Custom version of torchsummary to fix bugs with input
 import torch
 import time
@@ -454,30 +454,25 @@ def main(args):
 
     print("Creating Dataloaders")
     if args.pad_to_largest_image:
-        resized_height = args.raw_img_resize_height if args.raw_img_resize_height else None
-        train_collate_fct = CLEAR_collate_fct(padding_token=train_dataset.get_padding_token(),
-                                              forced_height=train_dataset.get_max_image_height(resized_height),
-                                              forced_width=train_dataset.get_max_image_width(resized_height))
+        max_train_img_dims = train_dataset.get_max_width_image_dims()
+        train_dataset.add_transform(PadTensor(max_train_img_dims))
 
-        val_collate_fct = CLEAR_collate_fct(padding_token=val_dataset.get_padding_token(),
-                                            forced_height=val_dataset.get_max_image_height(resized_height),
-                                            forced_width=val_dataset.get_max_image_width(resized_height))
+        max_val_img_dims = val_dataset.get_max_width_image_dims()
+        val_dataset.add_transform(PadTensor(max_val_img_dims))
 
-        test_collate_fct = CLEAR_collate_fct(padding_token=test_dataset.get_padding_token(),
-                                             forced_height=test_dataset.get_max_image_height(resized_height),
-                                             forced_width=test_dataset.get_max_image_width(resized_height))
-    else:
-        collate_fct = CLEAR_collate_fct(padding_token=train_dataset.get_padding_token())
-        train_collate_fct = val_collate_fct = test_collate_fct = collate_fct
+        max_test_img_dims = test_dataset.get_max_width_image_dims()
+        test_dataset.add_transform(PadTensor(max_test_img_dims))
+
+    collate_fct = CLEAR_collate_fct(padding_token=train_dataset.get_padding_token())
 
     train_dataloader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True,
-                                  num_workers=4, collate_fn=train_collate_fct)
+                                  num_workers=4, collate_fn=collate_fct)
 
     val_dataloader = DataLoader(val_dataset, batch_size=args.batch_size, shuffle=True,
-                                  num_workers=4, collate_fn=val_collate_fct)
+                                  num_workers=4, collate_fn=collate_fct)
 
     test_dataloader = DataLoader(test_dataset, batch_size=args.batch_size, shuffle=False,
-                                  num_workers=4, collate_fn=test_collate_fct)
+                                  num_workers=4, collate_fn=collate_fct)
 
     #trickytest_dataloader = DataLoader(trickytest_dataset, batch_size=args.batch_size, shuffle=False,
     #                             num_workers=4, collate_fn=train_dataset.CLEAR_collate_fct)

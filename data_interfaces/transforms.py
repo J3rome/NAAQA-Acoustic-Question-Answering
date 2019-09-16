@@ -1,6 +1,7 @@
 import torch
 import numpy as np
-import torchvision.transforms.functional as F
+import torchvision.transforms.functional as vis_F
+import torch.nn.functional as F
 
 
 class ToTensor(object):
@@ -43,7 +44,7 @@ class ResizeImg(object):
         self.output_shape = output_shape
 
     def __call__(self, sample):
-        sample['image'] = F.resize(sample['image'], self.output_shape)
+        sample['image'] = vis_F.resize(sample['image'], self.output_shape)
         return sample
 
 
@@ -56,6 +57,23 @@ class ResizeImgBasedOnHeight(object):
         output_width = int(self.output_height * sample['image'].width / sample['image'].height)
 
         if output_width + self.output_height != sample['image'].width + sample['image'].height:
-            sample['image'] = F.resize(sample['image'], (self.output_height, output_width))
+            sample['image'] = vis_F.resize(sample['image'], (self.output_height, output_width))
+
+        return sample
+
+
+class PadTensor(object):
+    """ Pad image Tensor to output_height x output_width. Pad to right & bottom of image"""
+    def __init__(self, output_shape):
+        self.output_shape = output_shape
+
+    def __call__(self, sample):
+        width_to_pad = self.output_shape[1] - sample['image'].shape[2]
+        height_to_pad = self.output_shape[0] - sample['image'].shape[1]
+
+        if width_to_pad + height_to_pad > 0:
+            sample['image'] = F.pad(sample['image'], [0, width_to_pad, 0, height_to_pad])
+
+        sample['image_padding'] = torch.tensor([height_to_pad, width_to_pad], dtype=torch.int)
 
         return sample

@@ -6,9 +6,11 @@ import numpy as np
 import torch
 from torch.utils.data import Dataset
 import torch.nn.functional as F
+from torchvision import transforms
 
 from data_interfaces.CLEAR_image_loader import get_img_builder, CLEARImage
 from utils import read_json, get_size_from_image_header
+from data_interfaces.transforms import ResizeImgBasedOnHeight
 
 import multiprocessing
 import ctypes
@@ -93,7 +95,12 @@ class CLEAR_dataset(Dataset):
             })
 
             if image_id not in self.scenes:
-                self.scenes[image_id] = image_filename
+                self.scenes[image_id] = {
+                    'filename': image_filename,
+                    'question_idx': [i]
+                }
+            else:
+                self.scenes[image_id]['question_idx'].append(i)
 
             self.answers.append(answer)
 
@@ -125,29 +132,54 @@ class CLEAR_dataset(Dataset):
 
         if self.all_image_sizes is None:
             image_folder = "%s/%s" % (self.image_builder.img_dir, self.set)
-            self.all_image_sizes = {idx: get_size_from_image_header(image_folder, filepath)
-                                    for idx, filepath in self.scenes.items()}
+            self.all_image_sizes = {idx: get_size_from_image_header(image_folder, s['filename'])
+                                    for idx, s in self.scenes.items()}
 
         return self.all_image_sizes
 
-    def get_max_image_width(self, resize_height=None):
+    def get_game_id_for_scene(self, scene_id):
+        assert scene_id in self.scenes
+
+        return self.scenes[scene_id]['question_idx'][0]
+
+    def get_resized_height(self):
+        height = None
+
+        if self.transforms:
+            for transform in self.transforms.transforms:
+                if type(transform) is ResizeImgBasedOnHeight:
+                    height = transform.output_height
+
+        return height
+
+    def get_min_width_image_dims(self, return_scene_id=False):
+        return self._get_minmax_width_image_dims(return_scene_id, minmax_fct=min)
+
+    def get_max_width_image_dims(self, return_scene_id=False):
+        return self._get_minmax_width_image_dims(return_scene_id, minmax_fct=max)
+
+    def _get_minmax_width_image_dims(self, return_scene_id=False, minmax_fct=max):
         image_sizes = self.get_all_image_sizes()
 
-        max_width = max(image_sizes.values(), key=lambda x: x[1])[1]
+        height, max_width = minmax_fct(image_sizes.values(), key=lambda x: x[1])
 
-        if resize_height is not None:
-            max_height = max(image_sizes.values(), key=lambda x: x[0])[0]
-            max_width = int(resize_height * max_width / max_height)
+        if return_scene_id:
+            to_return = [(game_idx,) for game_idx, dim in image_sizes.items()
+                         if dim[0] == height and dim[1] == max_width][0]
+        else:
+            to_return = tuple()
 
-        return max_width
+        resize_height = self.get_resized_height()
 
-    def get_max_image_height(self, resize_height=None):
         if resize_height:
-            return resize_height
+            max_width = int(resize_height * max_width / height)
+            height = resize_height
 
-        image_sizes = self.get_all_image_sizes()
+        return to_return + (height, max_width)
 
-        return max(image_sizes.values(), key=lambda x: x[0])[0]
+    def add_transform(self, transform):
+        # Create a new Compose object because initially, the object is shared between all dataset instances
+        self.transforms = transforms.Compose(self.transforms.transforms + [transform])
 
     def __len__(self):
         return len(self.games)
@@ -315,10 +347,8 @@ class CLEARTokenizer:
 # See https://stackoverflow.com/questions/51030782/why-do-we-pack-the-sequences-in-pytorch
 #     https://discuss.pytorch.org/t/simple-working-example-how-to-use-packing-for-variable-length-sequence-inputs-for-rnn/2120/33
 class CLEAR_collate_fct(object):
-    def __init__(self, padding_token, forced_width=None, forced_height=None):
+    def __init__(self, padding_token):
         self.padding_token = padding_token
-        self.forced_width = forced_width
-        self.forced_height = forced_height
 
     def __call__(self, batch):
         batch_questions = [b['question'] for b in batch]
@@ -327,15 +357,8 @@ class CLEAR_collate_fct(object):
 
         image_dims = [sample['image'].shape[1:] for sample in batch]
 
-        if self.forced_width is None:
-            target_image_width = max(image_dims, key=lambda x: x[1])[1]
-        else:
-            target_image_width = self.forced_width
-
-        if self.forced_height is None:
-            target_image_height = max(image_dims, key=lambda x: x[0])[0]
-        else:
-            target_image_height = self.forced_height
+        max_image_width = max(image_dims, key=lambda x: x[1])[1]
+        max_image_height = max(image_dims, key=lambda x: x[0])[0]
 
         # FIXME : Investigate why this doesnt work
         #seq_lengths = torch.tensor([len(q) for q in batch_questions])
@@ -345,11 +368,17 @@ class CLEAR_collate_fct(object):
             sample['question'] = padded_question
             sample['seq_length'] = seq_length
 
-            width_to_pad = target_image_width - sample['image'].shape[2]
-            height_to_pad = target_image_height - sample['image'].shape[1]
+            width_to_pad = max_image_width - sample['image'].shape[2]
+            height_to_pad = max_image_height - sample['image'].shape[1]
 
             if width_to_pad + height_to_pad > 0:
                 sample['image'] = F.pad(sample['image'], [0, width_to_pad, 0, height_to_pad])
+
+            if 'image_padding' not in sample:
+                sample['image_padding'] = torch.tensor([height_to_pad, width_to_pad], dtype=torch.int)
+            else:
+                sample['image_padding'][0] += height_to_pad
+                sample['image_padding'][1] += width_to_pad
 
         return torch.utils.data.dataloader.default_collate(batch)
 
