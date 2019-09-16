@@ -27,20 +27,15 @@ def extract_features(device, feature_extractor, dataloaders, output_folder_name=
     # Set model to eval mode
     feature_extractor.eval()
 
-    # In order to retrieve the output size, we run one example through the model. We first create a new dataloader
-    temp_dataloader = DataLoader(dataloaders[dataloaders_first_key].dataset, batch_size=1)
-
-    # Retrieving element from dataloader affects the random state.
-    # We restore it to ensure reproducibility between Pre-Extracted features & Raw input
-    random_state = get_random_state()
-    temp_sample = next(iter(temp_dataloader))['image'].to(device)
-    set_random_state(random_state)
-
-    feature_extractor_output_shape = feature_extractor.get_output_shape(temp_sample, channel_first=False)
-
     for set_type, dataloader in dataloaders.items():
         print("Extracting features from '%s' set" % set_type)
         output_filepath = '%s/%s_features.h5' % (output_folder_path, set_type)
+
+        # Retrieve min & max dims of images
+        max_width_id, height, max_width = dataloader.dataset.get_max_width_image_dims(return_scene_id=True)
+        game_id = dataloader.dataset.get_game_id_for_scene(max_width_id)
+        max_width_img = dataloader.dataset[game_id]['image'].unsqueeze(0)
+        feature_extractor_output_shape = feature_extractor.get_output_shape(max_width_img, channel_first=False)
 
         # Keep only 1 game per scene (We want to process every image only once)
         dataloader.dataset.keep_1_game_per_scene()
@@ -48,6 +43,8 @@ def extract_features(device, feature_extractor, dataloaders, output_folder_name=
         nb_games = len(dataloader.dataset)
 
         with h5py.File(output_filepath, 'w') as f:
+            # FIXME : Find a way to have variable size. MaxShape is not the answer
+            #         We can use --pad_to_largest image, save a dataset of padding and remove padding when retrieving <<-- This won't work, the output shape is different after passing throught the feature extractor. Padding at this level will have a big impact
             h5_dataset = f.create_dataset('features', shape=[nb_games] + feature_extractor_output_shape, dtype=np.float32)
             h5_idx2img = f.create_dataset('idx2img', shape=[nb_games], dtype=np.int32)
             h5_idx = 0
