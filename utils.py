@@ -318,3 +318,26 @@ def is_date_string(string):
         return True
     except ValueError:
         return False
+
+
+def visualize_cam(mask, img):
+    """ Taken from https://github.com/vickyliin/gradcam_plus_plus-pytorch
+    Make heatmap from mask and synthesize GradCAM result image using heatmap and img.
+    Args:
+        mask (torch.tensor): mask shape of (1, 1, H, W) and each element has value in range [0, 1]
+        img (torch.tensor): img shape of (1, 3, H, W) and each pixel value is in range [0, 1]
+
+    Return:
+        heatmap (torch.tensor): heatmap img shape of (3, H, W)
+        result (torch.tensor): synthesized GradCAM result of same shape with heatmap.
+    """
+    heatmap = (255 * mask.squeeze()).type(torch.uint8).cpu().numpy()
+    heatmap = cv2.applyColorMap(heatmap, cv2.COLORMAP_JET)
+    heatmap = torch.from_numpy(heatmap).permute(2, 0, 1).float().div(255)
+    b, g, r = heatmap.split(1)
+    heatmap = torch.cat([r, g, b])
+
+    result = heatmap+img.cpu()
+    result = result.div(result.max()).squeeze()
+
+    return heatmap, result

@@ -12,15 +12,13 @@ from tsnecuda import TSNE as cuda_TSNE
 
 from models.gradcam import GradCAM
 from torchvision.utils import make_grid
-# FIXME : Should not depend on pytorch-gradcam module
-from gradcam.utils import visualize_cam
 
 from data_interfaces.CLEAR_dataset import CLEAR_dataset
 from torch.utils.data import DataLoader
 from torchvision import transforms
 from tqdm import tqdm
 import torch
-from utils import process_predictions
+from utils import process_predictions, read_json, visualize_cam
 
 special_ending_nodes_correspondence = {
   'add': 'count',
