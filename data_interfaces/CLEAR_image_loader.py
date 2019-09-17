@@ -69,9 +69,7 @@ class RawImageBuilder(AbstractImgBuilder):
     def build(self, image_id, filename, which_set, **kwargs):
         img_path = os.path.join(self.img_dir, which_set, filename)
         return RawImageLoader(img_path)
-
-from skimage import io
-from skimage.color import rgba2rgb
+    
 
 class RawImageLoader(AbstractImgLoader):
     def __init__(self, img_path):
