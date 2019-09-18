@@ -219,6 +219,7 @@ def train_model(device, model, dataloaders, output_folder, criterion=None, optim
                 early_stop_counter = 0
             elif epoch > wait_first_n_epoch:
                 early_stop_counter += 1
+                print("Early Stopping count : %d/%d" % (early_stop_counter, stop_threshold))
 
                 if early_stop_counter >= stop_threshold:
                     print("Early Stopping at epoch %d on %d" % (epoch, nb_epoch))
