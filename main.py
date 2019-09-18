@@ -353,21 +353,6 @@ def main(args):
     test_writer_folder = '%s/test/%s' % (tensorboard_folder, current_datetime_str)
     beholder_folder = '%s/beholder' % tensorboard_folder
 
-    # If path specified is a date, we construct the path to the best model weights for the specified run
-    if args.film_model_weight_path is not None:
-
-        base_path = "%s/train_film/%s/%s" % (args.output_root_path, args.version_name, args.film_model_weight_path)
-        suffix = "best/model.pt.tar"        # FIXME : We might redo some epoch when continuing training because the 'best' epoch is not necessarely the last
-
-        if is_date_string(args.film_model_weight_path):
-            args.film_model_weight_path = "%s/%s" % (base_path, suffix)
-        elif args.film_model_weight_path == 'latest':
-            # The 'latest' symlink will be overriden by this run (If continuing training).
-            # Use real path of latest experiment
-            symlink_value = os.readlink(base_path)
-            clean_base_path = base_path[:-(len(args.film_model_weight_path) + 1)]
-            args.film_model_weight_path = '%s/%s/%s' % (clean_base_path, symlink_value, suffix)
-
     restore_model_weights = args.inference or (args.training and args.continue_training) or args.visualize_grad_cam
 
     args.dict_folder = args.preprocessed_folder_name if args.dict_folder is None else args.dict_folder
@@ -501,6 +486,19 @@ def main(args):
         if restore_model_weights:
             assert args.film_model_weight_path is not None, 'Must provide path to model weights to ' \
                                                             'do inference or to continue training.'
+
+            # If path specified is a date, we construct the path to the best model weights for the specified run
+            base_path = "%s/train_film/%s/%s" % (args.output_root_path, args.version_name, args.film_model_weight_path)
+            suffix = "best/model.pt.tar"  # FIXME : We might redo some epoch when continuing training because the 'best' epoch is not necessarely the last
+
+            if is_date_string(args.film_model_weight_path):
+                args.film_model_weight_path = "%s/%s" % (base_path, suffix)
+            elif args.film_model_weight_path == 'latest':
+                # The 'latest' symlink will be overriden by this run (If continuing training).
+                # Use real path of latest experiment
+                symlink_value = os.readlink(base_path)
+                clean_base_path = base_path[:-(len(args.film_model_weight_path) + 1)]
+                args.film_model_weight_path = '%s/%s/%s' % (clean_base_path, symlink_value, suffix)
 
             checkpoint = torch.load(args.film_model_weight_path, map_location=device)
 
