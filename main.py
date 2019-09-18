@@ -312,6 +312,7 @@ def process_dataloader(is_training, device, model, dataloader, criterion=None, o
 
 def main(args):
 
+    # Parameter validation
     mutually_exclusive_params = [args.training, args.inference, args.feature_extract,
                                  args.create_dict, args.visualize_gamma_beta, args.visualize_grad_cam]
 
@@ -346,23 +347,17 @@ def main(args):
     current_datetime_str = current_datetime.strftime("%Y-%m-%d_%Hh%M")
     output_dated_folder = "%s/%s" % (output_experiment_folder, current_datetime_str)
 
-    tensorboard_folder = "%s/tensorboard" % args.output_root_path
-
-    train_writer_folder = '%s/train/%s' % (tensorboard_folder, current_datetime_str)
-    val_writer_folder = '%s/val/%s' % (tensorboard_folder, current_datetime_str)
-    test_writer_folder = '%s/test/%s' % (tensorboard_folder, current_datetime_str)
-    beholder_folder = '%s/beholder' % tensorboard_folder
-
+    # Flags
     restore_model_weights = args.inference or (args.training and args.continue_training) or args.visualize_grad_cam
+    create_output_folder = not args.create_dict and not args.feature_extract
+    instantiate_model = not args.create_dict and 'gamma_beta' not in task
+    use_tensorboard = 'train' in task
 
     args.dict_folder = args.preprocessed_folder_name if args.dict_folder is None else args.dict_folder
     if args.dict_file_path is None:
         args.dict_file_path = "%s/%s/dict.json" % (data_path, args.dict_folder)
 
     film_model_config = get_config(args.config_path)
-
-    create_output_folder = not args.create_dict and not args.feature_extract
-    instantiate_model = not args.create_dict and 'gamma_beta' not in task
 
     if create_output_folder:
         # TODO : See if this is optimal file structure
