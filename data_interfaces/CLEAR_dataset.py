@@ -55,8 +55,7 @@ class CLEAR_dataset(Dataset):
         if questions is None:
             question_file_path = '{}/questions/CLEAR_{}_questions.json'.format(self.root_folder_path, self.set)
 
-            with open(question_file_path) as question_file:
-                self.questions = ujson.load(question_file)["questions"]
+            self.questions = read_json(question_file_path)["questions"]
         else:
             self.questions = questions
 
