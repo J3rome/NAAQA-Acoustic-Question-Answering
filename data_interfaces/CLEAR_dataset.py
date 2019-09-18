@@ -60,6 +60,12 @@ class CLEAR_dataset(Dataset):
         else:
             self.questions = questions
 
+        scene_file_path = '{}/scenes/CLEAR_{}_scenes.json'.format(self.root_folder_path, self.set)
+        if os.path.isfile(scene_file_path):
+            self.scenes_def = {int(s['scene_index']): s for s in read_json(scene_file_path)['scenes']}
+        else:
+            self.scenes_def = None
+
         nb_games = len(self.questions)
         self.games = multiprocessing.Array(ctypes.c_wchar_p, [""]*nb_games)
         self.scenes = {}
@@ -99,6 +105,10 @@ class CLEAR_dataset(Dataset):
                     'filename': image_filename,
                     'question_idx': [i]
                 }
+
+                if self.scenes_def:
+                    self.scenes[image_id]['definition'] = self.scenes_def[image_id]
+
             else:
                 self.scenes[image_id]['question_idx'].append(i)
 
