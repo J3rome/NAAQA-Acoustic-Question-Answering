@@ -68,6 +68,9 @@ def process_predictions(dataset, predictions, ground_truths, questions_id, scene
 
     iterator = zip(predictions, ground_truths, questions_id, scenes_id, predictions_probs, images_padding)
     for prediction, ground_truth, question_id, scene_id, prediction_probs, image_padding in iterator:
+        # TODO : Add is_relation
+        scene_objects = dataset.scenes[scene_id]['definition']['objects']
+
         decoded_prediction = dataset.tokenizer.decode_answer(prediction)
         decoded_ground_truth = dataset.tokenizer.decode_answer(ground_truth)
         prediction_answer_family = dataset.answer_to_family[decoded_prediction]
@@ -75,6 +78,7 @@ def process_predictions(dataset, predictions, ground_truths, questions_id, scene
         processed_predictions.append({
             'question_id': question_id,
             'scene_id': scene_id,
+            'scene_length': len(scene_objects),
             'correct': bool(prediction == ground_truth),
             'correct_answer_family': bool(prediction_answer_family == ground_truth_answer_family),
             'prediction': decoded_prediction,
