@@ -500,6 +500,9 @@ def main(args):
                 clean_base_path = base_path[:-(len(args.film_model_weight_path) + 1)]
                 args.film_model_weight_path = '%s/%s/%s' % (clean_base_path, symlink_value, suffix)
 
+            save_json({'restored_film_weight_path': args.film_model_weight_path},
+                      output_dated_folder, 'restored_from.json')
+
             checkpoint = torch.load(args.film_model_weight_path, map_location=device)
 
             if device != 'cpu':
