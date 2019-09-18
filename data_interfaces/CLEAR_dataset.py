@@ -206,6 +206,9 @@ class CLEAR_dataset(Dataset):
         if self.transforms:
             game_with_image = self.transforms(game_with_image)
 
+        if 'image_padding' not in game_with_image:
+            game_with_image['image_padding'] = torch.tensor([0, 0], dtype=torch.int)
+
         return game_with_image
 
     def is_raw_img(self):
