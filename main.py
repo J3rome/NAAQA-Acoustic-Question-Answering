@@ -57,6 +57,7 @@ parser.add_argument("--pad_to_largest_image", help="If set, images will be padde
                                                    "All input will have the same size.", action='store_true')
 parser.add_argument("--gamma_beta_path", type=str, default=None, help="Path where gamma_beta values are stored "
                                                                           "(when using --visualize_gamma_beta)")
+parser.add_argument("--no_early_stopping", help="Override the early stopping config", action='store_true')
 
 
 # Output parameters
@@ -359,6 +360,9 @@ def main(args):
         args.dict_file_path = "%s/%s/dict.json" % (data_path, args.dict_folder)
 
     film_model_config = get_config(args.config_path)
+
+    early_stopping = not args.no_early_stopping and film_model_config['early_stopping']['enable']
+    film_model_config['early_stopping']['enable'] =  early_stopping
 
     if create_output_folder:
         # TODO : See if this is optimal file structure
