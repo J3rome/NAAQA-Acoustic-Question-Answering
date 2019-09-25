@@ -185,11 +185,8 @@ def train_model(device, model, dataloaders, output_folder, criterion=None, optim
             'model_state_dict': model.get_cleaned_state_dict(),
             'optimizer_state_dict': optimizer.state_dict(),
             'loss': train_loss,
-            'rng_state': torch.get_rng_state(),
+            'rng_state': get_random_state(),
         }
-
-        if device != 'cpu':
-            checkpoint['rng_state_cuda'] = torch.cuda.get_rng_state()
 
         torch.save(checkpoint, '%s/model.pt.tar' % epoch_output_folder_path)
 
@@ -542,10 +539,7 @@ def main(args):
         if args.continue_training:
             optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
             start_epoch = checkpoint['epoch'] + 1
-            torch.set_rng_state(checkpoint['rng_state'])
-
-            if device != 'cpu' and 'rng_state_cuda' in checkpoint:
-                torch.cuda.set_rng_state(checkpoint['rng_state_cuda'])
+            set_random_state(checkpoint['rng_state'])
 
         # scheduler = torch.optim.lr_scheduler   # FIXME : Using a scheduler give the ability to decay only each N epoch.
 
