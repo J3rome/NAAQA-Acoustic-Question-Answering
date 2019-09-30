@@ -144,8 +144,9 @@ def train_model(device, model, dataloaders, output_folder, criterion=None, optim
 
     since = time.time()
 
-    # Early stopping
-    if model.early_stopping is not None:
+    # Early stopping (Only enable when we are running at least 20 epoch)
+    early_stopping = model.early_stopping is not None and nb_epoch > 20
+    if early_stopping:
         if type(model.early_stopping['wait_first_n_epoch']) == float:
             wait_first_n_epoch = int(nb_epoch * model.early_stopping['wait_first_n_epoch'])
         else:
@@ -223,7 +224,7 @@ def train_model(device, model, dataloaders, output_folder, criterion=None, optim
         print()
 
         # Early Stopping
-        if model.early_stopping is not None:
+        if early_stopping:
             if val_loss < best_val_loss - model.early_stopping['min_step']:
                 best_val_loss = val_loss
                 early_stop_counter = 0
