@@ -134,10 +134,10 @@ def set_inference(device, model, dataloader, output_folder, save_gamma_beta=True
 def train_model(device, model, dataloaders, output_folder, criterion=None, optimizer=None, scheduler=None,
                 nb_epoch=25, nb_epoch_to_keep=None, start_epoch=0, tensorboard_writers=None):
 
-    if tensorboard_writers:
-        assert 'train' in tensorboard_writers and 'val' in tensorboard_writers, 'Must provide all tensorboard writers.'
-    else:
+    if tensorboard_writers is None:
         tensorboard_writers = {'train': None, 'val': None}
+    else:
+        assert 'train' in tensorboard_writers and 'val' in tensorboard_writers, 'Must provide all tensorboard writers.'
 
     stats_file_path = "%s/stats.json" % output_folder
     removed_epoch = []
@@ -171,7 +171,7 @@ def train_model(device, model, dataloaders, output_folder, criterion=None, optim
         time_before_train = datetime.now()
         train_loss, train_acc, train_predictions = process_dataloader(True, device, model,
                                                                       dataloaders['train'],
-                                                                      criterion, optimizer, epoch_nb=epoch,
+                                                                      criterion, optimizer, epoch_id=epoch,
                                                                       tensorboard_writer=tensorboard_writers['train'],
                                                                       gamma_beta_path="%s/train_gamma_beta.h5" % epoch_output_folder_path)
         epoch_train_time = datetime.now() - time_before_train
@@ -179,7 +179,7 @@ def train_model(device, model, dataloaders, output_folder, criterion=None, optim
         print('\n{} Loss: {:.4f} Acc: {:.4f}'.format('Train', train_loss, train_acc))
 
         val_loss, val_acc, val_predictions = process_dataloader(False, device, model,
-                                                                dataloaders['val'], criterion, epoch_nb=epoch,
+                                                                dataloaders['val'], criterion, epoch_id=epoch,
                                                                 tensorboard_writer=tensorboard_writers['val'],
                                                                 gamma_beta_path="%s/val_gamma_beta.h5" % epoch_output_folder_path)
         print('\n{} Loss: {:.4f} Acc: {:.4f}'.format('Val', val_loss, val_acc))
@@ -245,7 +245,7 @@ def train_model(device, model, dataloaders, output_folder, criterion=None, optim
 
 
 def process_dataloader(is_training, device, model, dataloader, criterion=None, optimizer=None, gamma_beta_path=None,
-                       write_to_file_every=500, epoch_nb=0, tensorboard_writer=None):
+                       write_to_file_every=500, epoch_id=0, tensorboard_writer=None):
     # Model should already have been copied to the GPU at this point (If using GPU)
     assert (is_training and criterion is not None and optimizer is not None) or not is_training
 
@@ -318,8 +318,8 @@ def process_dataloader(is_training, device, model, dataloader, criterion=None, o
     epoch_loss = running_loss / dataset_size
     epoch_acc = running_corrects / dataset_size
 
-    tensorboard_writer.add_scalar('Results/Loss', epoch_loss, global_step=epoch_nb)
-    tensorboard_writer.add_scalar('Results/Accuracy', epoch_acc, global_step=epoch_nb)
+    tensorboard_writer.add_scalar('Results/Loss', epoch_loss, global_step=epoch_id)
+    tensorboard_writer.add_scalar('Results/Accuracy', epoch_acc, global_step=epoch_id)
 
     return epoch_loss, epoch_acc, processed_predictions
 
@@ -560,7 +560,7 @@ def main(args):
             # FIXME : For now we are ignoring TracerWarnings. Not sure the saved graph is 100% accurate...
             import warnings
             warnings.filterwarnings('ignore', category=torch.jit.TracerWarning)
-            
+
             # FIXME : Test on GPU
             dummy_input = [torch.ones(2, 22, dtype=torch.long),
                            torch.ones(2, 1, dtype=torch.long),
