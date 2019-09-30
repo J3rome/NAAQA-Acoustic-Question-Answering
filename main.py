@@ -67,6 +67,9 @@ parser.add_argument("--preprocessed_folder_name", type=str, default='preprocesse
 parser.add_argument("--dict_folder", type=str, default=None,
                     help="Directory where to store/retrieve generated dictionary. "
                          "If --dict_file_path is used, this will be ignored")
+parser.add_argument("--tensorboard_folder", type=str, default='tensorboard',
+                    help="Path where tensorboard data should be stored.")
+parser.add_argument("--tensorboard_save_graph", help="Save model graph to tensorboard", action='store_true')
 
 # Other parameters
 parser.add_argument("--nb_epoch", type=int, default=15, help="Nb of epoch for training")
@@ -129,7 +132,12 @@ def set_inference(device, model, dataloader, output_folder, save_gamma_beta=True
 
 
 def train_model(device, model, dataloaders, output_folder, criterion=None, optimizer=None, scheduler=None,
-                nb_epoch=25, nb_epoch_to_keep=None, start_epoch=0):
+                nb_epoch=25, nb_epoch_to_keep=None, start_epoch=0, tensorboard_writers=None):
+
+    if tensorboard_writers:
+        assert 'train' in tensorboard_writers and 'val' in tensorboard_writers, 'Must provide all tensorboard writers.'
+    else:
+        tensorboard_writers = {'train': None, 'val': None}
 
     stats_file_path = "%s/stats.json" % output_folder
     removed_epoch = []
@@ -152,6 +160,8 @@ def train_model(device, model, dataloaders, output_folder, criterion=None, optim
         best_val_loss = 9999
         early_stop_counter = 0
 
+    # TODO : Write hyperparams to tensorboard
+
     for epoch in range(start_epoch, start_epoch + nb_epoch):
         epoch_output_folder_path = "%s/Epoch_%.2d" % (output_folder, epoch)
         create_folder_if_necessary(epoch_output_folder_path)
@@ -161,14 +171,16 @@ def train_model(device, model, dataloaders, output_folder, criterion=None, optim
         time_before_train = datetime.now()
         train_loss, train_acc, train_predictions = process_dataloader(True, device, model,
                                                                       dataloaders['train'],
-                                                                      criterion, optimizer,
+                                                                      criterion, optimizer, epoch_nb=epoch,
+                                                                      tensorboard_writer=tensorboard_writers['train'],
                                                                       gamma_beta_path="%s/train_gamma_beta.h5" % epoch_output_folder_path)
         epoch_train_time = datetime.now() - time_before_train
 
         print('\n{} Loss: {:.4f} Acc: {:.4f}'.format('Train', train_loss, train_acc))
 
         val_loss, val_acc, val_predictions = process_dataloader(False, device, model,
-                                                                dataloaders['val'], criterion,
+                                                                dataloaders['val'], criterion, epoch_nb=epoch,
+                                                                tensorboard_writer=tensorboard_writers['val'],
                                                                 gamma_beta_path="%s/val_gamma_beta.h5" % epoch_output_folder_path)
         print('\n{} Loss: {:.4f} Acc: {:.4f}'.format('Val', val_loss, val_acc))
 
@@ -233,7 +245,7 @@ def train_model(device, model, dataloaders, output_folder, criterion=None, optim
 
 
 def process_dataloader(is_training, device, model, dataloader, criterion=None, optimizer=None, gamma_beta_path=None,
-                       write_to_file_every=500):
+                       write_to_file_every=500, epoch_nb=0, tensorboard_writer=None):
     # Model should already have been copied to the GPU at this point (If using GPU)
     assert (is_training and criterion is not None and optimizer is not None) or not is_training
 
@@ -268,7 +280,7 @@ def process_dataloader(is_training, device, model, dataloader, criterion=None, o
             optimizer.zero_grad()
 
         with torch.set_grad_enabled(is_training):
-            outputs, outputs_softmax = model(questions, seq_lengths, images)
+            outputs, outputs_softmax = model(questions, seq_lengths, images, pack_sequence=True)
             _, preds = torch.max(outputs, 1)
             if criterion:
                 loss = criterion(outputs, answers)
@@ -305,6 +317,9 @@ def process_dataloader(is_training, device, model, dataloader, criterion=None, o
 
     epoch_loss = running_loss / dataset_size
     epoch_acc = running_corrects / dataset_size
+
+    tensorboard_writer.add_scalar('Results/Loss', epoch_loss, global_step=epoch_nb)
+    tensorboard_writer.add_scalar('Results/Accuracy', epoch_acc, global_step=epoch_nb)
 
     return epoch_loss, epoch_acc, processed_predictions
 
@@ -392,6 +407,19 @@ def main(args):
 
             # Copy dictionary file used
             shutil.copyfile(args.dict_file_path, "%s/dict.json" % output_dated_folder)
+
+    if use_tensorboard:
+        # FIXME : What happen with test set? I guess we don't really care, we got our own visualisations for test run
+        # Create tensorboard writer
+        base_writer_path = '%s/%s/%s' % (args.tensorboard_folder, args.version_name, current_datetime_str)
+
+        # TODO : Add 'comment' param with more infos on run. Ex : Raw vs Conv
+        tensorboard_writers = {
+            'train': SummaryWriter('%s/train' % base_writer_path),
+            'val': SummaryWriter('%s/val' % base_writer_path)
+        }
+    else:
+        tensorboard_writers = None
 
     if args.no_img_resize or film_model_config['input']['type'].lower() != 'raw':
         args.raw_img_resize_height = None
@@ -528,6 +556,17 @@ def main(args):
             summary(film_model, [(22,), (1,), input_image_torch_shape], device=device)
             set_random_state(random_state)
 
+        if use_tensorboard and args.tensorboard_save_graph:
+            # FIXME : For now we are ignoring TracerWarnings. Not sure the saved graph is 100% accurate...
+            import warnings
+            warnings.filterwarnings('ignore', category=torch.jit.TracerWarning)
+            
+            # FIXME : Test on GPU
+            dummy_input = [torch.ones(2, 22, dtype=torch.long),
+                           torch.ones(2, 1, dtype=torch.long),
+                           torch.ones(2, *input_image_torch_shape, dtype=torch.float)]
+            tensorboard_writers['train'].add_graph(film_model, dummy_input)
+
     if task == "train_film":
         trainable_parameters = filter(lambda p: p.requires_grad, film_model.parameters())
 
@@ -546,7 +585,7 @@ def main(args):
         train_model(device=device, model=film_model, dataloaders={'train': train_dataloader, 'val': val_dataloader},
                     output_folder=output_dated_folder, criterion=nn.CrossEntropyLoss(), optimizer=optimizer,
                     nb_epoch=args.nb_epoch, nb_epoch_to_keep=args.nb_epoch_stats_to_keep,
-                    start_epoch=start_epoch)
+                    start_epoch=start_epoch, tensorboard_writers=tensorboard_writers)
 
     elif task == "inference":
         set_inference(device=device, model=film_model, dataloader=test_dataloader, output_folder=output_dated_folder)
@@ -568,6 +607,10 @@ def main(args):
     elif task == "visualize_grad_cam":
         grad_cam_visualization(device=device, model=film_model, dataloader=train_dataloader,
                                output_folder=output_dated_folder)
+
+    if tensorboard_writers:
+        for key, writer in tensorboard_writers.items():
+            writer.close()
 
     time_elapsed = str(datetime.now() - current_datetime)
 

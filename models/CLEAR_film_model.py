@@ -232,7 +232,7 @@ class CLEAR_FiLM_model(nn.Module):
 
         self.softmax = nn.Softmax(dim=1)
 
-    def forward(self, question, question_lengths, input_image, pack_sequence=True):
+    def forward(self, question, question_lengths, input_image, pack_sequence=False):
         # Question Pipeline
         word_emb = self.word_emb(question)
 
