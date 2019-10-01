@@ -320,7 +320,10 @@ class CLEARTokenizer:
             tokens.append(self.word2i[token])
         return tokens
 
-    def decode_question(self, tokens):
+    def decode_question(self, tokens, remove_padding=False):
+        if remove_padding:
+            tokens = [tok for tok in tokens if tok != self.padding_token]
+
         return ' '.join([self.i2word[tok] for tok in tokens])
 
     def encode_answer(self, answer):
