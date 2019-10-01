@@ -262,6 +262,7 @@ def process_dataloader(is_training, device, model, dataloader, criterion=None, o
 
     processed_predictions = []
     processed_gammas_betas = []
+    all_questions = []
     nb_written = 0
 
     for batch_idx, batch in enumerate(tqdm(dataloader)):
@@ -297,6 +298,12 @@ def process_dataloader(is_training, device, model, dataloader, criterion=None, o
 
         processed_predictions += batch_processed_predictions
 
+        # TODO : Add config to log only specific things
+        if tensorboard_writer:
+            # TODO : Tag img before adding to tensorboard ? -- This can be done via .add_image_with_boxes()
+            tensorboard_writer.add_images('Inputs/images', batch['image'], epoch_id)
+            all_questions += batch['question'].tolist()
+
         if gamma_beta_path is not None:
             gammas, betas = model.get_gammas_betas()
             processed_gammas_betas += process_gamma_beta(batch_processed_predictions, gammas, betas)
@@ -319,8 +326,20 @@ def process_dataloader(is_training, device, model, dataloader, criterion=None, o
     epoch_loss = running_loss / dataset_size
     epoch_acc = running_corrects / dataset_size
 
-    tensorboard_writer.add_scalar('Results/Loss', epoch_loss, global_step=epoch_id)
-    tensorboard_writer.add_scalar('Results/Accuracy', epoch_acc, global_step=epoch_id)
+    # TODO : Add config to log only specific things
+    if tensorboard_writer:
+        log_text = ""
+        for question, processed_prediction in zip(all_questions, processed_predictions):
+            # FIXME: Tokenizer might not be instantiated --- We probably wouldn't be logging in tensorboard..
+            decoded_question = dataloader.dataset.tokenizer.decode_question(question, remove_padding=True)
+            log_text += f"{processed_prediction['correct']}//{processed_prediction['correct_answer_family']} "
+            log_text += f"{decoded_question} -- {processed_prediction['ground_truth']} "
+            log_text += f"[[{processed_prediction['prediction']} - {processed_prediction['confidence']}]]  \n"
+
+        tensorboard_writer.add_text('Inputs/Text', log_text, epoch_id)
+
+        tensorboard_writer.add_scalar('Results/Loss', epoch_loss, global_step=epoch_id)
+        tensorboard_writer.add_scalar('Results/Accuracy', epoch_acc, global_step=epoch_id)
 
     return epoch_loss, epoch_acc, processed_predictions
 
