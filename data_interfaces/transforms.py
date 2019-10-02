@@ -49,7 +49,7 @@ class ResizeImg(object):
 
 
 class ResizeImgBasedOnHeight(object):
-    """ Resize PIL image to 'output_shape' """
+    """ Resize PIL image to 'output_height' while keeping image ration """
     def __init__(self, output_height):
         self.output_height = output_height
 
@@ -58,6 +58,20 @@ class ResizeImgBasedOnHeight(object):
 
         if output_width + self.output_height != sample['image'].width + sample['image'].height:
             sample['image'] = vis_F.resize(sample['image'], (self.output_height, output_width))
+
+        return sample
+
+
+class ResizeImgBasedOnWidth(object):
+    """ Resize PIL image to 'output_width' while keeping image ration"""
+    def __init__(self, output_width):
+        self.output_width = output_width
+
+    def __call__(self, sample):
+        output_height = int(self.output_width * sample['image'].height / sample['image'].width)
+
+        if output_height + self.output_width != sample['image'].height + sample['image'].width:
+            sample['image'] = vis_F.resize(sample['image'], (output_height, self.output_width))
 
         return sample
 
