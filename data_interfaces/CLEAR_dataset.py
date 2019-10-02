@@ -10,7 +10,7 @@ from torchvision import transforms
 
 from data_interfaces.CLEAR_image_loader import get_img_builder, CLEARImage
 from utils import read_json, get_size_from_image_header
-from data_interfaces.transforms import ResizeImgBasedOnHeight
+from data_interfaces.transforms import ResizeImgBasedOnHeight, ResizeImgBasedOnWidth
 
 import multiprocessing
 import ctypes
@@ -151,15 +151,20 @@ class CLEAR_dataset(Dataset):
 
         return self.scenes[scene_id]['question_idx'][0]
 
-    def get_resized_height(self):
-        height = None
+    def get_resize_config(self):
+        value = None
+        resize_type = None
 
         if self.transforms:
             for transform in self.transforms.transforms:
                 if type(transform) is ResizeImgBasedOnHeight:
-                    height = transform.output_height
+                    value = transform.output_height
+                    resize_type = 'height'
+                elif type(transform) is ResizeImgBasedOnWidth:
+                    value = transform.output_width
+                    resize_type = 'width'
 
-        return height
+        return value, resize_type
 
     def get_min_width_image_dims(self, return_scene_id=False):
         return self._get_minmax_width_image_dims(return_scene_id, minmax_fct=min)
@@ -178,11 +183,15 @@ class CLEAR_dataset(Dataset):
         else:
             to_return = tuple()
 
-        resize_height = self.get_resized_height()
+        resized_val, resized_dim = self.get_resize_config()
 
-        if resize_height:
-            max_width = int(resize_height * max_width / height)
-            height = resize_height
+        if resized_val:
+            if resized_dim == 'height':
+                max_width = int(resized_val * max_width / height)
+                height = resized_val
+            elif resized_dim == 'width':
+                height = int(resized_val * height / max_width)
+                max_width = resized_val
 
         return to_return + (height, max_width)
 

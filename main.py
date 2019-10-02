@@ -16,7 +16,7 @@ from preprocessing import create_dict_from_questions, extract_features
 # NEW IMPORTS
 from models.CLEAR_film_model import CLEAR_FiLM_model
 from data_interfaces.CLEAR_dataset import CLEAR_dataset, CLEAR_collate_fct
-from data_interfaces.transforms import ToTensor, ImgBetweenZeroOne, ResizeImgBasedOnHeight, PadTensor
+from data_interfaces.transforms import ToTensor, ImgBetweenZeroOne, ResizeImgBasedOnHeight, ResizeImgBasedOnWidth, PadTensor
 from models.torchsummary import summary     # Custom version of torchsummary to fix bugs with input
 import torch
 import time
@@ -49,9 +49,18 @@ parser.add_argument("--normalize_with_imagenet_stats", help="Will normalize inpu
 parser.add_argument("--normalize_with_clear_stats", help="Will normalize input images according to"
                                                          "CLEAR mean & std (Only with RAW input)", action='store_true')
 parser.add_argument("--no_img_resize", help="Disable RAW image resizing", action='store_true')
-parser.add_argument("--raw_img_resize_height", type=int, default=300,
+parser.add_argument("--raw_img_resize_val", type=int, default=224,
                     help="Specify the size to which the image will be resized (when working with RAW img)"
                          "The width is calculated according to the height in order to keep the ratio")
+parser.add_argument("--raw_img_resize_based_on_height", action='store_true',
+                    help="If set (with --raw_img_resize_val), the width of the image will be calculated according to "
+                         "the height in order to keep the ratio. [Default option if neither "
+                         "--raw_img_resize_based_on_height and --raw_img_resize_based_on_width are set]")
+parser.add_argument("--raw_img_resize_based_on_width", action='store_true',
+                    help="If set (with --raw_img_resize_val), the height of the image will be calculated according to "
+                         "the width in order to keep the ratio")
+
+
 parser.add_argument("--keep_image_range", help="Will NOT scale the image between 0-1 (RAW img)", action='store_true')
 parser.add_argument("--pad_to_largest_image", help="If set, images will be padded to meet the largest image in the set."
                                                    "All input will have the same size.", action='store_true')
@@ -359,6 +368,10 @@ def main(args):
         "[ERROR] Can only do one task at a time " \
         "(--training, --inference, --visualize_gamma_beta, --create_dict, --feature_extract)"
 
+    mutually_exclusive_params = [args.raw_img_resize_based_on_height, args.raw_img_resize_based_on_width]
+    assert sum(mutually_exclusive_params) < 2, "[ERROR] Image resize can be either --raw_img_resize_based_on_height " \
+                                               "or --raw_img_resize_based_on_width but not both"
+
     if args.training:
         task = "train_film"
     elif args.inference:
@@ -447,7 +460,7 @@ def main(args):
         tensorboard_writers = None
 
     if args.no_img_resize or film_model_config['input']['type'].lower() != 'raw':
-        args.raw_img_resize_height = None
+        args.raw_img_resize_val = None
 
     device = 'cuda:0' if torch.cuda.is_available() and not args.use_cpu else 'cpu'
     print("Using device '%s'" % device)
@@ -466,8 +479,13 @@ def main(args):
     if film_model_config['input']['type'] == 'raw':
         feature_extractor_config = {'version': 101, 'layer_index': 6}   # Idx 6 -> Block3/unit22
 
-        if args.raw_img_resize_height:
-            transforms_list.append(ResizeImgBasedOnHeight(args.raw_img_resize_height))
+        if args.raw_img_resize_val:
+            if args.raw_img_resize_based_on_width:
+                resize_transform = ResizeImgBasedOnWidth
+            else:
+                # By default, we resize according to height
+                resize_transform = ResizeImgBasedOnHeight
+            transforms_list.append(resize_transform(args.raw_img_resize_val))
 
         # TODO : Add data augmentation ?
 
