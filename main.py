@@ -302,8 +302,11 @@ def process_dataloader(is_training, device, model, dataloader, criterion=None, o
 
         # TODO : Add config to log only specific things
         if tensorboard_writer:
-            # TODO : Tag img before adding to tensorboard ? -- This can be done via .add_image_with_boxes()
-            tensorboard_writer.add_images('Inputs/images', batch['image'], epoch_id)
+            # FIXME: Find a way to show original input images in tensorboard (Could save a list of scene ids and add them to tensorboard after the epoch, check performance cost -- Image loading etc)
+            if dataloader.dataset.is_raw_img():
+                # TODO : Tag img before adding to tensorboard ? -- This can be done via .add_image_with_boxes()
+                tensorboard_writer.add_images('Inputs/images', batch['image'], epoch_id)
+
             all_questions += batch['question'].tolist()
 
         if gamma_beta_path is not None:
@@ -499,25 +502,26 @@ def main(args):
     #                             dict_file_path=args.dict_file_path,
     #                             transforms=transforms.Compose(transforms_list + [ToTensor()]))
 
-    max_train_img_dims = train_dataset.get_max_width_image_dims()
-    max_val_img_dims = val_dataset.get_max_width_image_dims()
-    max_test_img_dims = test_dataset.get_max_width_image_dims()
+    if args.pad_to_largest_image or args.force_square_images:
+        # We need the dataset object to retrieve images dims so we have to manually add transforms
+        max_train_img_dims = train_dataset.get_max_width_image_dims()
+        max_val_img_dims = val_dataset.get_max_width_image_dims()
+        max_test_img_dims = test_dataset.get_max_width_image_dims()
 
-    # We need the dataset object to retrieve images dims so we have to manually add transforms
-    if args.pad_to_largest_image:
-        train_dataset.add_transform(PadTensor(max_train_img_dims))
-        val_dataset.add_transform(PadTensor(max_val_img_dims))
-        test_dataset.add_transform(PadTensor(max_test_img_dims))
+        if args.pad_to_largest_image:
+            train_dataset.add_transform(PadTensor(max_train_img_dims))
+            val_dataset.add_transform(PadTensor(max_val_img_dims))
+            test_dataset.add_transform(PadTensor(max_test_img_dims))
 
-    if args.force_square_images:
-        biggest_dim = max(max_train_img_dims)
-        train_dataset.add_transform(PadTensor((biggest_dim, biggest_dim)))
+        if args.force_square_images:
+            biggest_dim = max(max_train_img_dims)
+            train_dataset.add_transform(PadTensor((biggest_dim, biggest_dim)))
 
-        biggest_dim = max(max_val_img_dims)
-        val_dataset.add_transform(PadTensor((biggest_dim, biggest_dim)))
+            biggest_dim = max(max_val_img_dims)
+            val_dataset.add_transform(PadTensor((biggest_dim, biggest_dim)))
 
-        biggest_dim = max(max_test_img_dims)
-        test_dataset.add_transform(PadTensor((biggest_dim, biggest_dim)))
+            biggest_dim = max(max_test_img_dims)
+            test_dataset.add_transform(PadTensor((biggest_dim, biggest_dim)))
 
 
     print("Creating Dataloaders")
