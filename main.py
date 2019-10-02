@@ -55,6 +55,8 @@ parser.add_argument("--raw_img_resize_height", type=int, default=300,
 parser.add_argument("--keep_image_range", help="Will NOT scale the image between 0-1 (RAW img)", action='store_true')
 parser.add_argument("--pad_to_largest_image", help="If set, images will be padded to meet the largest image in the set."
                                                    "All input will have the same size.", action='store_true')
+parser.add_argument("--force_square_images", help="If set, all images will be padded to make them square",
+                    action='store_true')
 parser.add_argument("--gamma_beta_path", type=str, default=None, help="Path where gamma_beta values are stored "
                                                                           "(when using --visualize_gamma_beta)")
 parser.add_argument("--no_early_stopping", help="Override the early stopping config", action='store_true')
@@ -497,17 +499,28 @@ def main(args):
     #                             dict_file_path=args.dict_file_path,
     #                             transforms=transforms.Compose(transforms_list + [ToTensor()]))
 
-    print("Creating Dataloaders")
+    max_train_img_dims = train_dataset.get_max_width_image_dims()
+    max_val_img_dims = val_dataset.get_max_width_image_dims()
+    max_test_img_dims = test_dataset.get_max_width_image_dims()
+
+    # We need the dataset object to retrieve images dims so we have to manually add transforms
     if args.pad_to_largest_image:
-        max_train_img_dims = train_dataset.get_max_width_image_dims()
         train_dataset.add_transform(PadTensor(max_train_img_dims))
-
-        max_val_img_dims = val_dataset.get_max_width_image_dims()
         val_dataset.add_transform(PadTensor(max_val_img_dims))
-
-        max_test_img_dims = test_dataset.get_max_width_image_dims()
         test_dataset.add_transform(PadTensor(max_test_img_dims))
 
+    if args.force_square_images:
+        biggest_dim = max(max_train_img_dims)
+        train_dataset.add_transform(PadTensor((biggest_dim, biggest_dim)))
+
+        biggest_dim = max(max_val_img_dims)
+        val_dataset.add_transform(PadTensor((biggest_dim, biggest_dim)))
+
+        biggest_dim = max(max_test_img_dims)
+        test_dataset.add_transform(PadTensor((biggest_dim, biggest_dim)))
+
+
+    print("Creating Dataloaders")
     collate_fct = CLEAR_collate_fct(padding_token=train_dataset.get_padding_token())
 
     train_dataloader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True,
