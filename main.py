@@ -434,7 +434,6 @@ def main(args):
         create_folder_if_necessary(output_task_folder)
         create_folder_if_necessary(output_experiment_folder)
         create_folder_if_necessary(output_dated_folder)
-        create_symlink_to_latest_folder(output_experiment_folder, current_datetime_str)
 
         # Save arguments & config to output folder
         save_json(args, output_dated_folder, filename="arguments.json")
@@ -621,6 +620,9 @@ def main(args):
                            torch.ones(2, 1, dtype=torch.long),
                            torch.ones(2, *input_image_torch_shape, dtype=torch.float)]
             tensorboard_writers['train'].add_graph(film_model, dummy_input)
+
+    if create_output_folder:
+        create_symlink_to_latest_folder(output_experiment_folder, current_datetime_str)
 
     if task == "train_film":
         trainable_parameters = filter(lambda p: p.requires_grad, film_model.parameters())
