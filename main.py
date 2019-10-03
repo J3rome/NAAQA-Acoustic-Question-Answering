@@ -409,20 +409,6 @@ def main(args):
     if args.dict_file_path is None:
         args.dict_file_path = "%s/%s/dict.json" % (data_path, args.dict_folder)
 
-    if args.film_model_weight_path is not None:
-        # If path specified is a date, we construct the path to the best model weights for the specified run
-        base_path = "%s/train_film/%s/%s" % (args.output_root_path, args.version_name, args.film_model_weight_path)
-        suffix = "best/model.pt.tar"  # Note : We might redo some epoch when continuing training because the 'best' epoch is not necessarely the last
-
-        if is_date_string(args.film_model_weight_path):
-            args.film_model_weight_path = "%s/%s" % (base_path, suffix)
-        elif args.film_model_weight_path == 'latest':
-            # The 'latest' symlink will be overriden by this run (If continuing training).
-            # Use real path of latest experiment
-            symlink_value = os.readlink(base_path)
-            clean_base_path = base_path[:-(len(args.film_model_weight_path) + 1)]
-            args.film_model_weight_path = '%s/%s/%s' % (clean_base_path, symlink_value, suffix)
-
     film_model_config = get_config(args.config_path)
 
     early_stopping = not args.no_early_stopping and film_model_config['early_stopping']['enable']
@@ -579,6 +565,20 @@ def main(args):
         if restore_model_weights:
             assert args.film_model_weight_path is not None, 'Must provide path to model weights to ' \
                                                             'do inference or to continue training.'
+
+            # If path specified is a date, we construct the path to the best model weights for the specified run
+            base_path = "%s/train_film/%s/%s" % (args.output_root_path, args.version_name, args.film_model_weight_path)
+            # Note : We might redo some epoch when continuing training because the 'best' epoch is not necessarely the last
+            suffix = "best/model.pt.tar"
+
+            if is_date_string(args.film_model_weight_path):
+                args.film_model_weight_path = "%s/%s" % (base_path, suffix)
+            elif args.film_model_weight_path == 'latest':
+                # The 'latest' symlink will be overriden by this run (If continuing training).
+                # Use real path of latest experiment
+                symlink_value = os.readlink(base_path)
+                clean_base_path = base_path[:-(len(args.film_model_weight_path) + 1)]
+                args.film_model_weight_path = '%s/%s/%s' % (clean_base_path, symlink_value, suffix)
 
             save_json({'restored_film_weight_path': args.film_model_weight_path},
                       output_dated_folder, 'restored_from.json')
