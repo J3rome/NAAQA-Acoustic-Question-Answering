@@ -180,13 +180,12 @@ def train_model(device, model, dataloaders, output_folder, criterion=None, optim
         print('Epoch {}/{}'.format(epoch, start_epoch + nb_epoch - 1))
         print('-' * 10)
 
-        time_before_train = datetime.now()
+        epoch_time = datetime.now()
         train_loss, train_acc, train_predictions = process_dataloader(True, device, model,
                                                                       dataloaders['train'],
                                                                       criterion, optimizer, epoch_id=epoch,
                                                                       tensorboard_writer=tensorboard_writers['train'],
                                                                       gamma_beta_path="%s/train_gamma_beta.h5" % epoch_output_folder_path)
-        epoch_train_time = datetime.now() - time_before_train
 
         print('\n{} Loss: {:.4f} Acc: {:.4f}'.format('Train', train_loss, train_acc))
 
@@ -200,8 +199,6 @@ def train_model(device, model, dataloaders, output_folder, criterion=None, optim
 
         save_json(train_predictions, epoch_output_folder_path, filename="train_predictions.json")
         save_json(val_predictions, epoch_output_folder_path, filename="val_predictions.json")
-
-        print("Training took %s" % str(epoch_train_time))
 
         # Save training weights
         checkpoint = {
@@ -225,6 +222,8 @@ def train_model(device, model, dataloaders, output_folder, criterion=None, optim
                     removed_epoch.append(epoch_stat['epoch'])
 
                     shutil.rmtree("%s/%s" % (output_folder, epoch_stat['epoch']))
+
+        print("Epoch took %s" % str(datetime.now() - epoch_time))
 
         # Create a symlink to best epoch output folder
         best_epoch = sorted_stats[0]
