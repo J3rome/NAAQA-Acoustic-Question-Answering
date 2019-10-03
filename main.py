@@ -587,11 +587,11 @@ def main(args):
             checkpoint = torch.load(args.film_model_weight_path, map_location=device)
 
             if device != 'cpu':
-                if 'rng_state' in checkpoint:
-                    checkpoint['rng_state'] = checkpoint['rng_state'].cpu()
+                if 'torch' in checkpoint['rng_state']:
+                    checkpoint['rng_state']['torch'] = checkpoint['rng_state']['torch'].cpu()
 
-                if 'rng_state_cuda' in checkpoint:
-                    checkpoint['rng_state_cuda'] = checkpoint['rng_state_cuda'].cpu()
+                if 'torch_cuda' in checkpoint['rng_state']:
+                    checkpoint['rng_state']['torch_cuda'] = checkpoint['rng_state']['torch_cuda'].cpu()
 
             # We need non-strict because feature extractor weight are not included in the saved state dict
             film_model.load_state_dict(checkpoint['model_state_dict'], strict=False)
