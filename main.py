@@ -168,6 +168,7 @@ def train_model(device, model, dataloaders, output_folder, criterion=None, optim
         else:
             stop_threshold = model.early_stopping['stop_threshold']
 
+        wait_first_n_epoch += start_epoch           # Apply grace period even when continuing training
         stop_threshold = max(stop_threshold, 1)
         best_val_loss = 9999
         early_stop_counter = 0
