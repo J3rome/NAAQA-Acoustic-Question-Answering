@@ -16,7 +16,7 @@ from preprocessing import create_dict_from_questions, extract_features
 # NEW IMPORTS
 from models.CLEAR_film_model import CLEAR_FiLM_model
 from data_interfaces.CLEAR_dataset import CLEAR_dataset, CLEAR_collate_fct
-from data_interfaces.transforms import ToTensor, ImgBetweenZeroOne, ResizeImgBasedOnHeight, ResizeImgBasedOnWidth, PadTensor
+from data_interfaces.transforms import ToTensor, ImgBetweenZeroOne, ResizeImgBasedOnHeight, ResizeImgBasedOnWidth, PadTensor, NormalizeSample
 from models.torchsummary import summary     # Custom version of torchsummary to fix bugs with input
 import torch
 import time
@@ -478,7 +478,7 @@ def main(args):
 
         if args.normalize_with_imagenet_stats:
             imagenet_stats = film_model_config['feature_extractor']['imagenet_stats']
-            transforms_list.append(transforms.Normalize(mean=imagenet_stats['mean'], std=imagenet_stats['std']))
+            transforms_list.append(NormalizeSample(mean=imagenet_stats['mean'], std=imagenet_stats['std'], inplace=True))
         elif args.normalize_with_clear_stats:
             assert False, "Normalization with CLEAR stats not implemented"
 

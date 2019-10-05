@@ -91,3 +91,36 @@ class PadTensor(object):
         sample['image_padding'] = torch.tensor([height_to_pad, width_to_pad], dtype=torch.int)
 
         return sample
+
+
+class NormalizeSample(object):
+    """Normalize a tensor image with mean and standard deviation.
+    Given mean: ``(M1,...,Mn)`` and std: ``(S1,..,Sn)`` for ``n`` channels, this transform
+    will normalize each channel of the input ``torch.*Tensor`` i.e.
+    ``input[channel] = (input[channel] - mean[channel]) / std[channel]``
+
+    .. note::
+        This transform acts out of place, i.e., it does not mutates the input tensor.
+
+    Args:
+        mean (sequence): Sequence of means for each channel.
+        std (sequence): Sequence of standard deviations for each channel.
+    """
+
+    def __init__(self, mean, std, inplace=False):
+        self.mean = mean
+        self.std = std
+        self.inplace = inplace      # FIXME : Not sure about inplace
+
+    def __call__(self, sample):
+        """
+        Args:
+            sample (Dict): Dict containing a Tensor image of size (C, H, W) to be normalized (Key is 'image').
+
+        Returns:
+            Tensor: Normalized Tensor image.
+        """
+
+        sample['image'] = vis_F.normalize(sample['image'], self.mean, self.std, self.inplace)
+
+        return sample
