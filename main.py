@@ -75,6 +75,8 @@ parser.add_argument("--no_early_stopping", help="Override the early stopping con
 parser.add_argument("--output_root_path", type=str, default='output', help="Directory with image")
 parser.add_argument("--preprocessed_folder_name", type=str, default='preprocessed',
                     help="Directory where to store/are stored extracted features and token dictionary")
+parser.add_argument("--output_name_suffix", type=str, default='', help="Suffix that will be appended to the version "
+                                                                       "name (output & tensorboard)")
 parser.add_argument("--dict_folder", type=str, default=None,
                     help="Directory where to store/retrieve generated dictionary. "
                          "If --dict_file_path is used, this will be ignored")
@@ -385,7 +387,8 @@ def main(args):
     elif args.create_dict:
         task = "create_dict"
 
-    print("Task '%s' for version '%s'\n" % (task.replace('_', ' ').title(), args.version_name))
+    output_name = args.version_name + "_" + args.output_name_suffix if args.output_name_suffix else args.version_name
+    print("Task '%s' for version '%s'\n" % (task.replace('_', ' ').title(), output_name))
 
     if args.random_seed is not None:
         set_random_seed(args.random_seed)
@@ -394,7 +397,7 @@ def main(args):
     data_path = "%s/%s" % (args.data_root_path, args.version_name)
 
     output_task_folder = "%s/%s" % (args.output_root_path, task)
-    output_experiment_folder = "%s/%s" %(output_task_folder, args.version_name)
+    output_experiment_folder = "%s/%s" % (output_task_folder, output_name)
     current_datetime = datetime.now()
     current_datetime_str = current_datetime.strftime("%Y-%m-%d_%Hh%M")
     output_dated_folder = "%s/%s" % (output_experiment_folder, current_datetime_str)
@@ -434,7 +437,7 @@ def main(args):
     if use_tensorboard:
         # FIXME : What happen with test set? I guess we don't really care, we got our own visualisations for test run
         # Create tensorboard writer
-        base_writer_path = '%s/%s/%s' % (args.tensorboard_folder, args.version_name, current_datetime_str)
+        base_writer_path = '%s/%s/%s' % (args.tensorboard_folder, output_name, current_datetime_str)
 
         # TODO : Add 'comment' param with more infos on run. Ex : Raw vs Conv
         tensorboard_writers = {
@@ -567,7 +570,7 @@ def main(args):
                                                             'do inference or to continue training.'
 
             # If path specified is a date, we construct the path to the best model weights for the specified run
-            base_path = "%s/train_film/%s/%s" % (args.output_root_path, args.version_name, args.film_model_weight_path)
+            base_path = "%s/train_film/%s/%s" % (args.output_root_path, output_name, args.film_model_weight_path)
             # Note : We might redo some epoch when continuing training because the 'best' epoch is not necessarely the last
             suffix = "best/model.pt.tar"
 
