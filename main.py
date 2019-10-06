@@ -508,15 +508,18 @@ def main(args):
     print("Creating Datasets")
     train_dataset = CLEAR_dataset(args.data_root_path, args.version_name, film_model_config['input'], 'train',
                                   dict_file_path=args.dict_file_path, transforms=transforms_to_apply,
-                                  tokenize_text=not args.create_dict)
+                                  tokenize_text=not args.create_dict,
+                                  preprocessed_folder_name=args.preprocessed_folder_name)
 
     val_dataset = CLEAR_dataset(args.data_root_path, args.version_name, film_model_config['input'], 'val',
                                 dict_file_path=args.dict_file_path, transforms=transforms_to_apply,
-                                tokenize_text=not args.create_dict)
+                                tokenize_text=not args.create_dict,
+                                preprocessed_folder_name=args.preprocessed_folder_name)
 
     test_dataset = CLEAR_dataset(args.data_root_path, args.version_name, film_model_config['input'], 'test',
                                  dict_file_path=args.dict_file_path, transforms=transforms_to_apply,
-                                 tokenize_text=not args.create_dict)
+                                 tokenize_text=not args.create_dict,
+                                 preprocessed_folder_name=args.preprocessed_folder_name)
 
     #trickytest_dataset = CLEAR_dataset(data_path, film_model_config['input'], 'trickytest',
     #                             dict_file_path=args.dict_file_path,
