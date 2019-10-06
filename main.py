@@ -363,9 +363,8 @@ def process_dataloader(is_training, device, model, dataloader, criterion=None, o
     return epoch_loss, epoch_acc, processed_predictions
 
 
-def main(args):
-
-    # Parameter validation
+def validate_arguments(args):
+    
     mutually_exclusive_params = [args.training, args.inference, args.feature_extract,
                                  args.create_dict, args.visualize_gamma_beta, args.visualize_grad_cam]
 
@@ -377,18 +376,30 @@ def main(args):
     assert sum(mutually_exclusive_params) < 2, "[ERROR] Image resize can be either --raw_img_resize_based_on_height " \
                                                "or --raw_img_resize_based_on_width but not both"
 
+    mutually_exclusive_params = [args.pad_to_square_images, args.resize_to_square_images]
+    assert sum(mutually_exclusive_params) < 2, "[ERROR] Can either --pad_to_square_images or --resize_to_square_images"
+
+
+def get_task_from_args(args):
     if args.training:
-        task = "train_film"
+        return "train_film"
     elif args.inference:
-        task = "inference"
+        return "inference"
     elif args.visualize_gamma_beta:
-        task = "visualize_gamma_beta"
+        return "visualize_gamma_beta"
     elif args.visualize_grad_cam:
-        task = "visualize_grad_cam"
+        return "visualize_grad_cam"
     elif args.feature_extract:
-        task = "feature_extract"
+        return "feature_extract"
     elif args.create_dict:
-        task = "create_dict"
+        return "create_dict"
+
+    assert False, "Arguments don't specify task"
+
+def main(args):
+    # Parameter validation
+    validate_arguments(args)
+    task = get_task_from_args(args)
 
     output_name = args.version_name + "_" + args.output_name_suffix if args.output_name_suffix else args.version_name
     print("Task '%s' for version '%s'\n" % (task.replace('_', ' ').title(), output_name))
