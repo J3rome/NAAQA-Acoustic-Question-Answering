@@ -16,7 +16,7 @@ from preprocessing import create_dict_from_questions, extract_features
 # NEW IMPORTS
 from models.CLEAR_film_model import CLEAR_FiLM_model
 from data_interfaces.CLEAR_dataset import CLEAR_dataset, CLEAR_collate_fct
-from data_interfaces.transforms import ToTensor, ImgBetweenZeroOne, ResizeImgBasedOnHeight, ResizeImgBasedOnWidth, PadTensor, NormalizeSample
+from data_interfaces.transforms import ToTensor, ImgBetweenZeroOne, ResizeImgBasedOnHeight, ResizeImgBasedOnWidth, PadTensor, NormalizeSample, ResizeTensor
 from models.torchsummary import summary     # Custom version of torchsummary to fix bugs with input
 import torch
 import time
@@ -64,7 +64,9 @@ parser.add_argument("--raw_img_resize_based_on_width", action='store_true',
 parser.add_argument("--keep_image_range", help="Will NOT scale the image between 0-1 (RAW img)", action='store_true')
 parser.add_argument("--pad_to_largest_image", help="If set, images will be padded to meet the largest image in the set."
                                                    "All input will have the same size.", action='store_true')
-parser.add_argument("--force_square_images", help="If set, all images will be padded to make them square",
+parser.add_argument("--pad_to_square_images", help="If set, all images will be padded to make them square",
+                    action='store_true')
+parser.add_argument("--resize_to_square_images", help="If set, all images will be resized to make them square",
                     action='store_true')
 parser.add_argument("--gamma_beta_path", type=str, default=None, help="Path where gamma_beta values are stored "
                                                                           "(when using --visualize_gamma_beta)")
@@ -509,7 +511,7 @@ def main(args):
     #                             dict_file_path=args.dict_file_path,
     #                             transforms=transforms.Compose(transforms_list + [ToTensor()]))
 
-    if args.pad_to_largest_image or args.force_square_images:
+    if args.pad_to_largest_image or args.pad_to_square_images:
         # We need the dataset object to retrieve images dims so we have to manually add transforms
         max_train_img_dims = train_dataset.get_max_width_image_dims()
         max_val_img_dims = val_dataset.get_max_width_image_dims()
@@ -520,15 +522,19 @@ def main(args):
             val_dataset.add_transform(PadTensor(max_val_img_dims))
             test_dataset.add_transform(PadTensor(max_test_img_dims))
 
-        if args.force_square_images:
-            biggest_dim = max(max_train_img_dims)
-            train_dataset.add_transform(PadTensor((biggest_dim, biggest_dim)))
+        if args.pad_to_square_images or args.resize_to_square_images:
+            train_biggest_dim = max(max_train_img_dims)
+            val_biggest_dim = max(max_val_img_dims)
+            test_biggest_dim = max(max_test_img_dims)
 
-            biggest_dim = max(max_val_img_dims)
-            val_dataset.add_transform(PadTensor((biggest_dim, biggest_dim)))
+            if args.resize_to_square_images:
+                to_square_transform = ResizeTensor
+            else:
+                to_square_transform = PadTensor
 
-            biggest_dim = max(max_test_img_dims)
-            test_dataset.add_transform(PadTensor((biggest_dim, biggest_dim)))
+            train_dataset.add_transform(to_square_transform((train_biggest_dim, train_biggest_dim)))
+            val_dataset.add_transform(to_square_transform((val_biggest_dim, val_biggest_dim)))
+            test_dataset.add_transform(to_square_transform((test_biggest_dim, test_biggest_dim)))
 
 
     print("Creating Dataloaders")

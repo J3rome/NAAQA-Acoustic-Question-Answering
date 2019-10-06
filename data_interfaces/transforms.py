@@ -38,6 +38,16 @@ class ImgBetweenZeroOne(object):
         return sample
 
 
+class ResizeTensor(object):
+    """ Resize PIL image to 'output_shape' """
+    def __init__(self, output_shape):
+        self.output_shape = output_shape
+
+    def __call__(self, sample):
+        sample['image'] = F.interpolate(sample['image'].unsqueeze(0), size=self.output_shape, mode='bicubic').squeeze(0)
+        return sample
+
+
 class ResizeImg(object):
     """ Resize PIL image to 'output_shape' """
     def __init__(self, output_shape):
