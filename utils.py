@@ -1,5 +1,6 @@
 import random
 import os
+from shutil import rmtree as rmdir_tree
 import numpy as np
 import subprocess
 import ujson
@@ -47,11 +48,20 @@ def set_random_state(states):
 
 
 def create_folder_if_necessary(folder_path, overwrite_folder=False):
-    if not os.path.isdir(folder_path):
+    is_symlink = os.path.islink(folder_path)
+    if not os.path.isdir(folder_path) and not is_symlink:
         os.mkdir(folder_path)
     elif overwrite_folder:
-        os.rmdir(folder_path)
-        os.mkdir(folder_path)
+        if is_symlink and not os.path.exists(os.readlink(folder_path)):
+            # Invalid symlink
+            return  # FIXME : should we remove the broken symlink ?
+
+        for file in os.listdir(folder_path):
+            file_path = "%s/%s" % (folder_path, file)
+            if os.path.isdir(file_path):
+                rmdir_tree(file_path)
+            elif os.path.isfile(file_path):
+                os.remove(file_path)
 
 
 def create_symlink_to_latest_folder(experiment_folder, dated_folder_name, symlink_name='latest'):
