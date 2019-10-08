@@ -229,7 +229,7 @@ class CLEAR_FiLM_model(nn.Module):
             nn.ReLU(inplace=True),
         )
 
-        self.linear_out = nn.Linear(config['classifier']['no_mlp_units'], nb_answers)
+        self.logits = nn.Linear(config['classifier']['no_mlp_units'], nb_answers)
 
         self.softmax = nn.Softmax(dim=1)
 
@@ -283,11 +283,11 @@ class CLEAR_FiLM_model(nn.Module):
         # TODO : Concat globalAvgPool ?
 
         classif_out = self.classif_hidden(classif_out)
-        classif_out = self.linear_out(classif_out)
+        logits = self.logits(classif_out)
 
-        classif_out_softmaxed = self.softmax(classif_out)
+        logits_softmaxed = self.softmax(classif_out)
 
-        return classif_out, classif_out_softmaxed
+        return logits, logits_softmaxed
 
     def get_gammas_betas(self):
         gammas = []
