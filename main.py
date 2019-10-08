@@ -85,6 +85,9 @@ parser.add_argument("--dict_folder", type=str, default=None,
 parser.add_argument("--tensorboard_folder", type=str, default='tensorboard',
                     help="Path where tensorboard data should be stored.")
 parser.add_argument("--tensorboard_save_graph", help="Save model graph to tensorboard", action='store_true')
+parser.add_argument("--perf_over_determinist", help="Will let torch use nondeterministic algorithms (Better "
+                                                    "performance but less reproductibility)", action='store_true')
+
 
 # Other parameters
 parser.add_argument("--nb_epoch", type=int, default=15, help="Nb of epoch for training")
@@ -237,8 +240,6 @@ def train_model(device, model, dataloaders, output_folder, criterion=None, optim
         best_epoch_symlink_path = '%s/best' % output_folder
         subprocess.run("ln -snf %s %s" % (best_epoch['epoch'], best_epoch_symlink_path), shell=True)
 
-        print()
-
         # Early Stopping
         if early_stopping:
             if val_loss < best_val_loss - model.early_stopping['min_step']:
@@ -251,6 +252,8 @@ def train_model(device, model, dataloaders, output_folder, criterion=None, optim
                 if early_stop_counter >= stop_threshold:
                     print("Early Stopping at epoch %d on %d" % (epoch, nb_epoch))
                     break
+
+        print()
 
     time_elapsed = time.time() - since
     print('Training complete in {:.0f}m {:.0f}s'.format(time_elapsed // 60, time_elapsed % 60))
@@ -319,7 +322,8 @@ def process_dataloader(is_training, device, model, dataloader, criterion=None, o
             # FIXME: Find a way to show original input images in tensorboard (Could save a list of scene ids and add them to tensorboard after the epoch, check performance cost -- Image loading etc)
             if dataloader.dataset.is_raw_img():
                 # TODO : Tag img before adding to tensorboard ? -- This can be done via .add_image_with_boxes()
-                tensorboard_writer.add_images('Inputs/images', batch['image'], epoch_id)
+                for image in batch['image']:
+                    tensorboard_writer.add_image('Inputs/images', image, epoch_id)
 
             all_questions += batch['question'].tolist()
 
@@ -620,8 +624,13 @@ def main(args):
             film_model.load_state_dict(checkpoint['model_state_dict'], strict=False)
 
         if device != 'cpu':
-            torch.backends.cudnn.benchmark = True
-            torch.backends.cudnn.deterministic = True
+            if args.perf_over_determinist:
+                torch.backends.cudnn.benchmark = True
+                torch.backends.cudnn.deterministic = False
+            else:
+                torch.backends.cudnn.benchmark = False
+                torch.backends.cudnn.deterministic = True
+
 
         film_model.to(device)
 
@@ -655,6 +664,8 @@ def main(args):
         optimizer = torch.optim.Adam(trainable_parameters, lr=film_model_config['optimizer']['learning_rate'],
                                      weight_decay=film_model_config['optimizer']['weight_decay'])
 
+        loss_criterion = nn.CrossEntropyLoss()
+
         start_epoch = 0
         if args.continue_training:
             optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
@@ -664,7 +675,7 @@ def main(args):
         # scheduler = torch.optim.lr_scheduler   # FIXME : Using a scheduler give the ability to decay only each N epoch.
 
         train_model(device=device, model=film_model, dataloaders={'train': train_dataloader, 'val': val_dataloader},
-                    output_folder=output_dated_folder, criterion=nn.CrossEntropyLoss(), optimizer=optimizer,
+                    output_folder=output_dated_folder, criterion=loss_criterion, optimizer=optimizer,
                     nb_epoch=args.nb_epoch, nb_epoch_to_keep=args.nb_epoch_stats_to_keep,
                     start_epoch=start_epoch, tensorboard_writers=tensorboard_writers)
 

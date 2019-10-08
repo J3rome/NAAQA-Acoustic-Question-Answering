@@ -87,7 +87,7 @@ class FiLM_layer(nn.Module):
         film_params = self.params_vector(rnn_last_hidden_state)
 
         # FIXME : Is it a good idea to have dropout here ?
-        film_params = self.dropout(film_params)
+        #film_params = self.dropout(film_params)
 
         gammas, betas = film_params.split(self.out_channels, dim=-1)
 
@@ -113,12 +113,13 @@ class FiLMed_resblock(nn.Module):
             nn.ReLU(inplace=True),
         )
 
-        self.dropout = nn.Dropout(p=dropout_drop_prob)
+        #self.dropout = nn.Dropout(p=dropout_drop_prob)
 
         self.conv2 = Conv2d_tf(in_channels=out_channels, out_channels=out_channels,
                                kernel_size=kernel2, stride=1, padding='SAME', dilation=1)
 
-        self.conv2_bn = nn.BatchNorm2d(out_channels)
+        # Center/reduce output (Batch Normalization with no training parameters)
+        self.conv2_bn = nn.BatchNorm2d(out_channels, affine=False)
 
         # Film Layer
         self.conv2_filmed = FiLM_layer(context_size, out_channels)
@@ -130,9 +131,9 @@ class FiLMed_resblock(nn.Module):
             input_features = append_spatial_location(input_features)
 
         conv1_out = self.conv1(input_features)
-        conv1_out = self.dropout(conv1_out)
+        #conv1_out = self.dropout(conv1_out)
         out = self.conv2(conv1_out)
-        out = self.dropout(out)
+        #out = self.dropout(out)
         out = self.conv2_bn(out)
         out = self.conv2_filmed(out, rnn_state)
         out = self.conv2_relu(out)
@@ -160,13 +161,15 @@ class CLEAR_FiLM_model(nn.Module):
             'classifier': 2 if config['classifier']['spatial_location'] else 0
         }
 
-        # FIXME: Add dropout
-
         # Question Pipeline
         self.word_emb = nn.Embedding(num_embeddings=nb_words,
                                      embedding_dim=config['question']['word_embedding_dim'],
                                      padding_idx=sequence_padding_idx)
 
+        # FIXME : Dropout always set to zero ?
+        # FIXME: Are we using correct rnn_state ?
+        # FIXME : Bidirectional
+        # FIXME : Are we missing normalization here ?
         # TODO : Make sure we have the correct activation fct (Validate that default is tanh)
         self.rnn_state = nn.GRU(input_size=config['question']['word_embedding_dim'],
                                 hidden_size=config["question"]["rnn_state_size"],
@@ -228,7 +231,7 @@ class CLEAR_FiLM_model(nn.Module):
             nn.ReLU(inplace=True),
         )
 
-        self.linear_out = nn.Linear(config['classifier']['no_mlp_units'], nb_answers)
+        self.logits = nn.Linear(config['classifier']['no_mlp_units'], nb_answers)
 
         self.softmax = nn.Softmax(dim=1)
 
@@ -272,7 +275,6 @@ class CLEAR_FiLM_model(nn.Module):
         if self.config["classifier"]["spatial_location"]:
            conv_out = append_spatial_location(conv_out)
 
-        # FIXME : Up to date Film network doesnt have this layer ---> FALSE... It does but it is in the FilmStack class
         classif_out = self.classif_conv(conv_out)
 
         # Global Max Pooling (Max pooling over whole dimensions 3,4)
@@ -282,11 +284,11 @@ class CLEAR_FiLM_model(nn.Module):
         # TODO : Concat globalAvgPool ?
 
         classif_out = self.classif_hidden(classif_out)
-        classif_out = self.linear_out(classif_out)
+        logits = self.logits(classif_out)
 
-        classif_out_softmaxed = self.softmax(classif_out)
+        logits_softmaxed = self.softmax(classif_out)
 
-        return classif_out, classif_out_softmaxed
+        return logits, logits_softmaxed
 
     def get_gammas_betas(self):
         gammas = []
