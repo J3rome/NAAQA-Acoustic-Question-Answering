@@ -240,8 +240,6 @@ def train_model(device, model, dataloaders, output_folder, criterion=None, optim
         best_epoch_symlink_path = '%s/best' % output_folder
         subprocess.run("ln -snf %s %s" % (best_epoch['epoch'], best_epoch_symlink_path), shell=True)
 
-        print()
-
         # Early Stopping
         if early_stopping:
             if val_loss < best_val_loss - model.early_stopping['min_step']:
@@ -254,6 +252,8 @@ def train_model(device, model, dataloaders, output_folder, criterion=None, optim
                 if early_stop_counter >= stop_threshold:
                     print("Early Stopping at epoch %d on %d" % (epoch, nb_epoch))
                     break
+
+        print()
 
     time_elapsed = time.time() - since
     print('Training complete in {:.0f}m {:.0f}s'.format(time_elapsed // 60, time_elapsed % 60))
