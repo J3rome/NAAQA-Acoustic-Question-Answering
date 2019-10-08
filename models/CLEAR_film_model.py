@@ -87,7 +87,7 @@ class FiLM_layer(nn.Module):
         film_params = self.params_vector(rnn_last_hidden_state)
 
         # FIXME : Is it a good idea to have dropout here ?
-        film_params = self.dropout(film_params)
+        #film_params = self.dropout(film_params)
 
         gammas, betas = film_params.split(self.out_channels, dim=-1)
 
@@ -113,7 +113,7 @@ class FiLMed_resblock(nn.Module):
             nn.ReLU(inplace=True),
         )
 
-        self.dropout = nn.Dropout(p=dropout_drop_prob)
+        #self.dropout = nn.Dropout(p=dropout_drop_prob)
 
         self.conv2 = Conv2d_tf(in_channels=out_channels, out_channels=out_channels,
                                kernel_size=kernel2, stride=1, padding='SAME', dilation=1)
@@ -131,9 +131,9 @@ class FiLMed_resblock(nn.Module):
             input_features = append_spatial_location(input_features)
 
         conv1_out = self.conv1(input_features)
-        conv1_out = self.dropout(conv1_out)
+        #conv1_out = self.dropout(conv1_out)
         out = self.conv2(conv1_out)
-        out = self.dropout(out)
+        #out = self.dropout(out)
         out = self.conv2_bn(out)
         out = self.conv2_filmed(out, rnn_state)
         out = self.conv2_relu(out)
