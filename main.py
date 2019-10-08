@@ -664,6 +664,8 @@ def main(args):
         optimizer = torch.optim.Adam(trainable_parameters, lr=film_model_config['optimizer']['learning_rate'],
                                      weight_decay=film_model_config['optimizer']['weight_decay'])
 
+        loss_criterion = nn.CrossEntropyLoss()
+
         start_epoch = 0
         if args.continue_training:
             optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
@@ -673,7 +675,7 @@ def main(args):
         # scheduler = torch.optim.lr_scheduler   # FIXME : Using a scheduler give the ability to decay only each N epoch.
 
         train_model(device=device, model=film_model, dataloaders={'train': train_dataloader, 'val': val_dataloader},
-                    output_folder=output_dated_folder, criterion=nn.CrossEntropyLoss(), optimizer=optimizer,
+                    output_folder=output_dated_folder, criterion=loss_criterion, optimizer=optimizer,
                     nb_epoch=args.nb_epoch, nb_epoch_to_keep=args.nb_epoch_stats_to_keep,
                     start_epoch=start_epoch, tensorboard_writers=tensorboard_writers)
 
