@@ -10,6 +10,10 @@ from plotly.io import write_html
 from sklearn.manifold import TSNE as sk_TSNE
 from tsnecuda import TSNE as cuda_TSNE
 
+import matplotlib.pyplot as plt
+import matplotlib.patches as patches
+import matplotlib.font_manager as font_manager
+
 from models.gradcam import GradCAM
 from torchvision.utils import make_grid
 
@@ -179,6 +183,58 @@ def plot_tsne_per_resblock(vals, question_types, title="T-SNE"):
             )
 
     return figs
+
+
+def get_tagged_scene(dataset, game_id, remove_padding=False):
+    assert dataset.is_raw_img(), 'Only support tagging when config is set to RAW img'
+
+    # FIXME : Take padding into account
+    # FIXME : Pass gradcam img
+
+    toPILimg_transform = transforms.ToPILImage()
+
+    # Retrieving scenes definition
+    scenes = {int(s['scene_index']): s for s in dataset.scenes_def}
+
+    game = dataset[game_id]
+    pil_img = toPILimg_transform(game['image'])
+    scene = scenes[game['scene_id']]
+    scene_duration = sum([o['duration'] + o['silence_after'] for o in scene['objects']]) + scene['silence_before']
+    image_padding = game['image_padding'].tolist()
+
+    time_resolution = int(scene_duration/(pil_img.width - image_padding[1]) + 0.5)   # Ms/pixel
+
+    if remove_padding:
+        pil_img = pil_img.crop((0,0,pil_img.width-image_padding[1], pil_img.height-image_padding[0]))
+
+    fig, ax = plt.subplots(1, figsize=((pil_img.width + 50)/100, (pil_img.height + 150)/100), dpi=100)
+    ax.imshow(pil_img)
+
+    annotation_colors = [np.random.rand(3) for i in range(len(scene['objects']))]
+    annotations = {}
+
+    current_position = int(scene['silence_before'] / time_resolution)
+    for i, sound in enumerate(scene['objects']):
+        sound_duration_in_px = int(sound['duration']/time_resolution + 0.5)
+        sound_silence_in_px = int(sound['silence_after']/time_resolution + 0.5)
+        annotation_rect = patches.Rectangle((current_position, 2), width=sound_duration_in_px,
+                                            height=pil_img.height - 4, fill=False, color=annotation_colors[i],
+                                            linewidth=1.4)
+        key = f"{sound['instrument'].capitalize()}/{sound['brightness']}/{sound['loudness']}/{sound['note']}/{sound['id']}"
+        annotations[key] = annotation_rect
+        ax.add_patch(annotation_rect)
+
+        current_position += sound_duration_in_px + sound_silence_in_px
+
+    # TODO : Add correct scale to axis (Freq & time)
+    ax.legend(annotations.values(), annotations.keys(), bbox_to_anchor=(0.5, -0.45), loc='lower center', ncol=2,
+              prop=font_manager.FontProperties(family='sans-serif', size='small'))
+    fig.tight_layout()
+    plt.show()
+    print("yo")
+
+
+    # TODO : Define vertical lines position
 
 
 def grad_cam_visualization(device, model, dataloader, output_folder, nb_game_per_img=10, limit_dataset=45):
