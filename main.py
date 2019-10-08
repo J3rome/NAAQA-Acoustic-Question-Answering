@@ -85,6 +85,9 @@ parser.add_argument("--dict_folder", type=str, default=None,
 parser.add_argument("--tensorboard_folder", type=str, default='tensorboard',
                     help="Path where tensorboard data should be stored.")
 parser.add_argument("--tensorboard_save_graph", help="Save model graph to tensorboard", action='store_true')
+parser.add_argument("--perf_over_determinist", help="Will let torch use nondeterministic algorithms (Better "
+                                                    "performance but less reproductibility)", action='store_true')
+
 
 # Other parameters
 parser.add_argument("--nb_epoch", type=int, default=15, help="Nb of epoch for training")
@@ -620,8 +623,13 @@ def main(args):
             film_model.load_state_dict(checkpoint['model_state_dict'], strict=False)
 
         if device != 'cpu':
-            torch.backends.cudnn.benchmark = True
-            torch.backends.cudnn.deterministic = True
+            if args.perf_over_determinist:
+                torch.backends.cudnn.benchmark = True
+                torch.backends.cudnn.deterministic = False
+            else:
+                torch.backends.cudnn.benchmark = False
+                torch.backends.cudnn.deterministic = True
+
 
         film_model.to(device)
 
