@@ -161,13 +161,15 @@ class CLEAR_FiLM_model(nn.Module):
             'classifier': 2 if config['classifier']['spatial_location'] else 0
         }
 
-        # FIXME: Add dropout
-
         # Question Pipeline
         self.word_emb = nn.Embedding(num_embeddings=nb_words,
                                      embedding_dim=config['question']['word_embedding_dim'],
                                      padding_idx=sequence_padding_idx)
 
+        # FIXME : Dropout always set to zero ?
+        # FIXME: Are we using correct rnn_state ?
+        # FIXME : Bidirectional
+        # FIXME : Are we missing normalization here ?
         # TODO : Make sure we have the correct activation fct (Validate that default is tanh)
         self.rnn_state = nn.GRU(input_size=config['question']['word_embedding_dim'],
                                 hidden_size=config["question"]["rnn_state_size"],
@@ -273,7 +275,6 @@ class CLEAR_FiLM_model(nn.Module):
         if self.config["classifier"]["spatial_location"]:
            conv_out = append_spatial_location(conv_out)
 
-        # FIXME : Up to date Film network doesnt have this layer ---> FALSE... It does but it is in the FilmStack class
         classif_out = self.classif_conv(conv_out)
 
         # Global Max Pooling (Max pooling over whole dimensions 3,4)
