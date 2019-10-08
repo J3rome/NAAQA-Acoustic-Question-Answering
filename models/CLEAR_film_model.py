@@ -118,7 +118,8 @@ class FiLMed_resblock(nn.Module):
         self.conv2 = Conv2d_tf(in_channels=out_channels, out_channels=out_channels,
                                kernel_size=kernel2, stride=1, padding='SAME', dilation=1)
 
-        self.conv2_bn = nn.BatchNorm2d(out_channels)
+        # Center/reduce output (Batch Normalization with no training parameters)
+        self.conv2_bn = nn.BatchNorm2d(out_channels, affine=False)
 
         # Film Layer
         self.conv2_filmed = FiLM_layer(context_size, out_channels)
