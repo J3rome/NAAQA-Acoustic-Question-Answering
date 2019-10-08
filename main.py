@@ -322,7 +322,8 @@ def process_dataloader(is_training, device, model, dataloader, criterion=None, o
             # FIXME: Find a way to show original input images in tensorboard (Could save a list of scene ids and add them to tensorboard after the epoch, check performance cost -- Image loading etc)
             if dataloader.dataset.is_raw_img():
                 # TODO : Tag img before adding to tensorboard ? -- This can be done via .add_image_with_boxes()
-                tensorboard_writer.add_images('Inputs/images', batch['image'], epoch_id)
+                for image in batch['image']:
+                    tensorboard_writer.add_image('Inputs/images', image, epoch_id)
 
             all_questions += batch['question'].tolist()
 
