@@ -247,15 +247,7 @@ class CLEAR_FiLM_model(nn.Module):
 
         rnn_out, rnn_hidden = self.rnn_state(word_emb)
 
-        if pack_sequence:
-            rnn_out, _ = torch.nn.utils.rnn.pad_packed_sequence(rnn_out, batch_first=True)
-
-        # We wan't an index to the last token  (len - 1)
-        question_lengths = question_lengths - 1
-        last_token_indexes = question_lengths.view(-1, 1, 1).expand(-1, 1, self.rnn_state.hidden_size).long()
-        rnn_hidden_state = rnn_out.gather(1, last_token_indexes).view(-1, self.rnn_state.hidden_size)       # FIXME : Is rnn_hidden_state the correct name here ?
-
-        rnn_hidden_state = self.dropout(rnn_hidden_state)
+        rnn_hidden_state = self.dropout(rnn_hidden.squeeze(0))
 
         # Image Pipeline
         conv_out = input_image
