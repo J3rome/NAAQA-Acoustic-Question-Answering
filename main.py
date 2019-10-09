@@ -708,11 +708,10 @@ def main(args):
     time_elapsed = str(datetime.now() - current_datetime)
 
     print("Execution took %s" % time_elapsed)
+    print()
 
     if create_output_folder:
         save_json({'time_elapsed': time_elapsed}, output_dated_folder, filename='timing.json')
-
-        print("All Done")
 
 
 if __name__ == "__main__":
