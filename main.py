@@ -453,19 +453,6 @@ def main(args):
             # Copy dictionary file used
             shutil.copyfile(args.dict_file_path, "%s/dict.json" % output_dated_folder)
 
-    if use_tensorboard:
-        # FIXME : What happen with test set? I guess we don't really care, we got our own visualisations for test run
-        # Create tensorboard writer
-        base_writer_path = '%s/%s/%s' % (args.tensorboard_folder, output_name, current_datetime_str)
-
-        # TODO : Add 'comment' param with more infos on run. Ex : Raw vs Conv
-        tensorboard_writers = {
-            'train': SummaryWriter('%s/train' % base_writer_path),
-            'val': SummaryWriter('%s/val' % base_writer_path)
-        }
-    else:
-        tensorboard_writers = None
-
     if args.no_img_resize or film_model_config['input']['type'].lower() != 'raw':
         args.raw_img_resize_val = None
 
@@ -632,7 +619,6 @@ def main(args):
                 torch.backends.cudnn.benchmark = False
                 torch.backends.cudnn.deterministic = True
 
-
         film_model.to(device)
 
         print("Model ready to run")
@@ -644,16 +630,29 @@ def main(args):
             summary(film_model, [(22,), (1,), input_image_torch_shape], device=device)
             set_random_state(random_state)
 
-        if use_tensorboard and args.tensorboard_save_graph:
-            # FIXME : For now we are ignoring TracerWarnings. Not sure the saved graph is 100% accurate...
-            import warnings
-            warnings.filterwarnings('ignore', category=torch.jit.TracerWarning)
+        if use_tensorboard:
+            # FIXME : What happen with test set? I guess we don't really care, we got our own visualisations for test run
+            # Create tensorboard writer
+            base_writer_path = '%s/%s/%s' % (args.tensorboard_folder, output_name, current_datetime_str)
 
-            # FIXME : Test on GPU
-            dummy_input = [torch.ones(2, 22, dtype=torch.long),
-                           torch.ones(2, 1, dtype=torch.long),
-                           torch.ones(2, *input_image_torch_shape, dtype=torch.float)]
-            tensorboard_writers['train'].add_graph(film_model, dummy_input)
+            # TODO : Add 'comment' param with more infos on run. Ex : Raw vs Conv
+            tensorboard_writers = {
+                'train': SummaryWriter('%s/train' % base_writer_path),
+                'val': SummaryWriter('%s/val' % base_writer_path)
+            }
+
+            if args.tensorboard_save_graph:
+                # FIXME : For now we are ignoring TracerWarnings. Not sure the saved graph is 100% accurate...
+                import warnings
+                warnings.filterwarnings('ignore', category=torch.jit.TracerWarning)
+
+                # FIXME : Test on GPU
+                dummy_input = [torch.ones(2, 22, dtype=torch.long),
+                               torch.ones(2, 1, dtype=torch.long),
+                               torch.ones(2, *input_image_torch_shape, dtype=torch.float)]
+                tensorboard_writers['train'].add_graph(film_model, dummy_input)
+        else:
+            tensorboard_writers = None
 
     if create_output_folder:
         create_symlink_to_latest_folder(output_experiment_folder, current_datetime_str)
