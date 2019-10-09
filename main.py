@@ -701,7 +701,7 @@ def main(args):
         grad_cam_visualization(device=device, model=film_model, dataloader=train_dataloader,
                                output_folder=output_dated_folder)
 
-    if tensorboard_writers:
+    if use_tensorboard:
         for key, writer in tensorboard_writers.items():
             writer.close()
 
