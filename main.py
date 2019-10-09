@@ -71,7 +71,7 @@ parser.add_argument("--resize_to_square_images", help="If set, all images will b
 parser.add_argument("--gamma_beta_path", type=str, default=None, help="Path where gamma_beta values are stored "
                                                                           "(when using --visualize_gamma_beta)")
 parser.add_argument("--no_early_stopping", help="Override the early stopping config", action='store_true')
-parser.add_argument("--feature_extractor_layer_index", type=str, default=6, help="Layer id of the pretrained Resnet")
+parser.add_argument("--feature_extractor_layer_index", type=int, default=6, help="Layer id of the pretrained Resnet")
 
 
 # Output parameters
