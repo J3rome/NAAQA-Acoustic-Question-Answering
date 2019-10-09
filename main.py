@@ -655,6 +655,7 @@ def main(args):
             tensorboard_writers = None
 
     if create_output_folder:
+        # We create the symlink here so that bug in initialisation won't create a new 'latest' folder
         create_symlink_to_latest_folder(output_experiment_folder, current_datetime_str)
 
     if task == "train_film":
