@@ -166,6 +166,35 @@ def get_img_builder(config, data_dir, preprocessed_folder_name='preprocessed', b
         bufferize = bufferize if bufferize is not None else True
         loader = h5FeatureBuilder(os.path.join(data_dir, preprocessed_folder_name), bufferize=bufferize)
     elif input_type in ["conv", "raw_h5"]:
+
+        # NOTE : When testing multiple dataset configurations, Images and questions are generated in separate folder and
+        #        linked together so we don't have multiple copies of the dataset (And multiple preprocessing runs)
+        #
+        #        If we can't find the 'preprocessed_folder_name', we follow the default preprocessed folder symlink.
+        #        If the requested 'preprocessed_folder_name' is present in this folder, we create a symlink to it so we
+        #        can have access to it.
+        #
+        #        If "preprocessed" is not a symlink, 'output_folder_name' will be created in requested 'data_path'
+
+        preprocessed_folder_path = "%s/%s" % (data_dir, preprocessed_folder_name)
+        preprocessed_exist = os.path.exists(preprocessed_folder_path)
+        preprocessed_default_folder_path = '%s/preprocessed' % data_dir
+        if not preprocessed_exist:
+            if os.path.exists(preprocessed_default_folder_path) and os.path.islink(preprocessed_default_folder_path):
+
+                # Retrieve paths from symlink
+                default_link_value = os.readlink(preprocessed_default_folder_path)
+                new_link_value = default_link_value.replace('preprocessed', preprocessed_folder_name)
+
+                real_preprocessed_folder_path = "%s/%s" % (data_dir, new_link_value)
+                if os.path.isdir(real_preprocessed_folder_path):
+                    # Create symlink
+                    os.symlink(new_link_value, preprocessed_folder_path)
+                else:
+                    assert False, "Preprocessed folder '%s' doesn't exist" % preprocessed_folder_path
+            else:
+                assert False, "Preprocessed folder '%s' doesn't exist" % preprocessed_folder_path
+
         bufferize = bufferize if bufferize is not None else False
         loader = h5FeatureBuilder(os.path.join(data_dir, preprocessed_folder_name), bufferize=bufferize)
     elif input_type == "raw":
