@@ -22,7 +22,32 @@ def extract_features(device, feature_extractor, dataloaders, output_folder_name=
     data_path = first_dataloader.dataset.root_folder_path
     batch_size = first_dataloader.batch_size
     output_folder_path = '%s/%s' % (data_path, output_folder_name)
-    create_folder_if_necessary(output_folder_path)
+
+    # NOTE : When testing multiple dataset configurations, Images and questions are generated in separate folder and
+    #        linked together so we don't have multiple copies of the dataset (And multiple preprocessing runs)
+    #
+    #        We use the default symlink to create the new folder at the correct destination so it is available
+    #        to other configuration of the dataset (When extracting using different value of 'output_folder_name')
+    #
+    #        If "preprocessed" is not a symlink, 'output_folder_name' will be created in requested 'data_path'
+
+    output_exist = os.path.exists(output_folder_path)
+    preprocessed_default_folder_path = '%s/preprocessed' % data_path
+    if not output_exist and os.path.exists(preprocessed_default_folder_path) and \
+            os.path.islink(preprocessed_default_folder_path):
+
+        # Retrieve paths from symlink
+        default_link_value = os.readlink(preprocessed_default_folder_path)
+        new_link_value = default_link_value.replace('preprocessed', output_folder_name)
+
+        # Create folder in appropriate directory
+        create_folder_if_necessary("%s/%s" % (data_path, new_link_value))
+
+        # Create symlink in requested directory
+        if not output_exist:
+            os.symlink(new_link_value, output_folder_path)
+    else:
+        create_folder_if_necessary(output_folder_path)
 
     # Set model to eval mode
     feature_extractor.eval()
