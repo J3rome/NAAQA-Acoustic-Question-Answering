@@ -237,7 +237,9 @@ def train_model(device, model, dataloaders, output_folder, criterion=None, optim
 
         # Create a symlink to best epoch output folder
         best_epoch = sorted_stats[0]
-        print("Best Epoch is %s" % best_epoch['epoch'])
+        print("Best Epoch is {} with Loss: {} Acc: {}".format(best_epoch['epoch'],
+                                                              best_epoch['val_loss'],
+                                                              best_epoch['val_acc']))
         best_epoch_symlink_path = '%s/best' % output_folder
         subprocess.run("ln -snf %s %s" % (best_epoch['epoch'], best_epoch_symlink_path), shell=True)
 
