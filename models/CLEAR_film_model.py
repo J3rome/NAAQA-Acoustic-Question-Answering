@@ -278,7 +278,7 @@ class CLEAR_FiLM_model(nn.Module):
         classif_out = self.classif_hidden(classif_out)
         logits = self.logits(classif_out)
 
-        logits_softmaxed = self.softmax(classif_out)
+        logits_softmaxed = self.softmax(logits)
 
         return logits, logits_softmaxed
 
