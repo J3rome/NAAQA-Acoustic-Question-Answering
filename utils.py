@@ -346,6 +346,7 @@ def is_date_string(string):
 
 def close_tensorboard_writers(tensorboard_writers):
     for key, writer in tensorboard_writers.items():
+        writer.close()
 
 
 def visualize_cam(mask, img):
