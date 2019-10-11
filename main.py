@@ -72,6 +72,8 @@ parser.add_argument("--gamma_beta_path", type=str, default=None, help="Path wher
                                                                           "(when using --visualize_gamma_beta)")
 parser.add_argument("--no_early_stopping", help="Override the early stopping config", action='store_true')
 parser.add_argument("--feature_extractor_layer_index", type=int, default=6, help="Layer id of the pretrained Resnet")
+parser.add_argument("--no_feature_extractor", help="Raw images won't go through Resnet feature extractor before "
+                                                    "training", action='store_true')
 
 
 # Output parameters
@@ -473,7 +475,11 @@ def main(args):
         to_tensor_transform.append(ImgBetweenZeroOne())
 
     if film_model_config['input']['type'] == 'raw':
-        feature_extractor_config = {'version': 101, 'layer_index': args.feature_extractor_layer_index}   # Idx 6 -> Block3/unit22
+
+        if args.no_feature_extractor:
+            feature_extractor_config = None
+        else:
+            feature_extractor_config = {'version': 101, 'layer_index': args.feature_extractor_layer_index}   # Idx 6 -> Block3/unit22
 
         if args.raw_img_resize_val:
             if args.raw_img_resize_based_on_width:
