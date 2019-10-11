@@ -135,7 +135,7 @@ def run_one_game(device, model, games, data_path, input_config, transforms_list=
     print("Accuracy is : %f" % accuracy)
 
 
-def set_inference(device, model, dataloader, output_folder, save_gamma_beta=True):
+def set_inference(device, model, dataloader, criterion, output_folder, save_gamma_beta=True):
     set_type = dataloader.dataset.set
 
     if save_gamma_beta:
@@ -143,7 +143,7 @@ def set_inference(device, model, dataloader, output_folder, save_gamma_beta=True
     else:
         gamma_beta_path = None
 
-    _, acc, predictions = process_dataloader(False, device, model, dataloader, gamma_beta_path=gamma_beta_path)
+    _, acc, predictions = process_dataloader(False, device, model, dataloader, criterion=criterion, gamma_beta_path=None)#gamma_beta_path)
 
     save_json(predictions, output_folder, filename='%s_predictions.json' % set_type)
 
@@ -683,7 +683,9 @@ def main(args):
                     start_epoch=start_epoch, tensorboard_writers=tensorboard_writers)
 
     elif task == "inference":
-        set_inference(device=device, model=film_model, dataloader=test_dataloader, output_folder=output_dated_folder)
+        inference_dataloader = train_dataloader
+        set_inference(device=device, model=film_model, dataloader=inference_dataloader, criterion=nn.CrossEntropyLoss(),
+                      output_folder=output_dated_folder)
 
     elif task == "create_dict":
         create_dict_from_questions(train_dataset, force_all_answers=args.force_dict_all_answer,
