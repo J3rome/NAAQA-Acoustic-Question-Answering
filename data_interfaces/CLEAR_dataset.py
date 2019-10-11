@@ -9,7 +9,7 @@ import torch.nn.functional as F
 from torchvision import transforms
 
 from data_interfaces.CLEAR_image_loader import get_img_builder, CLEARImage
-from utils import read_json, get_size_from_image_header
+from utils import read_json, get_size_from_image_header, get_answer_to_family_map
 from data_interfaces.transforms import ResizeImgBasedOnHeight, ResizeImgBasedOnWidth
 
 import multiprocessing
@@ -41,15 +41,7 @@ class CLEAR_dataset(Dataset):
         self.input_shape = None
         self.all_image_sizes = None
 
-        attributes = read_json(self.root_folder_path, 'attributes.json')
-
-        self.answer_to_family = {"<unk>": "unknown"}  # FIXME : Quantify what is the impact of having an unknown answer
-
-        for family, answers in attributes.items():
-            for answer in answers:
-                # If there is duplicated answers, they will be assigned to the first occurring family
-                if answer not in self.answer_to_family:
-                    self.answer_to_family[answer] = family
+        self.answer_to_family = get_answer_to_family_map('%s/%s' % (self.root_folder_path, 'attributes.json'))
 
         # Questions can either be read from file or provided as an array
         if questions is None:

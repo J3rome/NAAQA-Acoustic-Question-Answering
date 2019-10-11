@@ -327,6 +327,20 @@ def save_gamma_beta_h5(gammas_betas, set_type, folder, filename=None, nb_vals=No
         return nb_val_to_write
 
 
+def get_answer_to_family_map(attributes_filepath):
+    attributes = read_json(attributes_filepath)
+
+    answer_to_family = {"<unk>": "unknown"}  # FIXME : Quantify what is the impact of having an unknown answer
+
+    for family, answers in attributes.items():
+        for answer in answers:
+            # If there is duplicated answers, they will be assigned to the first occurring family
+            if answer not in answer_to_family:
+                answer_to_family[answer] = family
+
+    return answer_to_family
+
+
 def is_date_string(string):
     return re.match(r'\d+-\d+-\d+_\d+h\d+', string) != None
 
