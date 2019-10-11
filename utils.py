@@ -1,6 +1,7 @@
 import random
 import os
 from shutil import rmtree as rmdir_tree
+import re
 import numpy as np
 import subprocess
 import ujson
@@ -327,11 +328,10 @@ def save_gamma_beta_h5(gammas_betas, set_type, folder, filename=None, nb_vals=No
 
 
 def is_date_string(string):
-    try:
-        date_parse(string, fuzzy=True)  # Fuzzy parsing ignore unknown tokens
-        return True
-    except ValueError:
-        return False
+    return re.match(r'\d+-\d+-\d+_\d+h\d+', string) != None
+
+def close_tensorboard_writers(tensorboard_writers):
+    for key, writer in tensorboard_writers.items():
 
 
 def visualize_cam(mask, img):
