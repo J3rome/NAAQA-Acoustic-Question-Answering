@@ -683,7 +683,7 @@ def main(args):
                     start_epoch=start_epoch, tensorboard_writers=tensorboard_writers)
 
     elif task == "inference":
-        inference_dataloader = train_dataloader
+        inference_dataloader = test_dataloader
         set_inference(device=device, model=film_model, dataloader=inference_dataloader, criterion=nn.CrossEntropyLoss(),
                       output_folder=output_dated_folder)
 
