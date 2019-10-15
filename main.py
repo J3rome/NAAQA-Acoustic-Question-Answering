@@ -8,7 +8,7 @@ from tqdm import tqdm
 
 from utils import set_random_seed, create_folder_if_necessary, get_config, process_predictions, process_gamma_beta
 from utils import create_symlink_to_latest_folder, save_training_stats, save_json, sort_stats, is_date_string
-from utils import calc_mean_and_std, save_gamma_beta_h5, save_git_revision, get_random_state, set_random_state
+from utils import save_gamma_beta_h5, save_git_revision, get_random_state, set_random_state, close_tensorboard_writers
 
 from visualization import visualize_gamma_beta, grad_cam_visualization
 from preprocessing import create_dict_from_questions, extract_features
@@ -88,6 +88,8 @@ parser.add_argument("--dict_folder", type=str, default=None,
 parser.add_argument("--tensorboard_folder", type=str, default='tensorboard',
                     help="Path where tensorboard data should be stored.")
 parser.add_argument("--tensorboard_save_graph", help="Save model graph to tensorboard", action='store_true')
+parser.add_argument("--tensorboard_save_images", help="Save input images to tensorboard", action='store_true')
+parser.add_argument("--tensorboard_save_texts", help="Save input texts to tensorboard", action='store_true')
 parser.add_argument("--perf_over_determinist", help="Will let torch use nondeterministic algorithms (Better "
                                                     "performance but less reproductibility)", action='store_true')
 
@@ -153,12 +155,14 @@ def set_inference(device, model, dataloader, criterion, output_folder, save_gamm
 
 
 def train_model(device, model, dataloaders, output_folder, criterion=None, optimizer=None, scheduler=None,
-                nb_epoch=25, nb_epoch_to_keep=None, start_epoch=0, tensorboard_writers=None):
+                nb_epoch=25, nb_epoch_to_keep=None, start_epoch=0, tensorboard=None):
 
-    if tensorboard_writers is None:
-        tensorboard_writers = {'train': None, 'val': None}
+    if tensorboard is None:
+        tensorboard = {'writers': {'train': None, 'val': None}, 'options': None}
     else:
-        assert 'train' in tensorboard_writers and 'val' in tensorboard_writers, 'Must provide all tensorboard writers.'
+        assert 'train' in tensorboard['writers'] and 'val' in tensorboard['writers'], 'Must provide all tensorboard writers.'
+
+    tensorboard_per_set = {'writer': None, 'options': tensorboard['options']}
 
     stats_file_path = "%s/stats.json" % output_folder
     removed_epoch = []
@@ -192,18 +196,20 @@ def train_model(device, model, dataloaders, output_folder, criterion=None, optim
         print('-' * 10)
 
         epoch_time = datetime.now()
+        tensorboard_per_set['writer'] = tensorboard['writers']['train']
         train_loss, train_acc, train_predictions = process_dataloader(True, device, model,
                                                                       dataloaders['train'],
                                                                       criterion, optimizer, epoch_id=epoch,
-                                                                      tensorboard_writer=tensorboard_writers['train'],
+                                                                      tensorboard=tensorboard_per_set,
                                                                       gamma_beta_path="%s/train_gamma_beta.h5" % epoch_output_folder_path)
         epoch_train_time = datetime.now() - epoch_time
 
         print('\n{} Loss: {:.4f} Acc: {:.4f}'.format('Train', train_loss, train_acc))
 
+        tensorboard_per_set['writer'] = tensorboard['writers']['val']
         val_loss, val_acc, val_predictions = process_dataloader(False, device, model,
                                                                 dataloaders['val'], criterion, epoch_id=epoch,
-                                                                tensorboard_writer=tensorboard_writers['val'],
+                                                                tensorboard=tensorboard_per_set,
                                                                 gamma_beta_path="%s/val_gamma_beta.h5" % epoch_output_folder_path)
         print('\n{} Loss: {:.4f} Acc: {:.4f}'.format('Val', val_loss, val_acc))
 
@@ -270,7 +276,7 @@ def train_model(device, model, dataloaders, output_folder, criterion=None, optim
 
 
 def process_dataloader(is_training, device, model, dataloader, criterion=None, optimizer=None, gamma_beta_path=None,
-                       write_to_file_every=500, epoch_id=0, tensorboard_writer=None):
+                       write_to_file_every=500, epoch_id=0, tensorboard=None):
     # Model should already have been copied to the GPU at this point (If using GPU)
     assert (is_training and criterion is not None and optimizer is not None) or not is_training
 
@@ -323,12 +329,12 @@ def process_dataloader(is_training, device, model, dataloader, criterion=None, o
         processed_predictions += batch_processed_predictions
 
         # TODO : Add config to log only specific things
-        if tensorboard_writer:
+        if tensorboard and tensorboard['writer'] and tensorboard['options'] and tensorboard['options']['save_images']:
             # FIXME: Find a way to show original input images in tensorboard (Could save a list of scene ids and add them to tensorboard after the epoch, check performance cost -- Image loading etc)
             if dataloader.dataset.is_raw_img():
                 # TODO : Tag img before adding to tensorboard ? -- This can be done via .add_image_with_boxes()
                 for image in batch['image']:
-                    tensorboard_writer.add_image('Inputs/images', image, epoch_id)
+                    tensorboard['writer'].add_image('Inputs/images', image, epoch_id)
 
             all_questions += batch['question'].tolist()
 
@@ -355,19 +361,20 @@ def process_dataloader(is_training, device, model, dataloader, criterion=None, o
     epoch_acc = running_corrects / dataset_size
 
     # TODO : Add config to log only specific things
-    if tensorboard_writer:
-        log_text = ""
-        for question, processed_prediction in zip(all_questions, processed_predictions):
-            # FIXME: Tokenizer might not be instantiated --- We probably wouldn't be logging in tensorboard..
-            decoded_question = dataloader.dataset.tokenizer.decode_question(question, remove_padding=True)
-            log_text += f"{processed_prediction['correct']}//{processed_prediction['correct_answer_family']} "
-            log_text += f"{decoded_question} -- {processed_prediction['ground_truth']} "
-            log_text += f"[[{processed_prediction['prediction']} - {processed_prediction['confidence']}]]  \n"
+    if tensorboard and tensorboard['writer']:
+        if tensorboard['options'] and tensorboard['options']['save_texts']:
+            log_text = ""
+            for question, processed_prediction in zip(all_questions, processed_predictions):
+                # FIXME: Tokenizer might not be instantiated --- We probably wouldn't be logging in tensorboard..
+                decoded_question = dataloader.dataset.tokenizer.decode_question(question, remove_padding=True)
+                log_text += f"{processed_prediction['correct']}//{processed_prediction['correct_answer_family']} "
+                log_text += f"{decoded_question} -- {processed_prediction['ground_truth']} "
+                log_text += f"[[{processed_prediction['prediction']} - {processed_prediction['confidence']}]]  \n"
 
-        tensorboard_writer.add_text('Inputs/Text', log_text, epoch_id)
+            tensorboard['writer'].add_text('Inputs/Text', log_text, epoch_id)
 
-        tensorboard_writer.add_scalar('Results/Loss', epoch_loss, global_step=epoch_id)
-        tensorboard_writer.add_scalar('Results/Accuracy', epoch_acc, global_step=epoch_id)
+        tensorboard['writer'].add_scalar('Results/Loss', epoch_loss, global_step=epoch_id)
+        tensorboard['writer'].add_scalar('Results/Accuracy', epoch_acc, global_step=epoch_id)
 
     return epoch_loss, epoch_acc, processed_predictions
 
@@ -644,9 +651,15 @@ def main(args):
             base_writer_path = '%s/%s/%s' % (args.tensorboard_folder, output_name, current_datetime_str)
 
             # TODO : Add 'comment' param with more infos on run. Ex : Raw vs Conv
-            tensorboard_writers = {
-                'train': SummaryWriter('%s/train' % base_writer_path),
-                'val': SummaryWriter('%s/val' % base_writer_path)
+            tensorboard = {
+                'writers': {
+                    'train': SummaryWriter('%s/train' % base_writer_path),
+                    'val': SummaryWriter('%s/val' % base_writer_path)
+                },
+                'options': {
+                    'save_images': args.tensorboard_save_images,
+                    'save_texts': args.tensorboard_save_texts
+                }
             }
 
             if args.tensorboard_save_graph:
@@ -658,9 +671,9 @@ def main(args):
                 dummy_input = [torch.ones(2, 22, dtype=torch.long),
                                torch.ones(2, 1, dtype=torch.long),
                                torch.ones(2, *input_image_torch_shape, dtype=torch.float)]
-                tensorboard_writers['train'].add_graph(film_model, dummy_input)
+                tensorboard['writers']['train'].add_graph(film_model, dummy_input)
         else:
-            tensorboard_writers = None
+            tensorboard = None
 
     if create_output_folder:
         # We create the symlink here so that bug in initialisation won't create a new 'latest' folder
@@ -686,7 +699,7 @@ def main(args):
         train_model(device=device, model=film_model, dataloaders={'train': train_dataloader, 'val': val_dataloader},
                     output_folder=output_dated_folder, criterion=loss_criterion, optimizer=optimizer,
                     nb_epoch=args.nb_epoch, nb_epoch_to_keep=args.nb_epoch_stats_to_keep,
-                    start_epoch=start_epoch, tensorboard_writers=tensorboard_writers)
+                    start_epoch=start_epoch, tensorboard=tensorboard)
 
     elif task == "inference":
         inference_dataloader = test_dataloader
@@ -712,8 +725,7 @@ def main(args):
                                output_folder=output_dated_folder)
 
     if use_tensorboard:
-        for key, writer in tensorboard_writers.items():
-            writer.close()
+        close_tensorboard_writers(tensorboard['writers'])
 
     time_elapsed = str(datetime.now() - current_datetime)
 

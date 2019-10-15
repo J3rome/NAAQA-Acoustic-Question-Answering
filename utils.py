@@ -344,6 +344,7 @@ def get_answer_to_family_map(attributes_filepath):
 def is_date_string(string):
     return re.match(r'\d+-\d+-\d+_\d+h\d+', string) != None
 
+
 def close_tensorboard_writers(tensorboard_writers):
     for key, writer in tensorboard_writers.items():
         writer.close()
