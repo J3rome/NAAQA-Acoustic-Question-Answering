@@ -418,7 +418,7 @@ def main(args):
     task = get_task_from_args(args)
 
     output_name = args.version_name + "_" + args.output_name_suffix if args.output_name_suffix else args.version_name
-    print("Task '%s' for version '%s'\n" % (task.replace('_', ' ').title(), output_name))
+    print("\nTask '%s' for version '%s'\n" % (task.replace('_', ' ').title(), output_name))
 
     if args.random_seed is not None:
         set_random_seed(args.random_seed)
