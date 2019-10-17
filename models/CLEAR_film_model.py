@@ -276,6 +276,7 @@ class CLEAR_FiLM_model(nn.Module):
         # TODO : Concat globalAvgPool ?
 
         classif_out = self.classif_hidden(classif_out)
+        classif_out = self.dropout(classif_out)
         logits = self.logits(classif_out)
 
         logits_softmaxed = self.softmax(logits)
