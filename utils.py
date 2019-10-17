@@ -7,6 +7,7 @@ import subprocess
 import ujson
 import h5py
 from collections import defaultdict
+from tqdm import tqdm
 from dateutil.parser import parse as date_parse
 
 import torch
@@ -176,7 +177,7 @@ def calc_mean_and_std(dataloader, device='cpu'):
     fst_moment = torch.empty(3, device=device)
     snd_moment = torch.empty(3, device=device)
 
-    for batched_data in dataloader:
+    for batched_data in tqdm(dataloader):
         images = batched_data['image'].to(device)
         b, c, h, w = images.shape
         nb_pixels = b * h * w
