@@ -68,12 +68,14 @@ def append_spatial_location(features, start=-1, end=1):
 
 
 class FiLM_layer(nn.Module):
-    def __init__(self, in_channels, out_channels, dropout_drop_prob=0.0, save_gammas_betas=True):
+    def __init__(self, in_channels, out_channels, dropout_drop_prob=0.0, save_gammas_betas=True,
+                 film_layer_transformation=None):
         super(FiLM_layer, self).__init__()
 
         self.in_channels = in_channels
         self.out_channels = out_channels
         self.save_gammas_betas = save_gammas_betas
+        self.film_layer_transformation = film_layer_transformation
 
         # TODO : Prealocate gamma and betas ? In Tensor ? Np Array ? Only if save_gammas_betas == True
         self.gammas = None
@@ -97,12 +99,20 @@ class FiLM_layer(nn.Module):
 
         gammas = gammas.unsqueeze(2).unsqueeze(3).expand_as(input_features)
         betas = betas.unsqueeze(2).unsqueeze(3).expand_as(input_features)
-        return (gammas * input_features) + betas        # FIXME : Tensorflow implementation do 1 + gammas
-                                                        # FIXME : Original implementation have a shift of 1 (Just after film_gen.decoder forward)
+
+        if self.film_layer_transformation == 'plus':
+            # FIXME : Original implementation have a shift of 1 (Just after film_gen.decoder forward)
+            output = (1 + gammas) * input_features + betas        # FIXME : Tensorflow implementation do 1 + gammas
+        else:
+            output = gammas * input_features + betas
+
+        return output
+
 
 
 class FiLMed_resblock(nn.Module):
-    def __init__(self, in_channels, out_channels, context_size, dropout_drop_prob=0.0, kernel1=(1, 1), kernel2=(3, 3)):
+    def __init__(self, in_channels, out_channels, context_size, dropout_drop_prob=0.0, kernel1=(1, 1), kernel2=(3, 3),
+                 film_layer_transformation=None):
 
         super(FiLMed_resblock, self).__init__()
 
@@ -122,7 +132,7 @@ class FiLMed_resblock(nn.Module):
         self.conv2_bn = nn.BatchNorm2d(out_channels, affine=False)
 
         # Film Layer
-        self.conv2_filmed = FiLM_layer(context_size, out_channels)
+        self.conv2_filmed = FiLM_layer(context_size, out_channels, film_layer_transformation=film_layer_transformation)
 
         self.conv2_relu = nn.ReLU(inplace=True)
 
@@ -151,6 +161,7 @@ class CLEAR_FiLM_model(nn.Module):
         self.early_stopping = self.early_stopping if self.early_stopping and self.early_stopping['enable'] else None
 
         dropout_drop_prob = float(config['optimizer'].get('dropout_drop_prob', 0.0))
+        film_layer_transformation = config['resblock'].get('film_projection_type', None)
 
         # FIXME : Is it really ok to reuse the same dropout layer multiple time ?
         self.dropout = nn.Dropout(p=dropout_drop_prob)
@@ -210,7 +221,8 @@ class CLEAR_FiLM_model(nn.Module):
                                                   context_size=config["question"]["rnn_state_size"],
                                                   kernel1=config['resblock']['kernel1'],
                                                   kernel2=config['resblock']['kernel2'],
-                                                  dropout_drop_prob=dropout_drop_prob))
+                                                  dropout_drop_prob=dropout_drop_prob,
+                                                  film_layer_transformation=film_layer_transformation))
 
         #### Classification
         self.classif_conv = nn.Sequential(

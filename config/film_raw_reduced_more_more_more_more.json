@@ -29,6 +29,7 @@
     "resblock": {
         "no_resblock": 1,
         "spatial_location": true,
+        "film_projection_type": "plus",
         "kernel1": [1, 1],
         "kernel2": [3, 3]
     },
