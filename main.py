@@ -24,6 +24,7 @@ from torch.utils.data import DataLoader
 import torch.nn as nn
 from torchvision import transforms
 from tensorboardX import SummaryWriter
+from models.lr_finder import LRFinder
 
 
 # TODO : Add option for custom test file --> Already available by specifying different inference_set ? The according dataset & dataloader should be created..
@@ -36,6 +37,7 @@ parser.add_argument("--visualize_grad_cam", help="Class Activation Maps - GradCA
 parser.add_argument("--visualize_gamma_beta", help="FiLM model parameters visualization (T-SNE)", action='store_true')
 parser.add_argument("--feature_extract", help="Feature Pre-Extraction", action='store_true')
 parser.add_argument("--create_dict", help="Create word dictionary (for tokenization)", action='store_true')
+parser.add_argument("--lr_finder", help="Create LR Finder plot", action='store_true')
 
 # Input parameters
 parser.add_argument("--data_root_path", type=str, default='data', help="Directory with data")
@@ -275,6 +277,20 @@ def train_model(device, model, dataloaders, output_folder, criterion=None, optim
     return model
 
 
+def get_lr_finder_curves(model, device, train_dataloader, output_dated_folder, nb_epoch, val_dataloader=None):
+    trainable_parameters = filter(lambda p: p.requires_grad, model.parameters())
+    loss_criterion = nn.CrossEntropyLoss()
+
+    optimizer = torch.optim.Adam(trainable_parameters, lr=1e-7, weight_decay=1e-2)
+    lr_finder = LRFinder(model, optimizer, loss_criterion, device=device)
+
+    print(f"Learning Rate finder -- Running for {nb_epoch} epoch ({len(train_dataloader.dataset) * nb_epoch} samples)")
+    lr_finder.range_test(train_dataloader, val_loader=val_dataloader, end_lr=100, nb_epoch=nb_epoch)
+
+    filepath = "%s/%s" % (output_dated_folder, 'lr_finder_plot.png')
+    lr_finder.plot(export_filepath=filepath)
+
+
 def process_dataloader(is_training, device, model, dataloader, criterion=None, optimizer=None, gamma_beta_path=None,
                        write_to_file_every=500, epoch_id=0, tensorboard=None):
     # Model should already have been copied to the GPU at this point (If using GPU)
@@ -382,11 +398,12 @@ def process_dataloader(is_training, device, model, dataloader, criterion=None, o
 def validate_arguments(args):
     
     mutually_exclusive_params = [args.training, args.inference, args.feature_extract,
-                                 args.create_dict, args.visualize_gamma_beta, args.visualize_grad_cam]
+                                 args.create_dict, args.visualize_gamma_beta, args.visualize_grad_cam, args.lr_finder]
 
     assert sum(mutually_exclusive_params) == 1, \
         "[ERROR] Can only do one task at a time " \
-        "(--training, --inference, --visualize_gamma_beta, --create_dict, --feature_extract)"
+        "(--training, --inference, --visualize_gamma_beta, --create_dict, --feature_extract --visualize_grad_cam " \
+        "--lr_finder)"
 
     mutually_exclusive_params = [args.raw_img_resize_based_on_height, args.raw_img_resize_based_on_width]
     assert sum(mutually_exclusive_params) < 2, "[ERROR] Image resize can be either --raw_img_resize_based_on_height " \
@@ -409,6 +426,8 @@ def get_task_from_args(args):
         return "feature_extract"
     elif args.create_dict:
         return "create_dict"
+    elif args.lr_finder:
+        return 'lr_finder'
 
     assert False, "Arguments don't specify task"
 
@@ -725,6 +744,10 @@ def main(args):
     elif task == "visualize_grad_cam":
         grad_cam_visualization(device=device, model=film_model, dataloader=train_dataloader,
                                output_folder=output_dated_folder)
+
+    elif task == "lr_finder":
+        get_lr_finder_curves(film_model, device, train_dataloader, output_dated_folder, args.nb_epoch,
+                             val_dataloader=val_dataloader)
 
     if use_tensorboard:
         close_tensorboard_writers(tensorboard['writers'])

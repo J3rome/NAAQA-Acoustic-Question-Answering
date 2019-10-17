@@ -76,7 +76,7 @@ class LRFinder(object):
             train_loader,
             val_loader=None,
             end_lr=10,
-            num_iter=100,
+            nb_epoch=5,
             step_mode="exp",
             smooth_f=0.05,
             diverge_th=5,
@@ -106,55 +106,57 @@ class LRFinder(object):
         self.history = {"lr": [], "loss": []}
         self.best_loss = None
 
+        nb_examples = len(train_loader.dataset)
+
         # Move the model to the proper device
         self.model.to(self.device)
 
         # Initialize the proper learning rate policy
         if step_mode.lower() == "exp":
-            lr_schedule = ExponentialLR(self.optimizer, end_lr, num_iter)
+            lr_schedule = ExponentialLR(self.optimizer, end_lr, nb_epoch * nb_examples)
         elif step_mode.lower() == "linear":
-            lr_schedule = LinearLR(self.optimizer, end_lr, num_iter)
+            lr_schedule = LinearLR(self.optimizer, end_lr, nb_epoch * nb_examples)
         else:
             raise ValueError("expected one of (exp, linear), got {}".format(step_mode))
 
         if smooth_f < 0 or smooth_f >= 1:
             raise ValueError("smooth_f is outside the range [0, 1[")
 
-        # Create an iterator to get data batch by batch
-        iterator = iter(train_loader)
-        for iteration in tqdm(range(num_iter)):
-            # Get a new set of inputs and labels
-            try:
-                batch = next(iterator)
-            except StopIteration:
-                iterator = iter(train_loader)
-                batch = next(iterator)
+        iteration = 0
+        diverged = False
+        for epoch in range(nb_epoch):
+            for batch in tqdm(train_loader):
+                # Train on batch and retrieve loss
+                loss = self._train_batch(batch)
+                if val_loader:
+                    loss = self._validate(val_loader)
 
-            # Train on batch and retrieve loss
-            loss = self._train_batch(batch)
-            if val_loader:
-                loss = self._validate(val_loader)
+                # Update the learning rate
+                lr_schedule.step()
+                self.history["lr"].append(lr_schedule.get_lr()[0])
 
-            # Update the learning rate
-            lr_schedule.step()
-            self.history["lr"].append(lr_schedule.get_lr()[0])
-
-            # Track the best loss and smooth it if smooth_f is specified
-            if iteration == 0:
-                self.best_loss = loss
-            else:
-                if smooth_f > 0:
-                    loss = smooth_f * loss + (1 - smooth_f) * self.history["loss"][-1]
-                if loss < self.best_loss:
+                # Track the best loss and smooth it if smooth_f is specified
+                if iteration == 0:
                     self.best_loss = loss
+                else:
+                    if smooth_f > 0:
+                        loss = smooth_f * loss + (1 - smooth_f) * self.history["loss"][-1]
+                    if loss < self.best_loss:
+                        self.best_loss = loss
 
-            # Check if the loss has diverged; if it has, stop the test
-            self.history["loss"].append(loss)
-            if loss > diverge_th * self.best_loss:
-                print("Stopping early, the loss has diverged")
+                # Check if the loss has diverged; if it has, stop the test
+                self.history["loss"].append(loss)
+                if loss > diverge_th * self.best_loss:
+                    print("Stopping early, the loss has diverged")
+                    diverged = True
+                    break
+
+                iteration += 1
+
+            if diverged:
                 break
 
-        print("Learning rate search finished. See the graph with {finder_name}.plot()")
+        print("Learning rate search finished.")
 
     def _train_batch(self, batch):
         # Set model to training mode
@@ -182,15 +184,17 @@ class LRFinder(object):
         running_loss = 0
         self.model.eval()
         with torch.no_grad():
-            for inputs, labels in dataloader:
+            for batch in dataloader:
                 # Move data to the correct device
-                inputs = inputs.to(self.device)
-                labels = labels.to(self.device)
+                images = batch['image'].to(self.device)
+                questions = batch['question'].to(self.device)
+                answers = batch['answer'].to(self.device)
+                seq_lengths = batch['seq_length'].to(self.device)
 
                 # Forward pass and loss computation
-                outputs = self.model(inputs)
-                loss = self.criterion(outputs, labels)
-                running_loss += loss.item() * inputs.size(0)
+                outputs, outputs_softmaxed = self.model(questions, seq_lengths, images, pack_sequence=True)
+                loss = self.criterion(outputs, answers)
+                running_loss += loss.item() * images.size(0)
 
         return running_loss / len(dataloader.dataset)
 
@@ -234,6 +238,7 @@ class LRFinder(object):
             plt.show()
         else:
             plt.savefig(export_filepath)
+            print(f"See LR graph '{export_filepath}'")
 
 
 class LinearLR(_LRScheduler):
