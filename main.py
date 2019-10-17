@@ -500,11 +500,13 @@ def main(args):
 
         transforms_list += to_tensor_transform
 
-        if args.normalize_with_imagenet_stats:
-            imagenet_stats = film_model_config['feature_extractor']['imagenet_stats']
-            transforms_list.append(NormalizeSample(mean=imagenet_stats['mean'], std=imagenet_stats['std'], inplace=True))
-        elif args.normalize_with_clear_stats:
-            assert False, "Normalization with CLEAR stats not implemented"
+        if args.normalize_with_imagenet_stats or args.normalize_with_clear_stats:
+            if args.normalize_with_imagenet_stats:
+                stats = film_model_config['preprocessing']['imagenet_stats']
+            else:
+                stats = film_model_config['preprocessing']['clear_stats']
+                
+            transforms_list.append(NormalizeSample(mean=stats['mean'], std=stats['std'], inplace=True))
 
     else:
         transforms_list += to_tensor_transform
