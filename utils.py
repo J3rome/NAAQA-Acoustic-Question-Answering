@@ -165,7 +165,7 @@ def save_training_stats(stats_output_file, epoch_nb, train_accuracy, train_loss,
     return stats
 
 
-def calc_mean_and_std(dataloader, zero_one_range=True, device='cpu'):
+def calc_mean_and_std(dataloader, device='cpu'):
     """Compute the mean and sd in an online fashion
 
         Var[x] = E[X^2] - E^2[X]
@@ -188,10 +188,6 @@ def calc_mean_and_std(dataloader, zero_one_range=True, device='cpu'):
         cnt += nb_pixels
 
     snd_moment = torch.sqrt(snd_moment - fst_moment ** 2)
-
-    if zero_one_range:
-        fst_moment /= 255
-        snd_moment /= 255
 
     return fst_moment, snd_moment
 
