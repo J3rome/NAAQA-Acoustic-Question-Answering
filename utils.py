@@ -190,7 +190,19 @@ def calc_mean_and_std(dataloader, device='cpu'):
 
     snd_moment = torch.sqrt(snd_moment - fst_moment ** 2)
 
-    return fst_moment, snd_moment
+    return fst_moment.tolist(), snd_moment.tolist()
+
+
+def update_mean_in_config(mean, std, config_file_path, key='clear_stats'):
+    config = read_json(config_file_path)
+
+    if key not in config['preprocessing']:
+        config['preprocessing'][key] = {}
+
+    config['preprocessing'][key]['mean'] = mean
+    config['preprocessing'][key]['std'] = std
+
+    save_json(config, config_file_path, indented=True)
 
 
 def save_git_revision(output_folder, filename='git.revision'):

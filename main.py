@@ -9,6 +9,7 @@ from tqdm import tqdm
 from utils import set_random_seed, create_folder_if_necessary, get_config, process_predictions, process_gamma_beta
 from utils import create_symlink_to_latest_folder, save_training_stats, save_json, sort_stats, is_date_string
 from utils import save_gamma_beta_h5, save_git_revision, get_random_state, set_random_state, close_tensorboard_writers
+from utils import calc_mean_and_std, update_mean_in_config
 
 from visualization import visualize_gamma_beta, grad_cam_visualization
 from preprocessing import create_dict_from_questions, extract_features
@@ -38,6 +39,8 @@ parser.add_argument("--visualize_gamma_beta", help="FiLM model parameters visual
 parser.add_argument("--feature_extract", help="Feature Pre-Extraction", action='store_true')
 parser.add_argument("--create_dict", help="Create word dictionary (for tokenization)", action='store_true')
 parser.add_argument("--lr_finder", help="Create LR Finder plot", action='store_true')
+parser.add_argument("--write_clear_mean_to_config", help="Will calculate the mean and std of the dataset and write it "
+                                                         "to the config file", action='store_true')
 
 # Input parameters
 parser.add_argument("--data_root_path", type=str, default='data', help="Directory with data")
@@ -291,6 +294,16 @@ def get_lr_finder_curves(model, device, train_dataloader, output_dated_folder, n
     lr_finder.plot(export_filepath=filepath)
 
 
+def write_clear_mean_to_config(dataloader, device, config_file_path):
+    assert os.path.isfile(config_file_path), f"Config file '{config_file_path}' doesn't exist"
+
+    print("Calculating mean and std from dataset")
+    mean, std = calc_mean_and_std(dataloader, device=device)
+
+    print(f"Saving mean ({mean}) and std ({std}) in '{config_file_path}'")
+    update_mean_in_config(mean, std, config_file_path)
+
+
 def process_dataloader(is_training, device, model, dataloader, criterion=None, optimizer=None, gamma_beta_path=None,
                        write_to_file_every=500, epoch_id=0, tensorboard=None):
     # Model should already have been copied to the GPU at this point (If using GPU)
@@ -397,13 +410,14 @@ def process_dataloader(is_training, device, model, dataloader, criterion=None, o
 
 def validate_arguments(args):
     
-    mutually_exclusive_params = [args.training, args.inference, args.feature_extract,
-                                 args.create_dict, args.visualize_gamma_beta, args.visualize_grad_cam, args.lr_finder]
+    mutually_exclusive_params = [args.training, args.inference, args.feature_extract, args.create_dict,
+                                 args.visualize_gamma_beta, args.visualize_grad_cam, args.lr_finder,
+                                 args.write_clear_mean_to_config]
 
     assert sum(mutually_exclusive_params) == 1, \
         "[ERROR] Can only do one task at a time " \
         "(--training, --inference, --visualize_gamma_beta, --create_dict, --feature_extract --visualize_grad_cam " \
-        "--lr_finder)"
+        "--lr_finder, --write_clear_mean_to_config)"
 
     mutually_exclusive_params = [args.raw_img_resize_based_on_height, args.raw_img_resize_based_on_width]
     assert sum(mutually_exclusive_params) < 2, "[ERROR] Image resize can be either --raw_img_resize_based_on_height " \
@@ -428,6 +442,8 @@ def get_task_from_args(args):
         return "create_dict"
     elif args.lr_finder:
         return 'lr_finder'
+    elif args.write_clear_mean_to_config:
+        return 'write_clear_mean_to_config'
 
     assert False, "Arguments don't specify task"
 
@@ -453,8 +469,8 @@ def main(args):
 
     # Flags
     restore_model_weights = args.inference or (args.training and args.continue_training) or args.visualize_grad_cam
-    create_output_folder = not args.create_dict and not args.feature_extract
-    instantiate_model = not args.create_dict and 'gamma_beta' not in task
+    create_output_folder = not args.create_dict and not args.feature_extract and not args.write_clear_mean_to_config
+    instantiate_model = not args.create_dict and 'gamma_beta' not in task and not args.write_clear_mean_to_config
     use_tensorboard = 'train' in task
 
     args.dict_folder = args.preprocessed_folder_name if args.dict_folder is None else args.dict_folder
@@ -748,6 +764,9 @@ def main(args):
     elif task == "lr_finder":
         get_lr_finder_curves(film_model, device, train_dataloader, output_dated_folder, args.nb_epoch,
                              val_dataloader=val_dataloader)
+
+    elif task == "write_clear_mean_to_config":
+        write_clear_mean_to_config(train_dataloader, device, args.config_path)
 
     if use_tensorboard:
         close_tensorboard_writers(tensorboard['writers'])
