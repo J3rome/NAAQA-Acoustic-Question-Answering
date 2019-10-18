@@ -1,0 +1,54 @@
+{
+    "input": {
+        "type": "raw"
+    },
+    "preprocessing":{
+        "imagenet_stats" : {
+          "mean" : [0.485, 0.456, 0.406],
+          "std" : [0.229, 0.224, 0.225]
+        },
+        "clear_stats": {
+          "mean" : [0.1631, 0.5743, 0.5272],
+          "std" : [0.0578, 0.0906, 0.0451]
+        }
+    },
+    "feature_extractor": {
+        "type": "resnet",
+        "version": 101,
+        "output_layer": "block3/unit_22/bottleneck_v1"
+    },
+    "question": {
+        "word_embedding_dim": 64,
+        "rnn_state_size": 1024
+    },
+    "stem": {
+        "spatial_location": true,
+        "conv_out": 32,
+        "conv_kernel": [3, 3]
+    },
+    "resblock": {
+        "no_resblock": 2,
+        "spatial_location": true,
+        "film_projection_type": "plus",
+        "kernel1": [1, 1],
+        "kernel2": [3, 3]
+    },
+    "classifier": {
+        "spatial_location": true,
+        "conv_out": 32,
+        "conv_kernel": [1, 1],
+        "no_mlp_units": 64
+    },
+    "optimizer" : {
+        "learning_rate": 3e-4,
+        "clip_val": 0.0,
+        "weight_decay": 1e-5,
+        "dropout_drop_prob": 0.25
+    },
+    "early_stopping": {
+        "enable": true,
+        "wait_first_n_epoch": 0,
+        "stop_threshold": 0.2,
+        "min_step": 0.001
+    }
+}
