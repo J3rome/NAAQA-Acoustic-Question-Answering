@@ -92,8 +92,6 @@ parser.add_argument("--tensorboard_folder", type=str, default='tensorboard',
 parser.add_argument("--tensorboard_save_graph", help="Save model graph to tensorboard", action='store_true')
 parser.add_argument("--tensorboard_save_images", help="Save input images to tensorboard", action='store_true')
 parser.add_argument("--tensorboard_save_texts", help="Save input texts to tensorboard", action='store_true')
-parser.add_argument("--perf_over_determinist", help="Will let torch use nondeterministic algorithms (Better "
-                                                    "performance but less reproductibility)", action='store_true')
 
 
 # Other parameters
@@ -108,6 +106,8 @@ parser.add_argument("--force_dict_all_answer", help="Will make sure that all ans
                                                     "(not just the one appearing in the train set)" +
                                                     " -- Preprocessing option" , action='store_true')
 parser.add_argument("--no_model_summary", help="Will hide the model summary", action='store_true')
+parser.add_argument("--perf_over_determinist", help="Will let torch use nondeterministic algorithms (Better "
+                                                    "performance but less reproductibility)", action='store_true')
 
 
 # TODO : Interactive mode
