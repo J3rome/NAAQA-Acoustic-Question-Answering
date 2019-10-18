@@ -297,6 +297,8 @@ def get_lr_finder_curves(model, device, train_dataloader, output_dated_folder, n
 def write_clear_mean_to_config(dataloader, device, config_file_path):
     assert os.path.isfile(config_file_path), f"Config file '{config_file_path}' doesn't exist"
 
+    dataloader.dataset.keep_1_game_per_scene()
+
     print("Calculating mean and std from dataset")
     mean, std = calc_mean_and_std(dataloader, device=device)
 
