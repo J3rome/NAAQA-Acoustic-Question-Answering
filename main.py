@@ -475,6 +475,10 @@ def main(args):
     instantiate_model = not args.create_dict and 'gamma_beta' not in task and not args.write_clear_mean_to_config
     use_tensorboard = 'train' in task
 
+    if args.write_clear_mean_to_config:
+        args.normalize_with_imagenet_stats = False
+        args.normalize_with_clear_stats = False
+
     args.dict_folder = args.preprocessed_folder_name if args.dict_folder is None else args.dict_folder
     if args.dict_file_path is None:
         args.dict_file_path = "%s/%s/dict.json" % (data_path, args.dict_folder)
