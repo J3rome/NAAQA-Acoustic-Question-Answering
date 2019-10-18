@@ -783,22 +783,3 @@ def main(args):
 if __name__ == "__main__":
     args = parser.parse_args()
     main(args)
-
-        # TODO : Extract Beta And Gamma Parameters + T-SNE
-        # TODO : Feed RAW image directly to the FiLM network
-        # TODO : Resize images ? Do we absolutely need 224x224 for the resnet preprocessing ?
-        #        Since we extract a layer in resnet, we can feed any size, its fully convolutional up to that point
-        #        When feeding directly to FiLM, we can use original size ?
-        # TODO : What is the optimal size for our spectrograms ?
-        # TODO : Train with different amount of residual blocks. Other modifications to the architecture ?
-
-        #   Tasks :
-        #       Train from extracted features (No resnet - preprocessed)
-        #       Train from Raw Images (Resnet with fixed weights)
-        #       Train from Raw Images (Resnet or similar retrained (Only firsts couple layers))
-        #       Run from extracted features (No resnet - preprocessed)
-        #       Run from Raw Images (Resnet With fixed weights)
-        #       Run from Raw Images with VISUALIZATION
-
-
-
