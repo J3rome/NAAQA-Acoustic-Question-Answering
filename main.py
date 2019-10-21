@@ -3,6 +3,7 @@ from _datetime import datetime
 import subprocess
 import shutil
 import os
+import random
 
 from tqdm import tqdm
 
@@ -38,6 +39,9 @@ parser.add_argument("--visualize_grad_cam", help="Class Activation Maps - GradCA
 parser.add_argument("--visualize_gamma_beta", help="FiLM model parameters visualization (T-SNE)", action='store_true')
 parser.add_argument("--feature_extract", help="Feature Pre-Extraction", action='store_true')
 parser.add_argument("--create_dict", help="Create word dictionary (for tokenization)", action='store_true')
+parser.add_argument("--random_answer_baseline", help="Spit out a random answer for each question", action='store_true')
+parser.add_argument("--random_weight_baseline", help="Use randomly initialised Neural Network to answer the question",
+                    action='store_true')
 parser.add_argument("--lr_finder", help="Create LR Finder plot", action='store_true')
 parser.add_argument("--write_clear_mean_to_config", help="Will calculate the mean and std of the dataset and write it "
                                                          "to the config file", action='store_true')
@@ -410,16 +414,50 @@ def process_dataloader(is_training, device, model, dataloader, criterion=None, o
     return epoch_loss, epoch_acc, processed_predictions
 
 
+def random_answer_baseline(dataloader, output_folder=None):
+    answers = list(dataloader.dataset.answer_counter.keys())
+    set_type = dataloader.dataset.set
+    correct_answer = 0
+    incorrect_answer = 0
+    for batch in tqdm(dataloader):
+        ground_truths = batch['answer'].tolist()
+        for ground_truth in ground_truths:
+            random_answer = random.choice(answers)
+            if random_answer == ground_truth:
+                correct_answer += 1
+            else:
+                incorrect_answer += 1
+
+    accuracy = correct_answer / (correct_answer + incorrect_answer)
+
+    print(f"Random answer baseline accuracy for set {set_type} : {accuracy}")
+
+    if output_folder:
+        save_json({'accuracy': accuracy}, output_folder, f'{set_type}_results.json')
+
+
+def random_weight_baseline(model, device, dataloader, output_folder=None):
+
+    set_type = dataloader.dataset.set
+    loss, accuracy, _ = process_dataloader(False, device, model, dataloader)
+
+    print(f"Random weight baseline for set {set_type}. Accuracy : {accuracy}  Loss : {loss}")
+
+    if output_folder:
+        save_json({'accuracy': accuracy}, output_folder, f'{set_type}_results.json')
+
+
 def validate_arguments(args):
     
     mutually_exclusive_params = [args.training, args.inference, args.feature_extract, args.create_dict,
                                  args.visualize_gamma_beta, args.visualize_grad_cam, args.lr_finder,
-                                 args.write_clear_mean_to_config]
+                                 args.write_clear_mean_to_config, args.random_answer_baseline,
+                                 args.random_weight_baseline]
 
     assert sum(mutually_exclusive_params) == 1, \
         "[ERROR] Can only do one task at a time " \
         "(--training, --inference, --visualize_gamma_beta, --create_dict, --feature_extract --visualize_grad_cam " \
-        "--lr_finder, --write_clear_mean_to_config)"
+        "--lr_finder, --write_clear_mean_to_config, --random_answer_baseline, --random_weight_baseline)"
 
     mutually_exclusive_params = [args.raw_img_resize_based_on_height, args.raw_img_resize_based_on_width]
     assert sum(mutually_exclusive_params) < 2, "[ERROR] Image resize can be either --raw_img_resize_based_on_height " \
@@ -446,6 +484,10 @@ def get_task_from_args(args):
         return 'lr_finder'
     elif args.write_clear_mean_to_config:
         return 'write_clear_mean_to_config'
+    elif args.random_weight_baseline:
+        return 'random_weight_baseline'
+    elif args.random_answer_baseline:
+        return 'random_answer_baseline'
 
     assert False, "Arguments don't specify task"
 
@@ -472,9 +514,11 @@ def main(args):
     # Flags
     restore_model_weights = args.inference or (args.training and args.continue_training) or args.visualize_grad_cam
     create_output_folder = not args.create_dict and not args.feature_extract and not args.write_clear_mean_to_config
-    instantiate_model = not args.create_dict and 'gamma_beta' not in task and not args.write_clear_mean_to_config
+    instantiate_model = not args.create_dict and not args.write_clear_mean_to_config and \
+                        'gamma_beta' not in task and 'random_answer' not in task
     use_tensorboard = 'train' in task
 
+    # Make sure we are not normalizing beforce calculating mean and std
     if args.write_clear_mean_to_config:
         args.normalize_with_imagenet_stats = False
         args.normalize_with_clear_stats = False
@@ -773,6 +817,14 @@ def main(args):
 
     elif task == "write_clear_mean_to_config":
         write_clear_mean_to_config(train_dataloader, device, args.config_path)
+
+    elif task == 'random_answer_baseline':
+        random_answer_baseline(train_dataloader, output_dated_folder)
+        random_answer_baseline(val_dataloader, output_dated_folder)
+
+    elif task == 'random_weight_baseline':
+        random_weight_baseline(film_model, device, train_dataloader, output_dated_folder)
+        random_weight_baseline(film_model, device, val_dataloader, output_dated_folder)
 
     if use_tensorboard:
         close_tensorboard_writers(tensorboard['writers'])
