@@ -91,6 +91,8 @@ parser.add_argument("--preprocessed_folder_name", type=str, default='preprocesse
                     help="Directory where to store/are stored extracted features and token dictionary")
 parser.add_argument("--output_name_suffix", type=str, default='', help="Suffix that will be appended to the version "
                                                                        "name (output & tensorboard)")
+parser.add_argument("--no_start_end_tokens", help="Constants tokens won't be added to the question "
+                                                  "(<start> & <end> tokens)", action='store_true')
 parser.add_argument("--dict_folder", type=str, default=None,
                     help="Directory where to store/retrieve generated dictionary. "
                          "If --dict_file_path is used, this will be ignored")
@@ -795,7 +797,7 @@ def main(args):
 
     elif task == "create_dict":
         create_dict_from_questions(train_dataset, force_all_answers=args.force_dict_all_answer,
-                                   output_folder_name=args.dict_folder)
+                                   output_folder_name=args.dict_folder, start_end_tokens=not args.no_start_end_tokens)
 
     elif task == "feature_extract":
         extract_features(device=device, feature_extractor=film_model.feature_extractor,

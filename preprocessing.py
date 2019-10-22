@@ -96,14 +96,18 @@ def extract_features(device, feature_extractor, dataloaders, output_folder_name=
 
 # >>> Dictionary Creation (For word tokenization)
 def create_dict_from_questions(dataset, word_min_occurence=1, dict_filename='dict.json', force_all_answers=False,
-                               output_folder_name='preprocessed'):
-    # FIXME : Should we use the whole dataset to create the dictionary ?
+                               output_folder_name='preprocessed', start_end_tokens=True):
     games = dataset.games
 
     word2i = {'<padding>': 0,
               '<unk>': 1
               }
     word_index = max(word2i.values()) + 1
+
+    if start_end_tokens:
+        word2i['<start>'] = word_index
+        word2i['<end>'] = word_index + 1
+        word_index += 2
 
     answer2i = {  #'<padding>': 0,        # FIXME : Why would we need padding in the answers ?
         '<unk>': 0  # FIXME : We have no training example with unkonwn answer. Add Switch to remove unknown answer

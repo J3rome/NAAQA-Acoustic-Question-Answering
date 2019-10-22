@@ -288,6 +288,13 @@ class CLEARTokenizer:
         self.unknown_question_token = self.word2i["<unk>"]
         self.padding_token = self.word2i["<padding>"]
 
+        if "<start>" in self.word2i and "<end>" in self.word2i:
+            self.start_token = self.word2i['<start>']
+            self.end_token = self.word2i['<end>']
+        else:
+            self.start_token = None
+            self.end_token = None
+
         #self.padding_answer = self.answer2i["<padding>"]
         self.unknown_answer = self.answer2i["<unk>"]
 
@@ -319,6 +326,10 @@ class CLEARTokenizer:
             if token not in self.word2i:
                 token = '<unk>'
             tokens.append(self.word2i[token])
+
+        if self.start_token:
+            tokens = [self.start_token] + tokens + [self.end_token]
+
         return tokens
 
     def decode_question(self, tokens, remove_padding=False):
