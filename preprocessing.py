@@ -110,17 +110,19 @@ def create_dict_from_questions(dataset, word_min_occurence=1, dict_filename='dic
     }
     answer_index = max(answer2i.values()) + 1
 
-    answer2occ = dataset.answer_counter
+    answers = [k.lower() for k in dataset.answer_counter.keys()]
     word2occ = defaultdict(int)
 
     tokenizer = CLEARTokenizer.get_tokenizer_inst()
+    forbidden_tokens = [",", "?"]
 
     # Tokenize questions
     for i in range(len(games)):
         game = dataset.get_game(i)
-        input_tokens = tokenizer.tokenize(game['question'])
+        input_tokens = [t.lower() for t in tokenizer.tokenize(game['question'])]
         for tok in input_tokens:
-            word2occ[tok] += 1
+            if tok not in forbidden_tokens:
+                word2occ[tok] += 1
 
     # Sort tokens then shuffle then to keep control over the order (to enhance reproducibility)
     sorted_words = sorted(word2occ.items(), key=lambda x: x[0])
@@ -131,7 +133,7 @@ def create_dict_from_questions(dataset, word_min_occurence=1, dict_filename='dic
             word2i[word_occ[0]] = word_index
             word_index += 1
 
-    sorted_answers = sorted(answer2occ.keys())
+    sorted_answers = sorted(answers)
     shuffle(sorted_answers)
     # parse the answers
     for answer in sorted_answers:
