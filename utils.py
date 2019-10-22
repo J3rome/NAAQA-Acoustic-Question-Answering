@@ -344,8 +344,9 @@ def get_answer_to_family_map(attributes_filepath):
     for family, answers in attributes.items():
         for answer in answers:
             # If there is duplicated answers, they will be assigned to the first occurring family
-            if answer not in answer_to_family:
-                answer_to_family[answer] = family
+            answer_lower = answer.lower()
+            if answer_lower not in answer_to_family:
+                answer_to_family[answer_lower] = family
 
     return answer_to_family
 
