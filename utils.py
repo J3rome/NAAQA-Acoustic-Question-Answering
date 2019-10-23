@@ -336,17 +336,19 @@ def save_gamma_beta_h5(gammas_betas, set_type, folder, filename=None, nb_vals=No
         return nb_val_to_write
 
 
-def get_answer_to_family_map(attributes_filepath):
+def get_answer_to_family_map(attributes_filepath, to_lowercase=True):
     attributes = read_json(attributes_filepath)
 
     answer_to_family = {"<unk>": "unknown"}  # FIXME : Quantify what is the impact of having an unknown answer
 
     for family, answers in attributes.items():
         for answer in answers:
+            the_answer = answer
+            if to_lowercase:
+                the_answer = answer.lower()
             # If there is duplicated answers, they will be assigned to the first occurring family
-            answer_lower = answer.lower()
-            if answer_lower not in answer_to_family:
-                answer_to_family[answer_lower] = family
+            if the_answer not in answer_to_family:
+                answer_to_family[the_answer] = family
 
     return answer_to_family
 
