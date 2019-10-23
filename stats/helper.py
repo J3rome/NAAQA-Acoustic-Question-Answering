@@ -7,7 +7,8 @@ from utils import get_answer_to_family_map
 # TODO : Retrieve scenes ? Questions ?
 # TODO : If adding more attributes (Like presence of relation), should add them in the processing instead of here. We should mainly read and arrange stuff arond, not post process
 
-# General
+
+# Misc
 def format_epoch_folder(epoch_folder):
     if type(epoch_folder) == int or epoch_folder.isdigit():
         epoch_folder = f"Epoch_{epoch_folder:02d}"
@@ -17,60 +18,7 @@ def format_epoch_folder(epoch_folder):
     return epoch_folder
 
 
-def load_experiment_predictions(experiment_output_path, epoch_folder='best', set_type='val'):
-    epoch_folder = format_epoch_folder(epoch_folder)
-
-    epoch_path = f"{experiment_output_path}/{epoch_folder}"
-    prediction_filename = f"{set_type}_predictions.json"
-
-    predictions = read_json(epoch_path, prediction_filename)
-
-    return predictions
-
-
-def load_experiment_stats(experiment_output_path, set_type='val', sorted_by_time=True, only_epoch=None):
-    full_stats = read_json(experiment_output_path, 'stats.json')
-
-    if only_epoch:
-        if only_epoch == 'best':
-            stats = [full_stats[0]]
-        else:
-            epoch_folder = format_epoch_folder(only_epoch)
-
-            stats = [s for s in full_stats if s['epoch'] == epoch_folder]
-    else:
-        stats = full_stats
-        if sorted_by_time:
-            stats = sorted(stats, key=lambda s: int(s['epoch'].split('_')[1]))
-
-    stats = [{'epoch': s['epoch'],
-              'acc': s[f'{set_type}_acc'],
-              'loss': s[f'{set_type}_loss']
-              } for s in stats]
-
-    return stats
-
-
-def sort_correct_incorrect(predictions):
-    correct_predictions = []
-    correct_family_predictions = []
-    incorrect_family_predictions = []
-
-    for prediction in predictions:
-        if prediction['correct']:
-            correct_predictions.append(prediction)
-        elif prediction['correct_answer_family']:
-            correct_family_predictions.append(prediction)
-        else:
-            incorrect_family_predictions.append(prediction)
-
-    return {
-        'correct': correct_predictions,
-        'correct_family': correct_family_predictions,
-        'incorrect_family': incorrect_family_predictions
-    }
-
-
+# Plotting
 def show_discrete_hist_centered(data, title=None, sort_key_fct=None, show_fig=False, export_filepath=None, fig_ax=None):
     show_fig = show_fig and export_filepath is None
     labels, counts = np.unique(data, return_counts=True)
@@ -109,7 +57,92 @@ def show_discrete_hist_centered(data, title=None, sort_key_fct=None, show_fig=Fa
     return fig, ax
 
 
+def plot_hist(predictions, key, filter_fct=None, title=None, label=None, norm_hist=False, show_fig=False, fig_ax=None):
+    preds = predictions
+
+    if filter_fct:
+        preds = filter(filter_fct, preds)
+
+    to_plot = [p[key] for p in preds]
+
+    if fig_ax:
+        fig, ax = fig_ax
+    else:
+        fig, ax = plt.subplots()
+
+    if label and label.lower() == "same":
+        label = title
+
+    if norm_hist:
+        length = len(to_plot)
+        weights = np.ones(length)/length
+    else:
+        weights = None
+
+    ax.hist(to_plot, label=label, weights=weights)
+
+    if ax.get_title() == "":
+        ax.set_title(title)
+
+    fig.tight_layout()
+    if show_fig:
+        plt.show()
+
+
 # Results stats helpers
+def load_experiment_predictions(experiment_output_path, epoch_folder='best', set_type='val'):
+    epoch_folder = format_epoch_folder(epoch_folder)
+
+    epoch_path = f"{experiment_output_path}/{epoch_folder}"
+    prediction_filename = f"{set_type}_predictions.json"
+
+    predictions = read_json(epoch_path, prediction_filename)
+
+    return predictions
+
+
+def load_experiment_stats(experiment_output_path, set_type='val', sorted_by_time=True, only_epoch=None):
+    full_stats = read_json(experiment_output_path, 'stats.json')
+
+    if only_epoch:
+        if only_epoch == 'best':
+            stats = [full_stats[0]]
+        else:
+            epoch_folder = format_epoch_folder(only_epoch)
+
+            stats = [s for s in full_stats if s['epoch'] == epoch_folder]
+    else:
+        stats = full_stats
+        if sorted_by_time:
+            stats = sorted(stats, key=lambda s: int(s['epoch'].split('_')[1]))
+
+    stats = [{'epoch': s['epoch'],
+              'acc': s[f'{set_type}_acc'],
+              'loss': s[f'{set_type}_loss']
+              } for s in stats]
+
+    return stats
+
+
+def sort_correct_incorrect_predictions(predictions):
+    correct_predictions = []
+    correct_family_predictions = []
+    incorrect_family_predictions = []
+
+    for prediction in predictions:
+        if prediction['correct']:
+            correct_predictions.append(prediction)
+        elif prediction['correct_answer_family']:
+            correct_family_predictions.append(prediction)
+        else:
+            incorrect_family_predictions.append(prediction)
+
+    return {
+        'correct': correct_predictions,
+        'correct_family': correct_family_predictions,
+        'incorrect_family': incorrect_family_predictions
+    }
+
 
 def plot_confidence(train_predictions, val_predictions, question_family=None, norm_hist=False,
                     show_fig=False, fig_ax=None):
@@ -150,41 +183,6 @@ def plot_confidence(train_predictions, val_predictions, question_family=None, no
 
     if show_fig:
         plt.show()
-
-def plot_hist(predictions, key, filter_fct=None, title=None, label=None, norm_hist=False, show_fig=False, fig_ax=None):
-    preds = predictions
-
-    if filter_fct:
-        preds = filter(filter_fct, preds)
-
-    to_plot = [p[key] for p in preds]
-
-    if fig_ax:
-        fig, ax = fig_ax
-    else:
-        fig, ax = plt.subplots()
-
-    if label and label.lower() == "same":
-        label = title
-
-    if norm_hist:
-        length = len(to_plot)
-        weights = np.ones(length)/length
-    else:
-        weights = None
-
-    ax.hist(to_plot, label=label, weights=weights)
-
-    if ax.get_title() == "":
-        ax.set_title(title)
-
-    fig.tight_layout()
-    if show_fig:
-        plt.show()
-
-    #fig, ax = show_discrete_hist_centered(confidence, title=title, sort_key_fct=sort_key_fct, show_fig=True)
-
-
 
 # Dataset stats helpers
 
