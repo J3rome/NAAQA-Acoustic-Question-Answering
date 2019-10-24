@@ -101,6 +101,7 @@ parser.add_argument("--tensorboard_folder", type=str, default='tensorboard',
 parser.add_argument("--tensorboard_save_graph", help="Save model graph to tensorboard", action='store_true')
 parser.add_argument("--tensorboard_save_images", help="Save input images to tensorboard", action='store_true')
 parser.add_argument("--tensorboard_save_texts", help="Save input texts to tensorboard", action='store_true')
+parser.add_argument("--gpu_index", type=str, default='0', help="Index of the GPU to use")
 
 
 # Other parameters
@@ -554,7 +555,7 @@ def main(args):
     if args.no_img_resize or film_model_config['input']['type'].lower() != 'raw':
         args.raw_img_resize_val = None
 
-    device = 'cuda:0' if torch.cuda.is_available() and not args.use_cpu else 'cpu'
+    device = f'cuda:{args.gpu_index}' if torch.cuda.is_available() and not args.use_cpu else 'cpu'
     print("Using device '%s'" % device)
 
     ####################################
