@@ -52,7 +52,7 @@ def summary(model, input_size, batch_size=-1, device="cuda:0"):
     if isinstance(input_size, tuple):
         input_size = [input_size]
 
-    model.to(device)
+    #model.to(device)
 
     # batch_size of 2 for batchnorm
     x = []
