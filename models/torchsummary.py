@@ -5,7 +5,7 @@ from collections import OrderedDict
 import numpy as np
 
 
-def summary(model, input_size, batch_size=-1, device="cuda"):
+def summary(model, input_size, batch_size=-1, device="cuda:0"):
 
     def register_hook(module):
 
@@ -40,13 +40,10 @@ def summary(model, input_size, batch_size=-1, device="cuda"):
         ):
             hooks.append(module.register_forward_hook(hook))
 
-    device = device.lower().split(":")[0]
-    assert device in [
-        "cuda",
-        "cpu",
-    ], "Input device is not valid, please specify 'cuda' or 'cpu'"
+    assert 'cpu' in device or (torch.cuda.is_available() and 'cuda' in device), \
+        "Input device is not valid, please specify 'cuda' or 'cpu'"
 
-    if device == "cuda" and torch.cuda.is_available():
+    if device.startswith("cuda"):
         dtype_prefix = torch.cuda
     else:
         dtype_prefix = torch
@@ -55,16 +52,13 @@ def summary(model, input_size, batch_size=-1, device="cuda"):
     if isinstance(input_size, tuple):
         input_size = [input_size]
 
-#    model.cuda()
+    model.to(device)
 
     # batch_size of 2 for batchnorm
     x = []
-    x.append(torch.ones(2, *input_size[0]).type(dtype_prefix.LongTensor))
-    x.append(torch.ones(2).type(dtype_prefix.LongTensor) + 1)
-    x.append(torch.ones(2, *input_size[2]).type(dtype_prefix.FloatTensor))
-
-    #x = [torch.rand(2, *in_size).type(dtype) for in_size in input_size]
-    # print(type(x[0]))
+    x.append(torch.ones(2, *input_size[0]).type(dtype_prefix.LongTensor).to(device))
+    x.append(torch.ones(2).type(dtype_prefix.LongTensor).to(device) + 1)
+    x.append(torch.ones(2, *input_size[2]).type(dtype_prefix.FloatTensor).to(device))
 
     # create properties
     summary = OrderedDict()
@@ -73,10 +67,7 @@ def summary(model, input_size, batch_size=-1, device="cuda"):
     # register hook
     model.apply(register_hook)
 
-
-
     # make a forward pass
-    # print(x.shape)
     model(*x, pack_sequence=False)
 
     # remove these hooks
