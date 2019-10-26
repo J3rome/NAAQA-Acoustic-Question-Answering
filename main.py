@@ -515,11 +515,15 @@ def main(args):
     output_dated_folder = "%s/%s" % (output_experiment_folder, current_datetime_str)
 
     # Flags
-    restore_model_weights = args.inference or (args.training and args.continue_training) or args.visualize_grad_cam
+    continuing_training = args.training and args.continue_training
+    restore_model_weights = args.inference or continuing_training or args.visualize_grad_cam
     create_output_folder = not args.create_dict and not args.feature_extract and not args.write_clear_mean_to_config
     instantiate_model = not args.create_dict and not args.write_clear_mean_to_config and \
                         'gamma_beta' not in task and 'random_answer' not in task
     use_tensorboard = 'train' in task
+
+    if continuing_training and args.film_model_weight_path is None:
+        args.film_mode_weight_path = 'latest'
 
     # Make sure we are not normalizing beforce calculating mean and std
     if args.write_clear_mean_to_config:
