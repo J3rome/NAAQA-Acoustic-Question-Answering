@@ -118,6 +118,8 @@ parser.add_argument("--force_dict_all_answer", help="Will make sure that all ans
 parser.add_argument("--no_model_summary", help="Will hide the model summary", action='store_true')
 parser.add_argument("--perf_over_determinist", help="Will let torch use nondeterministic algorithms (Better "
                                                     "performance but less reproductibility)", action='store_true')
+parser.add_argument("--overwrite_clear_mean", help="Will overwrite the Mean and Std of the CLEAR dataset stored in "
+                                                   "config file", action='store_true')
 
 
 # TODO : Interactive mode
@@ -826,7 +828,8 @@ def main(args):
                              val_dataloader=val_dataloader)
 
     elif task == "write_clear_mean_to_config":
-        write_clear_mean_to_config(train_dataloader, device, film_model_config, args.config_path)
+        write_clear_mean_to_config(train_dataloader, device, film_model_config, args.config_path,
+                                   args.overwrite_clear_mean)
 
     elif task == 'random_answer_baseline':
         random_answer_baseline(train_dataloader, output_dated_folder)
