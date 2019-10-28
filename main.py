@@ -301,16 +301,19 @@ def get_lr_finder_curves(model, device, train_dataloader, output_dated_folder, n
     lr_finder.plot(export_filepath=filepath)
 
 
-def write_clear_mean_to_config(dataloader, device, config_file_path):
+def write_clear_mean_to_config(dataloader, device, current_config, config_file_path, overwrite_mean=False):
     assert os.path.isfile(config_file_path), f"Config file '{config_file_path}' doesn't exist"
+
+    key = "clear_stats"
+
+    assert (not overwrite_mean and 'preprocessing' in current_config and key in current_config['preprocessing']
+            and type(current_config['preprocessing'][key]) == list), "CLEAR mean is already present in config."
 
     dataloader.dataset.keep_1_game_per_scene()
 
-    print("Calculating mean and std from dataset")
     mean, std = calc_mean_and_std(dataloader, device=device)
 
-    print(f"Saving mean ({mean}) and std ({std}) in '{config_file_path}'")
-    update_mean_in_config(mean, std, config_file_path)
+    update_mean_in_config(mean, std, config_file_path, current_config=current_config, key=key)
 
 
 def process_dataloader(is_training, device, model, dataloader, criterion=None, optimizer=None, gamma_beta_path=None,
@@ -823,7 +826,7 @@ def main(args):
                              val_dataloader=val_dataloader)
 
     elif task == "write_clear_mean_to_config":
-        write_clear_mean_to_config(train_dataloader, device, args.config_path)
+        write_clear_mean_to_config(train_dataloader, device, film_model_config, args.config_path)
 
     elif task == 'random_answer_baseline':
         random_answer_baseline(train_dataloader, output_dated_folder)

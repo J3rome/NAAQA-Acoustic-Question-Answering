@@ -193,14 +193,22 @@ def calc_mean_and_std(dataloader, device='cpu'):
     return fst_moment.tolist(), snd_moment.tolist()
 
 
-def update_mean_in_config(mean, std, config_file_path, key='clear_stats'):
-    config = read_json(config_file_path)
+def update_mean_in_config(mean, std, config_file_path, key='clear_stats', current_config=None):
+    if current_config:
+        config = current_config
+    else:
+        config = read_json(config_file_path)
+
+    if 'preprocessing' not in config:
+        config['preprocessing'] = {}
 
     if key not in config['preprocessing']:
         config['preprocessing'][key] = {}
 
     config['preprocessing'][key]['mean'] = mean
     config['preprocessing'][key]['std'] = std
+
+    print(f"Saving mean ({mean}) and std ({std}) in '{config_file_path}'")
 
     save_json(config, config_file_path, indented=True)
 
