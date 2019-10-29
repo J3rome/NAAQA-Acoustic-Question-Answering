@@ -320,7 +320,10 @@ class CLEARTokenizer:
     Input: String
     Output: List of tokens
     """
-    def encode_question(self, question):
+    def encode_question(self, question, to_lowercase=True):
+        if to_lowercase:
+            question = [w.lower() for w in question.split(' ')]
+            
         tokens = []
         for token in self.tokenizer.tokenize(question):
             if token not in self.word2i:
@@ -338,7 +341,10 @@ class CLEARTokenizer:
 
         return ' '.join([self.i2word[tok] for tok in tokens])
 
-    def encode_answer(self, answer):
+    def encode_answer(self, answer, to_lowercase=True):
+        if to_lowercase:
+            answer = answer.lower()
+
         if answer not in self.answer2i:
             return self.answer2i['<unk>']
         return self.answer2i[answer]
