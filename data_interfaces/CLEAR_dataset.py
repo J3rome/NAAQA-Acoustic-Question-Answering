@@ -322,8 +322,8 @@ class CLEARTokenizer:
     """
     def encode_question(self, question, to_lowercase=True):
         if to_lowercase:
-            question = [w.lower() for w in question.split(' ')]
-            
+            question = ''.join([w.lower() for w in question.split(' ')])
+
         tokens = []
         for token in self.tokenizer.tokenize(question):
             if token not in self.word2i:
