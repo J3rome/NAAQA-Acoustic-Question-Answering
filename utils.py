@@ -173,6 +173,8 @@ def calc_mean_and_std(dataloader, device='cpu'):
     """
     assert dataloader.dataset.is_raw_img(), "Config must be set to RAW img to calculate images stats"
 
+    print("Calculating mean and std from dataset")
+
     cnt = 0
     fst_moment = torch.empty(3, device=device)
     snd_moment = torch.empty(3, device=device)
