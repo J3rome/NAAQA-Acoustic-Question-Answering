@@ -18,21 +18,44 @@ def format_epoch_folder(epoch_folder):
     return epoch_folder
 
 
+def autolabel_bar(ax, rects):
+    for rect in rects:
+        h = rect.get_height()
+        h_str = f'{int(h)}' if h >= 1 or h == 0 else f'{float(h):.2f}'
+        ax.text(rect.get_x() + rect.get_width()/2., 1.00 * h, h_str, ha='center', va='bottom', fontsize=6)
+
+
 # Plotting
-def show_discrete_hist_centered(data, title=None, sort_key_fct=None, show_fig=False, export_filepath=None, fig_ax=None):
+def show_discrete_hist(data, key=None, title=None, label=None, sort_key_fct=None, show_fig=False,
+                                export_filepath=None, fig_ax=None, position='center', capitalize=True, bar_width=0.4,
+                                norm_hist=False, all_x_labels=None):
     show_fig = show_fig and export_filepath is None
+
+    if key:
+        data = [d[key] for d in data]
+
     labels, counts = np.unique(data, return_counts=True)
 
-    if sort_key_fct:
-        labels_counts = sorted(zip(labels, counts), key=sort_key_fct)
-        labels, counts = zip(*labels_counts)
+    if all_x_labels:
+        missing_labels = list(set(all_x_labels) - set(labels))
 
-    #plt.bar(labels, counts, align='center')
-    #plt.gca().set_xticks(labels)
-    #plt.xticks(rotation=90)
-    #plt.show()
+        labels = np.append(labels, missing_labels)
+        counts = np.append(counts, np.zeros(len(missing_labels)))
 
-    #return 0,0
+    nb_labels = len(labels)
+
+    if sort_key_fct is None:
+        sort_key_fct = lambda x: x[0]
+
+    labels_counts = sorted(zip(labels, counts), key=sort_key_fct)
+    labels, counts = zip(*labels_counts)
+
+    if norm_hist:
+        total = sum(counts)
+        counts = [count/total for count in counts]
+
+    if capitalize:
+        labels = [l.capitalize() for l in labels]
 
     if fig_ax:
         # Add plot to provided figure
@@ -40,13 +63,23 @@ def show_discrete_hist_centered(data, title=None, sort_key_fct=None, show_fig=Fa
     else:
         fig, ax = plt.subplots()
 
-    ax.bar(labels, counts, align='center')
-    #ax.set_xticks(np.arange(len(labels)))
+    x = np.arange(nb_labels)
+    original_x = x
+    if position == 'left':
+        x = x - (bar_width/2)
+    elif position == 'right':
+        x = x + (bar_width/2)
+
+    rects = ax.bar(x, counts, width=bar_width, align='center', label=label)
+    ax.set_xticks(original_x)
     ax.set_xticklabels(labels, rotation=90)
-    #ax.xticks(rotation=90)
+
+    autolabel_bar(ax, rects)
 
     if title:
         ax.set_title(title)
+
+    #fig.tight_layout()
 
     if show_fig:
         plt.show()
@@ -57,13 +90,18 @@ def show_discrete_hist_centered(data, title=None, sort_key_fct=None, show_fig=Fa
     return fig, ax
 
 
-def plot_hist(predictions, key, filter_fct=None, title=None, label=None, norm_hist=False, show_fig=False, fig_ax=None):
+def plot_hist(predictions, key=None, filter_fct=None, title=None, label=None, norm_hist=False, show_fig=False,
+              fig_ax=None):
+
     preds = predictions
 
     if filter_fct:
         preds = filter(filter_fct, preds)
 
-    to_plot = [p[key] for p in preds]
+    if key:
+        to_plot = [p[key] for p in preds]
+    else:
+        to_plot = preds
 
     if fig_ax:
         fig, ax = fig_ax
@@ -144,9 +182,36 @@ def sort_correct_incorrect_predictions(predictions):
     }
 
 
-def plot_confidence(train_predictions, val_predictions, question_family=None, norm_hist=False,
-                    show_fig=False, fig_ax=None):
+def plot_distribution_per_question_family(train_predictions, val_predictions, all_x_labels=None, norm_hist=False,
+                                          show_fig=False):
+    keys_titles = [('correct', 'Correct Answer'),
+                   ('correct_family', 'Incorrect Answer -- Correct Family'),
+                   ('incorrect_family', 'Incorrect Answer -- Incorrect Family')]
 
+    figs_axs = []
+
+    for key, title in keys_titles:
+        fig, ax = plt.subplots(1, 1)
+        ax.set_title(title)
+        show_discrete_hist(train_predictions[key], key="ground_truth_answer_family", all_x_labels=all_x_labels,
+                           fig_ax=(fig, ax), position='left', label="Train", norm_hist=norm_hist)
+        show_discrete_hist(val_predictions[key], key="ground_truth_answer_family", all_x_labels=all_x_labels,
+                           fig_ax=(fig, ax), position='right', label='Val', norm_hist=norm_hist)
+        ax.legend()
+
+        fig.tight_layout()
+
+        figs_axs.append((fig, ax))
+
+    if show_fig:
+        plt.show()
+
+    return figs_axs
+
+
+def plot_predictions_confidence(train_predictions, val_predictions, question_family=None, norm_hist=False,
+                    show_fig=False, fig_ax=None):
+    # TODO : Add X & Y Axis labels
     if fig_ax:
         fig, axs = fig_ax
         assert len(axs) >= 3, 'Subplot provided doesn\'t have 3 ax available'
@@ -184,50 +249,6 @@ def plot_confidence(train_predictions, val_predictions, question_family=None, no
     if show_fig:
         plt.show()
 
-# Dataset stats helpers
-
 
 if __name__ == "__main__":
-    root_data_path = "data"
-    root_output_path = "output/train_film"
-    experiment_name = "v3_resnet_1k_5_inst_1024_win_50_overlap_resnet_4"
-    experiment_output_path = f"{root_output_path}/{experiment_name}"
-    data_name = "v3_resnet_1k_5_inst_1024_win_50_overlap"
-    data_path = f"{root_data_path}/{data_name}"        # FIXME : This won't work because of the suffix in the output
-    epoch_id = 25
-
-    answer_to_family_map = get_answer_to_family_map(f'{data_path}/attributes.json', to_lowercase=False)
-
-    train_predictions = load_experiment_predictions(experiment_output_path, epoch_id, set_type='train')
-    val_predictions = load_experiment_predictions(experiment_output_path, epoch_id, set_type='val')
-
-    correct_train_predictions = [p for p in train_predictions if p['correct']]
-    incorrect_family_train_predictions = [p for p in train_predictions if not p['correct'] and not p['correct_answer_family']]
-    correct_family_train_predictions = [p for p in train_predictions if not p['correct'] and p['correct_answer_family']]
-
-    correct_val_predictions = [p for p in val_predictions if p['correct']]
-    incorrect_family_val_predictions = [p for p in val_predictions if not p['correct'] and not p['correct_answer_family']]
-    correct_family_val_predictions = [p for p in val_predictions if not p['correct'] and p['correct_answer_family']]
-
-    correct_family_val_hist = [(p['prediction'], p['prediction_answer_family'], p['confidence']) for p in correct_family_val_predictions]
-    correct_family_train_hist = [(p['prediction'], p['prediction_answer_family'], p['confidence']) for p in correct_family_train_predictions]
-
-    train_confidence = [v[2] for v in correct_family_train_hist]
-    val_confidence = [v[2] for v in correct_family_val_hist]
-
-    plt.hist(train_confidence)
-    plt.figure()
-    plt.hist(val_confidence)
-    plt.show()
-
-    preds = [p[0] for p in correct_family_val_hist]
-    train_ground_truth = [p['ground_truth'] for p in train_predictions]
-    val_ground_truth = [p['ground_truth'] for p in val_predictions]
-    show_discrete_hist_centered(train_ground_truth, sort_key_fct=lambda x: (answer_to_family_map[x[0]], x[0]))
-    show_discrete_hist_centered(val_ground_truth, sort_key_fct=lambda x: (answer_to_family_map[x[0]], x[0]))
-
-    train_family_ground_truth = [p['ground_truth_answer_family'] for p in train_predictions]
-    val_family_ground_truth = [p['ground_truth_answer_family'] for p in val_predictions]
-
-    show_discrete_hist_centered(train_family_ground_truth, sort_key_fct=lambda x: x[0])
-    show_discrete_hist_centered(val_family_ground_truth, sort_key_fct=lambda x: x[0])
+    print("Not meant to be runned as a standalone script")
