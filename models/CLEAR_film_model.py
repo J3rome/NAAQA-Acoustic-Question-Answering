@@ -247,7 +247,14 @@ class CLEAR_FiLM_model(nn.Module):
 
         self.softmax = nn.Softmax(dim=1)
 
-    def forward(self, question, question_lengths, input_image, pack_sequence=False):
+    def forward(self, question, question_lengths=None, input_image=None, pack_sequence=False):
+        if question is not None and question_lengths is None and input_image is None:
+            assert type(question) == list and len(question) == 3, "Invalid parameters"
+            # Allow passing a list of arguments
+            question_lengths = question[1]
+            input_image = question[2]
+            question = question[0]
+
         # Question Pipeline
         word_emb = self.word_emb(question)
 
