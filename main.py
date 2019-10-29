@@ -308,8 +308,9 @@ def write_clear_mean_to_config(dataloader, device, current_config, config_file_p
 
     key = "clear_stats"
 
-    assert (not overwrite_mean and 'preprocessing' in current_config and key in current_config['preprocessing']
-            and type(current_config['preprocessing'][key]) == list), "CLEAR mean is already present in config."
+    if not overwrite_mean and 'preprocessing' in current_config and key in current_config['preprocessing'] \
+       and type(current_config['preprocessing'][key]) == list:
+        assert False, "CLEAR mean is already present in config."
 
     dataloader.dataset.keep_1_game_per_scene()
 
