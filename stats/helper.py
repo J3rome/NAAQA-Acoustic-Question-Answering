@@ -323,7 +323,10 @@ def plot_confusion_matrix(predictions, ground_truth, normalize=False, title=None
     if add_annotations:
         # Loop over data dimensions and create text annotations.
         fmt = '.2f' if normalize else 'd'
-        thresh = conf_matrix.max() / 2.
+        if conf_matrix.max() - conf_matrix.min() > 100:
+            thresh = conf_matrix.max() / 2.
+        else:
+            thresh = 100000
         for i in range(conf_matrix.shape[0]):
             for j in range(conf_matrix.shape[1]):
                 if conf_matrix[i, j] > 0:
