@@ -299,16 +299,12 @@ from sklearn.metrics import confusion_matrix
 from sklearn.utils.multiclass import unique_labels
 
 
-def plot_confusion_matrix(predictions, ground_truths, normalize=False, title=None, show_fig=True,
-                          colormap=plt.cm.Blues, add_annotations=True, show_out_of_ground_truth=True):
-
-    if not show_out_of_ground_truth:
-        ground_truth_families = set(ground_truths)
-        predictions = [p for p in predictions if p in ground_truth_families]
+def plot_confusion_matrix(predictions, ground_truth, normalize=False, title=None, show_fig=True,
+                          colormap=plt.cm.Blues, add_annotations=True):
 
     # TODO : Sort labels
-    conf_matrix = confusion_matrix(ground_truths, predictions)
-    labels = unique_labels(predictions, ground_truths)
+    conf_matrix = confusion_matrix(ground_truth, predictions)
+    labels = unique_labels(predictions, ground_truth)
 
     if normalize:
         conf_matrix = conf_matrix / conf_matrix.sum(axis=1)[:, np.newaxis]
