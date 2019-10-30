@@ -322,7 +322,7 @@ class CLEARTokenizer:
     """
     def encode_question(self, question, to_lowercase=True):
         if to_lowercase:
-            question = ''.join([w.lower() for w in question.split(' ')])
+            question = ' '.join([w.lower() for w in question.split(' ')])
 
         tokens = []
         for token in self.tokenizer.tokenize(question):
