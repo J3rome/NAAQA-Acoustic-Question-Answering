@@ -1,3 +1,5 @@
+from collections import defaultdict
+
 from utils import read_json
 import matplotlib.pyplot as plt
 import numpy as np
@@ -128,13 +130,19 @@ def plot_hist(predictions, key=None, filter_fct=None, title=None, label=None, no
 
 
 # Results stats helpers
-def load_experiment_predictions(experiment_output_path, epoch_folder='best', set_type='val'):
+def load_experiment_predictions(experiment_output_path, epoch_folder='best', set_type='val', reduced_text=False):
     epoch_folder = format_epoch_folder(epoch_folder)
 
     epoch_path = f"{experiment_output_path}/{epoch_folder}"
     prediction_filename = f"{set_type}_predictions.json"
 
     predictions = read_json(epoch_path, prediction_filename)
+
+    if reduced_text:
+        for prediction in predictions:
+            for key in ['prediction', 'ground_truth']:
+                if 'of the scene' in prediction[key]:
+                    prediction[key] = str(prediction[key].split(' ')[0][:3])
 
     return predictions
 
@@ -248,6 +256,87 @@ def plot_predictions_confidence(train_predictions, val_predictions, question_fam
 
     if show_fig:
         plt.show()
+
+
+def separate_preds_ground_truth_old(processed_predictions, filter_fct=None):
+
+    if filter_fct:
+        processed_predictions = filter(filter_fct, processed_predictions)
+
+    predictions = []
+    ground_truths = []
+
+    for processed_prediction in processed_predictions:
+        predictions.append(processed_prediction['prediction'])
+        ground_truths.append(processed_prediction['ground_truth'])
+
+    return predictions, ground_truths
+
+
+def separate_preds_ground_truth(processed_predictions, attribute=None):
+
+    predictions = defaultdict(list)
+    ground_truths = defaultdict(list)
+
+    for processed_prediction in processed_predictions:
+        if attribute:
+            value = processed_prediction[attribute]
+            predictions[value].append(processed_prediction['prediction'])
+            ground_truths[value].append(processed_prediction['ground_truth'])
+
+        predictions['all'].append(processed_prediction['prediction'])
+        ground_truths['all'].append(processed_prediction['ground_truth'])
+
+    if attribute is None:
+        predictions = predictions['all']
+        ground_truths = ground_truths['all']
+
+    return predictions, ground_truths
+
+
+
+from sklearn.metrics import confusion_matrix
+from sklearn.utils.multiclass import unique_labels
+
+
+def plot_confusion_matrix(predictions, ground_truth, normalize=False, title=None, show_fig=True,
+                          colormap=plt.cm.Blues, add_annotations=True):
+
+    # TODO : Sort labels
+    conf_matrix = confusion_matrix(ground_truth, predictions)
+    labels = unique_labels(predictions, ground_truth)
+
+    if normalize:
+        conf_matrix = conf_matrix / conf_matrix.sum(axis=1)[:, np.newaxis]
+
+    if title is None:
+        title = "Confusion Matrix"
+
+    fig, ax = plt.subplots()
+    im = ax.imshow(conf_matrix, interpolation='nearest', cmap=colormap)
+    ax.figure.colorbar(im, ax=ax)
+    ax.set(xticks=np.arange(conf_matrix.shape[1]), yticks=np.arange(conf_matrix.shape[0]), yticklabels=labels,
+           title=title, ylabel="Ground Truth", xlabel="Predictions")
+    ax.set_xticklabels(labels, rotation=90)
+    ax.axis('image')
+
+    if add_annotations:
+        # Loop over data dimensions and create text annotations.
+        fmt = '.2f' if normalize else 'd'
+        thresh = conf_matrix.max() / 2.
+        for i in range(conf_matrix.shape[0]):
+            for j in range(conf_matrix.shape[1]):
+                if conf_matrix[i, j] > 0:
+                    ax.text(j, i, format(conf_matrix[i, j], fmt),
+                            ha="center", va="center",
+                            color="white" if conf_matrix[i, j] > thresh else "black")
+
+    fig.tight_layout()
+
+    if show_fig:
+        plt.show()
+
+    return fig, ax
 
 
 if __name__ == "__main__":
