@@ -12,6 +12,7 @@ from dateutil.parser import parse as date_parse
 
 import torch
 from sklearn.metrics import confusion_matrix
+from sklearn.utils.multiclass import unique_labels
 
 
 def get_config(config_path):
@@ -401,7 +402,10 @@ def visualize_cam(mask, img):
 
 
 # Based on Bob Yang answer : https://stats.stackexchange.com/questions/21551/how-to-compute-precision-recall-for-multiclass-multilabel-classification
-def calc_f1_score(preds, ground_truths, labels):
+def calc_f1_score(preds, ground_truths, labels=None):
+    if labels is None:
+        labels = unique_labels(preds, ground_truths)
+
     conf_matrix = confusion_matrix(ground_truths, preds, labels=labels)
     f1_scores = []
 
