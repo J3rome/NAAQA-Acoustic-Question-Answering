@@ -365,7 +365,7 @@ def process_dataloader(is_training, device, model, dataloader, criterion=None, o
                 loss = criterion(outputs, answers)
 
                 if use_f1_score:
-                    f1_score = calc_f1_score(preds, answers, labels=range(outputs.shape[1]))
+                    f1_score = calc_f1_score(preds.cpu(), answers.cpu())
                     loss = loss + (1 - f1_score)
 
             if is_training:
