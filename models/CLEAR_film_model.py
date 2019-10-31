@@ -1,3 +1,5 @@
+from collections import OrderedDict
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -85,7 +87,9 @@ class FiLM_layer(nn.Module):
                                                                                     # FIXME : The linear layer is not in here on the original tho. This might be why we don't have *4 for the number of resblock (We are inside the resblock here)
         self.dropout = nn.Dropout(p=dropout_drop_prob)
 
-    def forward(self, input_features, rnn_last_hidden_state):
+    def forward(self, input_features_rnn_state):
+        input_features, rnn_last_hidden_state = input_features_rnn_state
+
         film_params = self.params_vector(rnn_last_hidden_state)
 
         # FIXME : Is it a good idea to have dropout here ?
@@ -109,32 +113,34 @@ class FiLM_layer(nn.Module):
         return output
 
 
-
 class FiLMed_resblock(nn.Module):
     def __init__(self, in_channels, out_channels, context_size, dropout_drop_prob=0.0, kernel1=(1, 1), kernel2=(3, 3),
                  film_layer_transformation=None):
 
         super(FiLMed_resblock, self).__init__()
 
-        self.conv1 = nn.Sequential(
-            Conv2d_tf(in_channels=in_channels, out_channels=out_channels,
-                      kernel_size=kernel1, stride=1, padding='SAME', dilation=1),
+        self.is_container = True
 
-            nn.ReLU(inplace=True),
-        )
+        self.conv1 = nn.Sequential(OrderedDict([
+            ('conv', Conv2d_tf(in_channels=in_channels, out_channels=out_channels, kernel_size=kernel1, stride=1,
+                               padding='SAME', dilation=1)),
+            ('relu', nn.ReLU(inplace=True))
+        ]))
 
         #self.dropout = nn.Dropout(p=dropout_drop_prob)
 
-        self.conv2 = Conv2d_tf(in_channels=out_channels, out_channels=out_channels,
-                               kernel_size=kernel2, stride=1, padding='SAME', dilation=1)
-
-        # Center/reduce output (Batch Normalization with no training parameters)
-        self.conv2_bn = nn.BatchNorm2d(out_channels, affine=False)
+        self.conv2 = nn.Sequential(OrderedDict([
+            ('conv', Conv2d_tf(in_channels=out_channels, out_channels=out_channels, kernel_size=kernel2, stride=1,
+                               padding='SAME', dilation=1)),
+            # Center/reduce output (Batch Normalization with no training parameters)
+            ('batchnorm', nn.BatchNorm2d(out_channels, affine=False))
+        ]))
 
         # Film Layer
-        self.conv2_filmed = FiLM_layer(context_size, out_channels, film_layer_transformation=film_layer_transformation)
-
-        self.conv2_relu = nn.ReLU(inplace=True)
+        self.film_layer = nn.Sequential(OrderedDict([
+            ('film', FiLM_layer(context_size, out_channels, film_layer_transformation=film_layer_transformation)),
+            ('relu', nn.ReLU(inplace=True))
+        ]))
 
     def forward(self, input_features, rnn_state, spatial_location):
         if spatial_location:
@@ -143,10 +149,8 @@ class FiLMed_resblock(nn.Module):
         conv1_out = self.conv1(input_features)
         #conv1_out = self.dropout(conv1_out)
         out = self.conv2(conv1_out)
+        out = self.film_layer((out, rnn_state))
         #out = self.dropout(out)
-        out = self.conv2_bn(out)
-        out = self.conv2_filmed(out, rnn_state)
-        out = self.conv2_relu(out)
 
         return out + conv1_out
 
@@ -200,15 +204,13 @@ class CLEAR_FiLM_model(nn.Module):
             self.feature_extractor = None
 
         ## Stem
-        self.stem_conv = nn.Sequential(
-            Conv2d_tf(in_channels=input_image_channels + spatial_location_extra_channels['stem'],
-                      out_channels=config['stem']['conv_out'],
-                      kernel_size=config['stem']['conv_kernel'], stride=1, padding='SAME', dilation=1),
-
-            nn.BatchNorm2d(config['stem']['conv_out']),
-
-            nn.ReLU(inplace=True)
-        )
+        self.stem_conv = nn.Sequential(OrderedDict([
+            ('conv', Conv2d_tf(in_channels=input_image_channels + spatial_location_extra_channels['stem'],
+                               out_channels=config['stem']['conv_out'], kernel_size=config['stem']['conv_kernel'],
+                               stride=1, padding='SAME', dilation=1)),
+            ('batchnorm', nn.BatchNorm2d(config['stem']['conv_out'])),
+            ('relu', nn.ReLU(inplace=True))
+        ]))
 
         ## Resblocks
         resblock_out_channels = config['stem']['conv_out']
@@ -225,23 +227,19 @@ class CLEAR_FiLM_model(nn.Module):
                                                   film_layer_transformation=film_layer_transformation))
 
         #### Classification
-        self.classif_conv = nn.Sequential(
-            Conv2d_tf(in_channels=resblock_out_channels + spatial_location_extra_channels['classifier'],
-                      out_channels=config['classifier']['conv_out'],
-                      kernel_size=config['classifier']['conv_kernel'], stride=1, padding="SAME", dilation=1),
+        self.classif_conv = nn.Sequential(OrderedDict([
+            ('conv', Conv2d_tf(in_channels=resblock_out_channels + spatial_location_extra_channels['classifier'],
+                               out_channels=config['classifier']['conv_out'],
+                               kernel_size=config['classifier']['conv_kernel'], stride=1, padding="SAME", dilation=1)),
+            ('batchnorm', nn.BatchNorm2d(config['classifier']['conv_out'])),
+            ('relu', nn.ReLU(inplace=True))
+        ]))
 
-            nn.BatchNorm2d(config['classifier']['conv_out']),
-
-            nn.ReLU(inplace=True),
-        )
-
-        self.classif_hidden = nn.Sequential(
-            nn.Linear(config['classifier']['conv_out'], config['classifier']['no_mlp_units']),
-
-            nn.BatchNorm1d(config['classifier']['no_mlp_units']),
-
-            nn.ReLU(inplace=True),
-        )
+        self.classif_hidden = nn.Sequential(OrderedDict([
+            ('linear', nn.Linear(config['classifier']['conv_out'], config['classifier']['no_mlp_units'])),
+            ('batchnorm', nn.BatchNorm1d(config['classifier']['no_mlp_units'])),
+            ('relu', nn.ReLU(inplace=True))
+        ]))
 
         self.logits = nn.Linear(config['classifier']['no_mlp_units'], nb_answers)
 
@@ -306,8 +304,8 @@ class CLEAR_FiLM_model(nn.Module):
         gammas = []
         betas = []
         for resblock in self.resblocks:
-            betas.append(resblock.conv2_filmed.betas)
-            gammas.append(resblock.conv2_filmed.gammas)
+            betas.append(resblock.film_layer.film.betas)
+            gammas.append(resblock.film_layer.film.gammas)
 
         return gammas, betas
 
