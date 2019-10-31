@@ -85,17 +85,19 @@ def summary(model, input_size, batch_size=-1, device="cuda:0"):
     for h in hooks:
         h.remove()
 
-    print("----------------------------------------------------------------")
-    line_new = "{:>20}  {:>25} {:>15}".format("Layer (type)", "Output Shape", "Param #")
+    line_new = "{:>20} {:>35} {:>30} {:>15}".format("Layer (type)", "Input Shape", "Output Shape", "Param #")
+    nb_char_per_line = len(line_new)
+    print("-" * nb_char_per_line)
     print(line_new)
-    print("================================================================")
+    print("=" * nb_char_per_line)
     total_params = 0
     total_output = 0
     trainable_params = 0
     for layer in summary:
         # input_shape, output_shape, trainable, nb_params
-        line_new = "{:>20}  {:>25} {:>15}".format(
+        line_new = "{:>20} {:>35} {:>30} {:>15}".format(
             layer,
+            str(summary[layer]["input_shape"]),
             str(summary[layer]["output_shape"]),
             "{0:,}".format(summary[layer]["nb_params"]),
         )
@@ -114,14 +116,14 @@ def summary(model, input_size, batch_size=-1, device="cuda:0"):
     total_params_size = abs(total_params.numpy() * 4. / (1024 ** 2.))
     total_size = total_params_size + total_output_size + total_input_size
 
-    print("================================================================")
+    print("=" * nb_char_per_line)
     print("Total params: {0:,}".format(total_params))
     print("Trainable params: {0:,}".format(trainable_params))
     print("Non-trainable params: {0:,}".format(total_params - trainable_params))
-    print("----------------------------------------------------------------")
+    print("-" * nb_char_per_line)
     print("Input size (MB): %0.2f" % total_input_size)
     print("Forward/backward pass size (MB): %0.2f" % total_output_size)
     print("Params size (MB): %0.2f" % total_params_size)
     print("Estimated Total Size (MB): %0.2f" % total_size)
-    print("----------------------------------------------------------------")
+    print("-" * nb_char_per_line)
     # return summary
