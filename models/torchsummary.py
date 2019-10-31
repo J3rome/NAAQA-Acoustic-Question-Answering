@@ -47,6 +47,7 @@ def summary(model, input_size, batch_size=-1, device="cuda:0"):
             not isinstance(module, nn.Sequential)
             and not isinstance(module, nn.ModuleList)
             and not (module == model)
+            and not (hasattr(module, "is_container") and module.is_container)
         ):
             hooks.append(module.register_forward_hook(hook))
 
