@@ -10,7 +10,7 @@ from tqdm import tqdm
 from utils import set_random_seed, create_folder_if_necessary, get_config, process_predictions, process_gamma_beta
 from utils import create_symlink_to_latest_folder, save_training_stats, save_json, sort_stats, is_date_string
 from utils import save_gamma_beta_h5, save_git_revision, get_random_state, set_random_state, close_tensorboard_writers
-from utils import calc_mean_and_std, update_mean_in_config
+from utils import calc_mean_and_std, update_mean_in_config, calc_f1_score
 
 from visualization import visualize_gamma_beta, grad_cam_visualization
 from preprocessing import create_dict_from_questions, extract_features
@@ -120,6 +120,7 @@ parser.add_argument("--perf_over_determinist", help="Will let torch use nondeter
                                                     "performance but less reproductibility)", action='store_true')
 parser.add_argument("--overwrite_clear_mean", help="Will overwrite the Mean and Std of the CLEAR dataset stored in "
                                                    "config file", action='store_true')
+parser.add_argument("--f1_score", help="Use f1 score in loss calculation", action='store_true')
 
 
 # TODO : Interactive mode
@@ -169,7 +170,7 @@ def set_inference(device, model, dataloader, criterion, output_folder, save_gamm
 
 
 def train_model(device, model, dataloaders, output_folder, criterion=None, optimizer=None, scheduler=None,
-                nb_epoch=25, nb_epoch_to_keep=None, start_epoch=0, tensorboard=None):
+                use_f1_score=False, nb_epoch=25, nb_epoch_to_keep=None, start_epoch=0, tensorboard=None):
 
     if tensorboard is None:
         tensorboard = {'writers': {'train': None, 'val': None}, 'options': None}
@@ -214,6 +215,7 @@ def train_model(device, model, dataloaders, output_folder, criterion=None, optim
         train_loss, train_acc, train_predictions = process_dataloader(True, device, model,
                                                                       dataloaders['train'],
                                                                       criterion, optimizer, epoch_id=epoch,
+                                                                      use_f1_score=use_f1_score,
                                                                       tensorboard=tensorboard_per_set,
                                                                       gamma_beta_path="%s/train_gamma_beta.h5" % epoch_output_folder_path)
         epoch_train_time = datetime.now() - epoch_time
@@ -223,6 +225,7 @@ def train_model(device, model, dataloaders, output_folder, criterion=None, optim
         tensorboard_per_set['writer'] = tensorboard['writers']['val']
         val_loss, val_acc, val_predictions = process_dataloader(False, device, model,
                                                                 dataloaders['val'], criterion, epoch_id=epoch,
+                                                                use_f1_score=use_f1_score,
                                                                 tensorboard=tensorboard_per_set,
                                                                 gamma_beta_path="%s/val_gamma_beta.h5" % epoch_output_folder_path)
         print('\n{} Loss: {:.4f} Acc: {:.4f}'.format('Val', val_loss, val_acc))
@@ -320,7 +323,7 @@ def write_clear_mean_to_config(dataloader, device, current_config, config_file_p
 
 
 def process_dataloader(is_training, device, model, dataloader, criterion=None, optimizer=None, gamma_beta_path=None,
-                       write_to_file_every=500, epoch_id=0, tensorboard=None):
+                       use_f1_score=False, write_to_file_every=500, epoch_id=0, tensorboard=None):
     # Model should already have been copied to the GPU at this point (If using GPU)
     assert (is_training and criterion is not None and optimizer is not None) or not is_training
 
@@ -360,6 +363,10 @@ def process_dataloader(is_training, device, model, dataloader, criterion=None, o
             _, preds = torch.max(outputs, 1)
             if criterion:
                 loss = criterion(outputs, answers)
+
+                if use_f1_score:
+                    f1_score = calc_f1_score(preds, answers, labels=range(outputs.shape[1]))
+                    loss = loss + (1 - f1_score)
 
             if is_training:
                 # backward + optimize only if in training phase
@@ -798,7 +805,7 @@ def main(args):
 
         train_model(device=device, model=film_model, dataloaders={'train': train_dataloader, 'val': val_dataloader},
                     output_folder=output_dated_folder, criterion=loss_criterion, optimizer=optimizer,
-                    nb_epoch=args.nb_epoch, nb_epoch_to_keep=args.nb_epoch_stats_to_keep,
+                    use_f1_score=args.f1_score, nb_epoch=args.nb_epoch, nb_epoch_to_keep=args.nb_epoch_stats_to_keep,
                     start_epoch=start_epoch, tensorboard=tensorboard)
 
     elif task == "inference":
