@@ -15,8 +15,18 @@ def summary(model, input_size, batch_size=-1, device="cuda:0"):
 
             m_key = "%s-%i" % (class_name, module_idx + 1)
             summary[m_key] = OrderedDict()
-            summary[m_key]["input_shape"] = list(input[0].size())
-            summary[m_key]["input_shape"][0] = batch_size
+
+            if isinstance(input[0], tuple):
+                input_shape = []
+                for inp in input[0]:
+                    shape = list(inp.size())
+                    shape[0] = batch_size
+                    input_shape.append(shape)
+            else:
+                input_shape = list(input[0].size())
+                input_shape[0] = batch_size
+
+            summary[m_key]["input_shape"] = input_shape
             if isinstance(output, (list, tuple)):
                 summary[m_key]["output_shape"] = [
                     [-1] + list(o.size())[1:] for o in output
