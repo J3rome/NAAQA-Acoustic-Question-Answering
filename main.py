@@ -13,7 +13,7 @@ from utils import save_gamma_beta_h5, save_git_revision, get_random_state, set_r
 from utils import calc_mean_and_std, update_mean_in_config, calc_f1_score
 
 from visualization import visualize_gamma_beta, grad_cam_visualization
-from preprocessing import create_dict_from_questions, extract_features
+from preprocessing import create_dict_from_questions, extract_features, images_to_h5
 
 # NEW IMPORTS
 from models.CLEAR_film_model import CLEAR_FiLM_model
@@ -37,6 +37,7 @@ parser.add_argument("--training", help="FiLM model training", action='store_true
 parser.add_argument("--inference", help="FiLM model inference", action='store_true')
 parser.add_argument("--visualize_grad_cam", help="Class Activation Maps - GradCAM", action='store_true')
 parser.add_argument("--visualize_gamma_beta", help="FiLM model parameters visualization (T-SNE)", action='store_true')
+parser.add_argument("--prepare_images", help="Save images in h5 file for faster retrieving", action='store_true')
 parser.add_argument("--feature_extract", help="Feature Pre-Extraction", action='store_true')
 parser.add_argument("--create_dict", help="Create word dictionary (for tokenization)", action='store_true')
 parser.add_argument("--random_answer_baseline", help="Spit out a random answer for each question", action='store_true')
@@ -468,12 +469,12 @@ def validate_arguments(args):
     mutually_exclusive_params = [args.training, args.inference, args.feature_extract, args.create_dict,
                                  args.visualize_gamma_beta, args.visualize_grad_cam, args.lr_finder,
                                  args.write_clear_mean_to_config, args.random_answer_baseline,
-                                 args.random_weight_baseline]
+                                 args.random_weight_baseline, args.prepare_images]
 
     assert sum(mutually_exclusive_params) == 1, \
         "[ERROR] Can only do one task at a time " \
         "(--training, --inference, --visualize_gamma_beta, --create_dict, --feature_extract --visualize_grad_cam " \
-        "--lr_finder, --write_clear_mean_to_config, --random_answer_baseline, --random_weight_baseline)"
+        "--prepare_images, --lr_finder, --write_clear_mean_to_config, --random_answer_baseline, --random_weight_baseline)"
 
     mutually_exclusive_params = [args.raw_img_resize_based_on_height, args.raw_img_resize_based_on_width]
     assert sum(mutually_exclusive_params) < 2, "[ERROR] Image resize can be either --raw_img_resize_based_on_height " \
@@ -494,6 +495,8 @@ def get_task_from_args(args):
         return "visualize_grad_cam"
     elif args.feature_extract:
         return "feature_extract"
+    elif args.prepare_images:
+        return "prepare_images"
     elif args.create_dict:
         return "create_dict"
     elif args.lr_finder:
@@ -816,6 +819,11 @@ def main(args):
     elif task == "create_dict":
         create_dict_from_questions(train_dataset, force_all_answers=args.force_dict_all_answer,
                                    output_folder_name=args.dict_folder, start_end_tokens=not args.no_start_end_tokens)
+
+    elif task == "prepare_images":
+        images_to_h5(dataloaders={'train': train_dataloader, 'val': val_dataloader, 'test': test_dataloader},
+                     square_image=args.pad_to_square_images or args.resize_to_square_images,
+                     output_folder_name=args.preprocessed_folder_name)
 
     elif task == "feature_extract":
         extract_features(device=device, feature_extractor=film_model.feature_extractor,
