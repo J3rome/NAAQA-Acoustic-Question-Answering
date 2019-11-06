@@ -563,6 +563,7 @@ def main(args):
     use_tensorboard = 'train' in task
     create_loss_criterion = args.training or args.lr_finder
     create_optimizer = args.training or args.lr_finder
+    force_sgd_optimizer = args.lr_finder or args.cyclical_lr
 
     if continuing_training and args.film_model_weight_path is None:
         args.film_mode_weight_path = 'latest'
@@ -765,7 +766,7 @@ def main(args):
         trainable_parameters = filter(lambda p: p.requires_grad, film_model.parameters())
 
         if create_optimizer:
-            if film_model_config['optimizer'].get('type', '') == 'sgd':
+            if film_model_config['optimizer'].get('type', '') == 'sgd' or force_sgd_optimizer:
                 optimizer = torch.optim.SGD(trainable_parameters, lr=film_model_config['optimizer']['learning_rate'],
                                             momentum=film_model_config['optimizer']['momentum'],
                                             weight_decay=film_model_config['optimizer']['weight_decay'])
