@@ -171,7 +171,7 @@ def set_inference(device, model, dataloader, criterion, output_folder, save_gamm
 
 
 def train_model(device, model, dataloaders, output_folder, criterion=None, optimizer=None, scheduler=None,
-                use_f1_score=False, nb_epoch=25, nb_epoch_to_keep=None, start_epoch=0, tensorboard=None):
+                nb_epoch=25, nb_epoch_to_keep=None, start_epoch=0, tensorboard=None):
 
     if tensorboard is None:
         tensorboard = {'writers': {'train': None, 'val': None}, 'options': None}
@@ -215,9 +215,8 @@ def train_model(device, model, dataloaders, output_folder, criterion=None, optim
         tensorboard_per_set['writer'] = tensorboard['writers']['train']
         train_loss, train_acc, train_predictions = process_dataloader(True, device, model,
                                                                       dataloaders['train'],
-                                                                      criterion, optimizer, epoch_id=epoch,
-                                                                      use_f1_score=use_f1_score,
-                                                                      tensorboard=tensorboard_per_set,
+                                                                      criterion, optimizer, scheduler=scheduler,
+                                                                      epoch_id=epoch, tensorboard=tensorboard_per_set,
                                                                       gamma_beta_path="%s/train_gamma_beta.h5" % epoch_output_folder_path)
         epoch_train_time = datetime.now() - epoch_time
 
@@ -225,9 +224,8 @@ def train_model(device, model, dataloaders, output_folder, criterion=None, optim
 
         tensorboard_per_set['writer'] = tensorboard['writers']['val']
         val_loss, val_acc, val_predictions = process_dataloader(False, device, model,
-                                                                dataloaders['val'], criterion, epoch_id=epoch,
-                                                                use_f1_score=use_f1_score,
-                                                                tensorboard=tensorboard_per_set,
+                                                                dataloaders['val'], criterion,
+                                                                epoch_id=epoch, tensorboard=tensorboard_per_set,
                                                                 gamma_beta_path="%s/val_gamma_beta.h5" % epoch_output_folder_path)
         print('\n{} Loss: {:.4f} Acc: {:.4f}'.format('Val', val_loss, val_acc))
 
@@ -323,8 +321,8 @@ def write_clear_mean_to_config(dataloader, device, current_config, config_file_p
     update_mean_in_config(mean, std, config_file_path, current_config=current_config, key=key)
 
 
-def process_dataloader(is_training, device, model, dataloader, criterion=None, optimizer=None, gamma_beta_path=None,
-                       use_f1_score=False, write_to_file_every=500, epoch_id=0, tensorboard=None):
+def process_dataloader(is_training, device, model, dataloader, criterion=None, optimizer=None, scheduler=None, gamma_beta_path=None,
+                       write_to_file_every=500, epoch_id=0, tensorboard=None):
     # Model should already have been copied to the GPU at this point (If using GPU)
     assert (is_training and criterion is not None and optimizer is not None) or not is_training
 
@@ -364,10 +362,6 @@ def process_dataloader(is_training, device, model, dataloader, criterion=None, o
             _, preds = torch.max(outputs, 1)
             if criterion:
                 loss = criterion(outputs, answers)
-
-                if use_f1_score:
-                    f1_score = calc_f1_score(preds.cpu(), answers.cpu())
-                    loss = loss + (1 - f1_score)
 
             if is_training:
                 # backward + optimize only if in training phase
@@ -537,6 +531,8 @@ def main(args):
     instantiate_model = not args.create_dict and not args.write_clear_mean_to_config and \
                         'gamma_beta' not in task and 'random_answer' not in task
     use_tensorboard = 'train' in task
+    create_loss_criterion = args.training or args.lr_finder
+    create_optimizer = args.training or args.lr_finder
 
     if continuing_training and args.film_model_weight_path is None:
         args.film_mode_weight_path = 'latest'
@@ -736,6 +732,29 @@ def main(args):
             # We need non-strict because feature extractor weight are not included in the saved state dict
             film_model.load_state_dict(checkpoint['model_state_dict'], strict=False)
 
+        trainable_parameters = filter(lambda p: p.requires_grad, film_model.parameters())
+
+        if create_optimizer:
+            if film_model_config['optimizer'].get('type', '') == 'sgd':
+                optimizer = torch.optim.SGD(trainable_parameters, lr=film_model_config['optimizer']['learning_rate'],
+                                            momentum=film_model_config['optimizer']['momentum'],
+                                            weight_decay=film_model_config['optimizer']['weight_decay'])
+            else:
+                optimizer = torch.optim.Adam(trainable_parameters, lr=film_model_config['optimizer']['learning_rate'],
+                                             weight_decay=film_model_config['optimizer']['weight_decay'])
+
+        if create_loss_criterion:
+            loss_criterion_tmp = nn.CrossEntropyLoss()
+
+            if args.f1_score:
+                def loss_criterion(outputs, answers):
+                    loss = loss_criterion_tmp(outputs, answers)
+                    _, preds = torch.max(outputs, 1)
+
+                    return loss + (1 - calc_f1_score(preds, answers))
+            else:
+                loss_criterion = loss_criterion_tmp
+
         if device != 'cpu':
             if args.perf_over_determinist:
                 torch.backends.cudnn.benchmark = True
@@ -791,10 +810,8 @@ def main(args):
 
     if task == "train_film":
         trainable_parameters = filter(lambda p: p.requires_grad, film_model.parameters())
+        scheduler = None
 
-        # FIXME : Not sure what is the current behavious when specifying weight decay to Adam Optimizer. INVESTIGATE THIS
-        optimizer = torch.optim.Adam(trainable_parameters, lr=film_model_config['optimizer']['learning_rate'],
-                                     weight_decay=film_model_config['optimizer']['weight_decay'])
 
         loss_criterion = nn.CrossEntropyLoss()
 
@@ -804,12 +821,10 @@ def main(args):
             start_epoch = checkpoint['epoch'] + 1
             set_random_state(checkpoint['rng_state'])
 
-        # scheduler = torch.optim.lr_scheduler   # FIXME : Using a scheduler give the ability to decay only each N epoch.
-
         train_model(device=device, model=film_model, dataloaders={'train': train_dataloader, 'val': val_dataloader},
                     output_folder=output_dated_folder, criterion=loss_criterion, optimizer=optimizer,
-                    use_f1_score=args.f1_score, nb_epoch=args.nb_epoch, nb_epoch_to_keep=args.nb_epoch_stats_to_keep,
-                    start_epoch=start_epoch, tensorboard=tensorboard)
+                    scheduler=scheduler, nb_epoch=args.nb_epoch,
+                    nb_epoch_to_keep=args.nb_epoch_stats_to_keep, start_epoch=start_epoch, tensorboard=tensorboard)
 
     elif task == "inference":
         inference_dataloader = test_dataloader
@@ -840,8 +855,8 @@ def main(args):
                                output_folder=output_dated_folder)
 
     elif task == "lr_finder":
-        get_lr_finder_curves(film_model, device, train_dataloader, output_dated_folder, args.nb_epoch,
-                             val_dataloader=val_dataloader)
+        get_lr_finder_curves(film_model, device, train_dataloader, output_dated_folder, args.nb_epoch, optimizer,
+                             val_dataloader=val_dataloader, loss_criterion=loss_criterion)
 
     elif task == "write_clear_mean_to_config":
         write_clear_mean_to_config(train_dataloader, device, film_model_config, args.config_path,
