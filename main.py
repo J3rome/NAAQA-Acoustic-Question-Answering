@@ -851,6 +851,11 @@ def main(args):
 
     if task == "train_film":
         if args.cyclical_lr:
+            base_lr = film_model_config['optimizer']['cyclical']['base_learning_rate']
+            max_lr = film_model_config['optimizer']['cyclical']['max_learning_rate']
+            base_momentum = film_model_config['optimizer']['cyclical']['base_momentum']
+            max_momentum = film_model_config['optimizer']['cyclical']['max_momentum']
+
             total_nb_steps = args.nb_epoch * len(train_dataloader)
 
             cycle_length = film_model_config['optimizer']['cyclical']['cycle_length']
@@ -862,11 +867,14 @@ def main(args):
                 # Cycle length is a ratio of the total nb steps
                 cycle_step = int(total_nb_steps * cycle_length)
 
-            scheduler = CyclicLR(optimizer, base_lr=film_model_config['optimizer']['cyclical']['base_learning_rate'],
-                                 max_lr=film_model_config['optimizer']['cyclical']['max_learning_rate'],
+            print(f"Using cyclical LR : ({base_lr},{max_lr})  Momentum ({base_momentum}, {max_momentum})")
+            print(f"Total nb steps : {total_nb_steps}  -- Nb steps per cycle : {cycle_length}")
+
+            scheduler = CyclicLR(optimizer, base_lr=base_lr,
+                                 max_lr=max_lr,
                                  step_size_up=cycle_step//2,
-                                 base_momentum=film_model_config['optimizer']['cyclical']['base_momentum'],
-                                 max_momentum=film_model_config['optimizer']['cyclical']['max_momentum'])
+                                 base_momentum=base_momentum,
+                                 max_momentum=max_momentum)
 
         else:
             scheduler = None
