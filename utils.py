@@ -403,6 +403,11 @@ def visualize_cam(mask, img):
 
 # Based on Bob Yang answer : https://stats.stackexchange.com/questions/21551/how-to-compute-precision-recall-for-multiclass-multilabel-classification
 def calc_f1_score(preds, ground_truths, labels=None):
+    if isinstance(preds, torch.Tensor) and preds.device.type != 'cpu':
+        preds = preds.cpu()
+        ground_truths = ground_truths.cpu()
+
+    # FIXME : This kinda break the grad.. Rewrite in torch ?
     if labels is None:
         labels = unique_labels(preds, ground_truths)
 
