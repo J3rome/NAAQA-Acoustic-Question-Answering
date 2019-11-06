@@ -65,22 +65,23 @@ class LRFinder(object):
         else:
             self.device = self.model_device
 
-    def reset(self):
+    def reset(self, weight_decay=None, learning_rate=None):
         """Restores the model and optimizer to their initial states."""
         self.model.load_state_dict(self.state_cacher.retrieve('model'))
-        self.optimizer.load_state_dict(self.state_cacher.retrieve('optimizer'))
+        optimizer_initial_state = self.state_cacher.retrieve('optimizer')
+        if weight_decay:
+            optimizer_initial_state['param_groups'][0]['weight_decay'] = weight_decay
+
+        if learning_rate:
+            optimizer_initial_state['param_groups'][0]['learning_rate'] = learning_rate
+
+        self.optimizer.load_state_dict(optimizer_initial_state)
         self.model.to(self.model_device)
 
-    def range_test(
-            self,
-            train_loader,
-            val_loader=None,
-            end_lr=10,
-            nb_epoch=5,
-            step_mode="exp",
-            smooth_f=0.05,
-            diverge_th=5,
-    ):
+    def range_test(self, train_loader, val_loader=None, end_lr=10, num_iter=100, num_iter_val=None, step_mode="exp",
+                   smooth_f=0.05, diverge_th=5):
+
+
         """Performs the learning rate range test.
 
         Arguments:
@@ -106,54 +107,52 @@ class LRFinder(object):
         self.history = {"lr": [], "loss": []}
         self.best_loss = None
 
-        nb_examples = len(train_loader.dataset)
-
         # Move the model to the proper device
         self.model.to(self.device)
 
         # Initialize the proper learning rate policy
         if step_mode.lower() == "exp":
-            lr_schedule = ExponentialLR(self.optimizer, end_lr, nb_epoch * nb_examples)
+            lr_schedule = ExponentialLR(self.optimizer, end_lr, num_iter)
         elif step_mode.lower() == "linear":
-            lr_schedule = LinearLR(self.optimizer, end_lr, nb_epoch * nb_examples)
+            lr_schedule = LinearLR(self.optimizer, end_lr, num_iter)
         else:
             raise ValueError("expected one of (exp, linear), got {}".format(step_mode))
 
         if smooth_f < 0 or smooth_f >= 1:
             raise ValueError("smooth_f is outside the range [0, 1[")
 
-        iteration = 0
-        diverged = False
-        for epoch in range(nb_epoch):
-            for batch in tqdm(train_loader):
-                # Train on batch and retrieve loss
-                loss = self._train_batch(batch)
-                if val_loader:
-                    loss = self._validate(val_loader)
+        # Create an iterator to get data batch by batch
+        iterator = iter(train_loader)
+        for iteration in tqdm(range(num_iter)):
+            # Get a new set of inputs and labels
+            try:
+                batch = next(iterator)
+            except StopIteration:
+                iterator = iter(train_loader)
+                batch = next(iterator)
 
-                # Update the learning rate
-                lr_schedule.step()
-                self.history["lr"].append(lr_schedule.get_lr()[0])
+            # Train on batch and retrieve loss
+            loss = self._train_batch(batch)
+            if val_loader:
+                loss = self._validate(val_loader, num_iter_val)
 
-                # Track the best loss and smooth it if smooth_f is specified
-                if iteration == 0:
+            # Update the learning rate
+            lr_schedule.step()
+            self.history["lr"].append(lr_schedule.get_lr()[0])
+
+            # Track the best loss and smooth it if smooth_f is specified
+            if iteration == 0:
+                self.best_loss = loss
+            else:
+                if smooth_f > 0:
+                    loss = smooth_f * loss + (1 - smooth_f) * self.history["loss"][-1]
+                if loss < self.best_loss:
                     self.best_loss = loss
-                else:
-                    if smooth_f > 0:
-                        loss = smooth_f * loss + (1 - smooth_f) * self.history["loss"][-1]
-                    if loss < self.best_loss:
-                        self.best_loss = loss
 
-                # Check if the loss has diverged; if it has, stop the test
-                self.history["loss"].append(loss)
-                if loss > diverge_th * self.best_loss:
-                    print("Stopping early, the loss has diverged")
-                    diverged = True
-                    break
-
-                iteration += 1
-
-            if diverged:
+            # Check if the loss has diverged; if it has, stop the test
+            self.history["loss"].append(loss)
+            if loss > diverge_th * self.best_loss:
+                print("Stopping early, the loss has diverged")
                 break
 
         print("Learning rate search finished.")
@@ -179,12 +178,20 @@ class LRFinder(object):
 
         return loss.item()
 
-    def _validate(self, dataloader):
+    def _validate(self, dataloader, num_iter=None):
+        batch_size = dataloader.batch_size
+        nb_batch = len(dataloader)
+        if num_iter is None or num_iter > nb_batch:
+            num_iter = nb_batch
+
         # Set model to evaluation mode and disable gradient computation
         running_loss = 0
         self.model.eval()
         with torch.no_grad():
-            for batch in dataloader:
+            # Create an iterator to get data batch by batch
+            iterator = iter(dataloader)
+            for iteration in range(num_iter):
+                batch = next(iterator)
                 # Move data to the correct device
                 images = batch['image'].to(self.device)
                 questions = batch['question'].to(self.device)
@@ -196,9 +203,10 @@ class LRFinder(object):
                 loss = self.criterion(outputs, answers)
                 running_loss += loss.item() * images.size(0)
 
-        return running_loss / len(dataloader.dataset)
+        return running_loss / (num_iter * batch_size)
 
-    def plot(self, skip_start=10, skip_end=5, log_lr=True, export_filepath=None):
+    def plot(self, skip_start=10, skip_end=5, log_lr=True, legend_label=None, export_filepath=None, fig_ax=None,
+             show_fig=True):
         """Plots the learning rate range test.
 
         Arguments:
@@ -228,17 +236,27 @@ class LRFinder(object):
             losses = losses[skip_start:-skip_end]
 
         # Plot loss as a function of the learning rate
-        plt.plot(lrs, losses)
-        if log_lr:
-            plt.xscale("log")
-        plt.xlabel("Learning rate")
-        plt.ylabel("Loss")
-
-        if export_filepath is None:
-            plt.show()
+        if fig_ax is None:
+            fig, ax = plt.subplots()
         else:
-            plt.savefig(export_filepath)
+            fig, ax = fig_ax
+
+        # TODO : Add label & legend
+        ax.plot(lrs, losses, label=legend_label)
+        if log_lr:
+            ax.set_xscale("log")
+        ax.set_xlabel("Learning rate")
+        ax.set_ylabel("Loss")
+        ax.legend()
+        fig.tight_layout()
+
+        if export_filepath:
+            fig.savefig(export_filepath)
             print(f"See LR graph '{export_filepath}'")
+        elif show_fig:
+            plt.show()
+
+        return fig, ax
 
 
 class LinearLR(_LRScheduler):

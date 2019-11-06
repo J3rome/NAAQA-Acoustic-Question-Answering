@@ -23,10 +23,12 @@ from models.torchsummary import summary     # Custom version of torchsummary to 
 import torch
 import time
 from torch.utils.data import DataLoader
+from torch.optim.lr_scheduler import CyclicLR
 import torch.nn as nn
 from torchvision import transforms
 from tensorboardX import SummaryWriter
 from models.lr_finder import LRFinder
+import matplotlib.pyplot as plt
 
 
 # TODO : Add option for custom test file --> Already available by specifying different inference_set ? The according dataset & dataloader should be created..
@@ -122,6 +124,8 @@ parser.add_argument("--perf_over_determinist", help="Will let torch use nondeter
 parser.add_argument("--overwrite_clear_mean", help="Will overwrite the Mean and Std of the CLEAR dataset stored in "
                                                    "config file", action='store_true')
 parser.add_argument("--f1_score", help="Use f1 score in loss calculation", action='store_true')
+parser.add_argument("--cyclical_lr", help="Will use cyclical learning rate (Bounds in config.json)",
+                    action='store_true')
 
 
 # TODO : Interactive mode
@@ -291,18 +295,41 @@ def train_model(device, model, dataloaders, output_folder, criterion=None, optim
     return model
 
 
-def get_lr_finder_curves(model, device, train_dataloader, output_dated_folder, nb_epoch, val_dataloader=None):
-    trainable_parameters = filter(lambda p: p.requires_grad, model.parameters())
-    loss_criterion = nn.CrossEntropyLoss()
+def get_lr_finder_curves(model, device, train_dataloader, output_dated_folder, num_iter, optimizer, val_dataloader=None,
+                         loss_criterion=nn.CrossEntropyLoss(), weight_decay_list=None, min_lr=1e-10):
+    if type(weight_decay_list) != list:
+        weight_decay_list = [0., 3e-1, 3e-2, 3e-3, 3e-4, 3e-5, 3e-6, 3e-7, 3e-8, 3e-9]
 
-    optimizer = torch.optim.Adam(trainable_parameters, lr=1e-7, weight_decay=1e-2)
+    # TODO : The order of the data probably affect the LR curves. Shuffling and doing multiple time should help
+
+    # FIXME : What momentum value should we use for SGD ???
+    # Force momentum to 0
+    initial_optimizer_state_dict = optimizer.state_dict()
+    zero_momentum_state_dict = optimizer.state_dict()
+    zero_momentum_state_dict['param_groups'][0]['momentum'] = 0
+    optimizer.load_state_dict(zero_momentum_state_dict)
+    # FIXME : Should force SGD when running lr_finder ?
+
+    fig, ax = plt.subplots()
     lr_finder = LRFinder(model, optimizer, loss_criterion, device=device)
 
-    print(f"Learning Rate finder -- Running for {nb_epoch} epoch ({len(train_dataloader.dataset) * nb_epoch} samples)")
-    lr_finder.range_test(train_dataloader, val_loader=val_dataloader, end_lr=100, nb_epoch=nb_epoch)
+    # There is probably a better way to set weight decay and learning rate that modifying state_dict and reloading
+    lr_finder.reset(weight_decay=weight_decay_list[0], learning_rate=min_lr)
+
+    for weight_decay in weight_decay_list:
+        lr_finder.reset(weight_decay=weight_decay)
+        print(f"Learning Rate finder -- Running for {num_iter} batches with weight decay : {weight_decay:.5}")
+        # FIXME : Should probably run with validation data?
+        lr_finder.range_test(train_dataloader, val_loader=None, end_lr=100, num_iter=num_iter,
+                             num_iter_val=100)
+
+        fig, ax = lr_finder.plot(fig_ax=(fig, ax), legend_label=f"Weight Decay : {weight_decay:.5}", show_fig=False)
 
     filepath = "%s/%s" % (output_dated_folder, 'lr_finder_plot.png')
-    lr_finder.plot(export_filepath=filepath)
+    fig.savefig(filepath)
+
+    # Reset optimiser config
+    optimizer.load_state_dict(initial_optimizer_state_dict)
 
 
 def write_clear_mean_to_config(dataloader, device, current_config, config_file_path, overwrite_mean=False):
@@ -367,6 +394,9 @@ def process_dataloader(is_training, device, model, dataloader, criterion=None, o
                 # backward + optimize only if in training phase
                 loss.backward()
                 optimizer.step()
+
+                if scheduler:
+                    scheduler.step()
 
         batch_processed_predictions = process_predictions(dataloader.dataset, preds.tolist(), answers.tolist(),
                                                           questions_id.tolist(), scenes_id.tolist(),
@@ -809,11 +839,26 @@ def main(args):
         create_symlink_to_latest_folder(output_experiment_folder, current_datetime_str)
 
     if task == "train_film":
-        trainable_parameters = filter(lambda p: p.requires_grad, film_model.parameters())
-        scheduler = None
+        if args.cyclical_lr:
+            total_nb_steps = args.nb_epoch * len(train_dataloader)
 
+            cycle_length = film_model_config['optimizer']['cyclical']['cycle_length']
 
-        loss_criterion = nn.CrossEntropyLoss()
+            if type(cycle_length) == int:
+                # Cycle length define the number of step in the cycle
+                cycle_step = cycle_length
+            elif type(cycle_length) == float:
+                # Cycle length is a ratio of the total nb steps
+                cycle_step = int(total_nb_steps * cycle_length)
+
+            scheduler = CyclicLR(optimizer, base_lr=film_model_config['optimizer']['cyclical']['base_learning_rate'],
+                                 max_lr=film_model_config['optimizer']['cyclical']['max_learning_rate'],
+                                 step_size_up=cycle_step//2,
+                                 base_momentum=film_model_config['optimizer']['cyclical']['base_momentum'],
+                                 max_momentum=film_model_config['optimizer']['cyclical']['max_momentum'])
+
+        else:
+            scheduler = None
 
         start_epoch = 0
         if args.continue_training:
