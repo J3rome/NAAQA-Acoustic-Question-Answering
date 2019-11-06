@@ -21,7 +21,7 @@ import re
 
 class CLEAR_dataset(Dataset):
 
-    def __init__(self, folder, version_name, image_config, set_type, questions=None,
+    def __init__(self, folder, version_name, input_image_type, set_type, questions=None,
                  preprocessed_folder_name="preprocessed", transforms=None, dict_file_path=None, tokenize_text=True):
 
         self.root_folder_path = "%s/%s" % (folder, version_name)
@@ -34,8 +34,8 @@ class CLEAR_dataset(Dataset):
             tokenize_text = False
 
         self.set = set_type
-        self.image_config = image_config
-        self.image_builder = get_img_builder(image_config, self.root_folder_path,
+        self.input_image_type = input_image_type
+        self.image_builder = get_img_builder(input_image_type, self.root_folder_path,
                                              preprocessed_folder_name=preprocessed_folder_name, bufferize=None)
         self.transforms = transforms
         self.input_shape = None
@@ -111,7 +111,7 @@ class CLEAR_dataset(Dataset):
     def from_dataset_object(cls, dataset_obj, questions):
         folder_path = dataset_obj.root_folder_path.replace('/%s' % dataset_obj.version_name, '')
         return cls(folder_path, version_name=dataset_obj.version_name,
-                   image_config=dataset_obj.image_config, set_type=dataset_obj.set,
+                   input_image_type=dataset_obj.input_image_type, set_type=dataset_obj.set,
                    questions=questions, dict_file_path=dataset_obj.tokenizer.dictionary_file,
                    transforms=dataset_obj.transforms)
 

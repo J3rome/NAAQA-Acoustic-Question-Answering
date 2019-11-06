@@ -157,9 +157,9 @@ class h5FeatureBufloader(AbstractImgLoader):
 
 
 
-def get_img_builder(config, data_dir, preprocessed_folder_name='preprocessed', bufferize=None):
+def get_img_builder(input_image_type, data_dir, preprocessed_folder_name='preprocessed', bufferize=None):
 
-    input_type = config["type"]
+    input_type = input_image_type
 
     # FIXME: Figure out why there is the fc8 and fc7 cases with inversed buffersize logic
     if input_type in ["fc8", "fc7"]:

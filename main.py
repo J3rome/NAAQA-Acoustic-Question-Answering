@@ -54,14 +54,17 @@ parser.add_argument("--data_root_path", type=str, default='data', help="Director
 parser.add_argument("--version_name", type=str, help="Name of the dataset version")
 parser.add_argument("--film_model_weight_path", type=str, default=None, help="Path to Film pretrained weight file")
 parser.add_argument("--config_path", type=str, default='config/film.json', help="Path to Film pretrained ckpt file")
+parser.add_argument("--h5_image_input", help="If set, images will be read from h5 file in preprocessed folder",
+                    action='store_true')
+parser.add_argument("--conv_feature_input", help="If set, conv feature will be read from h5 file in preprocessed folder",
+                    action='store_true')
 parser.add_argument("--inference_set", type=str, default='test', help="Define on which set the inference will run")
 parser.add_argument("--dict_file_path", type=str, default=None, help="Define what dictionnary file should be used")
 parser.add_argument("--normalize_with_imagenet_stats", help="Will normalize input images according to"
                                                        "ImageNet mean & std (Only with RAW input)", action='store_true')
 parser.add_argument("--normalize_with_clear_stats", help="Will normalize input images according to"
                                                          "CLEAR mean & std (Only with RAW input)", action='store_true')
-parser.add_argument("--no_img_resize", help="Disable RAW image resizing", action='store_true')
-parser.add_argument("--raw_img_resize_val", type=int, default=224,
+parser.add_argument("--raw_img_resize_val", type=int, default=None,
                     help="Specify the size to which the image will be resized (when working with RAW img)"
                          "The width is calculated according to the height in order to keep the ratio")
 parser.add_argument("--raw_img_resize_based_on_height", action='store_true',
@@ -564,6 +567,16 @@ def main(args):
     create_loss_criterion = args.training or args.lr_finder
     create_optimizer = args.training or args.lr_finder
     force_sgd_optimizer = args.lr_finder or args.cyclical_lr
+    if args.conv_feature_input:
+        input_image_type = "conv"
+    elif args.h5_image_input:
+        input_image_type = "raw_h5"
+    else:
+        input_image_type = "raw"
+
+    if input_image_type == 'raw' and args.raw_img_resize_val is None:
+        # Default value when in raw mode
+        args.raw_img_resize_val = 224
 
     if continuing_training and args.film_model_weight_path is None:
         args.film_mode_weight_path = 'latest'
@@ -594,13 +607,10 @@ def main(args):
         save_git_revision(output_dated_folder)
 
         if instantiate_model:
-            save_json(film_model_config, output_dated_folder, filename='config_%s.json' % film_model_config['input']['type'])
+            save_json(film_model_config, output_dated_folder, filename='config_%s_input.json' % input_image_type)
 
             # Copy dictionary file used
             shutil.copyfile(args.dict_file_path, "%s/dict.json" % output_dated_folder)
-
-    if args.no_img_resize or film_model_config['input']['type'].lower() != 'raw':
-        args.raw_img_resize_val = None
 
     device = f'cuda:{args.gpu_index}' if torch.cuda.is_available() and not args.use_cpu else 'cpu'
     print("Using device '%s'" % device)
@@ -616,7 +626,7 @@ def main(args):
     if not args.keep_image_range:
         to_tensor_transform.append(ImgBetweenZeroOne())
 
-    if film_model_config['input']['type'] == 'raw':
+    if input_image_type.startswith('raw'):
 
         if args.no_feature_extractor:
             feature_extractor_config = None
@@ -650,17 +660,17 @@ def main(args):
     transforms_to_apply = transforms.Compose(transforms_list)
 
     print("Creating Datasets")
-    train_dataset = CLEAR_dataset(args.data_root_path, args.version_name, film_model_config['input'], 'train',
+    train_dataset = CLEAR_dataset(args.data_root_path, args.version_name, input_image_type, 'train',
                                   dict_file_path=args.dict_file_path, transforms=transforms_to_apply,
                                   tokenize_text=not args.create_dict,
                                   preprocessed_folder_name=args.preprocessed_folder_name)
 
-    val_dataset = CLEAR_dataset(args.data_root_path, args.version_name, film_model_config['input'], 'val',
+    val_dataset = CLEAR_dataset(args.data_root_path, args.version_name, input_image_type, 'val',
                                 dict_file_path=args.dict_file_path, transforms=transforms_to_apply,
                                 tokenize_text=not args.create_dict,
                                 preprocessed_folder_name=args.preprocessed_folder_name)
 
-    test_dataset = CLEAR_dataset(args.data_root_path, args.version_name, film_model_config['input'], 'test',
+    test_dataset = CLEAR_dataset(args.data_root_path, args.version_name, input_image_type, 'test',
                                  dict_file_path=args.dict_file_path, transforms=transforms_to_apply,
                                  tokenize_text=not args.create_dict,
                                  preprocessed_folder_name=args.preprocessed_folder_name)
