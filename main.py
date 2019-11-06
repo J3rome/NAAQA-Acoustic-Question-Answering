@@ -301,7 +301,7 @@ def train_model(device, model, dataloaders, output_folder, criterion=None, optim
 def get_lr_finder_curves(model, device, train_dataloader, output_dated_folder, num_iter, optimizer, val_dataloader=None,
                          loss_criterion=nn.CrossEntropyLoss(), weight_decay_list=None, min_lr=1e-10):
     if type(weight_decay_list) != list:
-        weight_decay_list = [0., 3e-1, 3e-2, 3e-3, 3e-4, 3e-5, 3e-6, 3e-7, 3e-8, 3e-9]
+        weight_decay_list = [0., 3e-1, 3e-2, 3e-3, 3e-4, 3e-5, 3e-6, 3e-7]
 
     # TODO : The order of the data probably affect the LR curves. Shuffling and doing multiple time should help
 
