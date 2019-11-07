@@ -250,6 +250,9 @@ def train_model(device, model, dataloaders, output_folder, criterion, optimizer,
             'rng_state': get_random_state(),
         }
 
+        if scheduler:
+            checkpoint['scheduler_state_dict'] = scheduler.state_dict()
+
         torch.save(checkpoint, '%s/model.pt.tar' % epoch_output_folder_path)
 
         sorted_stats = sort_stats(stats)
@@ -884,6 +887,9 @@ def main(args):
             optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
             start_epoch = checkpoint['epoch'] + 1
             set_random_state(checkpoint['rng_state'])
+
+            if scheduler and 'scheduler_state_dict' in checkpoint:
+                scheduler.load_state_dict(checkpoint['scheduler_state_dict'])
 
         train_model(device=device, model=film_model, dataloaders={'train': train_dataloader, 'val': val_dataloader},
                     output_folder=output_dated_folder, criterion=loss_criterion, optimizer=optimizer,
