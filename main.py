@@ -868,7 +868,7 @@ def main(args):
                 cycle_step = int(total_nb_steps * cycle_length)
 
             print(f"Using cyclical LR : ({base_lr},{max_lr})  Momentum ({base_momentum}, {max_momentum})")
-            print(f"Total nb steps : {total_nb_steps}  -- Nb steps per cycle : {cycle_length}")
+            print(f"Total nb steps : {total_nb_steps}  -- Nb steps per cycle : {cycle_step}")
 
             scheduler = CyclicLR(optimizer, base_lr=base_lr,
                                  max_lr=max_lr,
