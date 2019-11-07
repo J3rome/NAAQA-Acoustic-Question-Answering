@@ -177,7 +177,7 @@ def set_inference(device, model, dataloader, criterion, output_folder, save_gamm
     print("%s Accuracy : %.5f" % (set_type, acc))
 
 
-def train_model(device, model, dataloaders, output_folder, criterion=None, optimizer=None, scheduler=None,
+def train_model(device, model, dataloaders, output_folder, criterion, optimizer, scheduler=None,
                 nb_epoch=25, nb_epoch_to_keep=None, start_epoch=0, tensorboard=None):
 
     if tensorboard is None:
