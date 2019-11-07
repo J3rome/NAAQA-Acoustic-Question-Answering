@@ -312,7 +312,7 @@ def get_lr_finder_curves(model, device, train_dataloader, output_dated_folder, n
     # Force momentum to 0
     initial_optimizer_state_dict = optimizer.state_dict()
     optimizer.param_groups[0]['momentum'] = 0
-    optimizer.param_groups[0]['learning_rate'] = min_lr
+    optimizer.param_groups[0]['lr'] = min_lr
 
     fig, ax = plt.subplots()
     lr_finder = LRFinder(model, optimizer, loss_criterion, device=device)
