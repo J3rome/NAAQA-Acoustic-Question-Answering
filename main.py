@@ -759,6 +759,8 @@ def main(args):
                 clean_base_path = base_path[:-(len(args.film_model_weight_path) + 1)]
                 args.film_model_weight_path = '%s/%s/%s' % (clean_base_path, symlink_value, suffix)
 
+            print(f"Restoring model weights from '{args.film_model_weight_path}'")
+
             save_json({'restored_film_weight_path': args.film_model_weight_path},
                       output_dated_folder, 'restored_from.json')
 
@@ -868,8 +870,9 @@ def main(args):
                 # Cycle length is a ratio of the total nb steps
                 cycle_step = int(total_nb_steps * cycle_length)
 
-            print(f"Using cyclical LR : ({base_lr},{max_lr})  Momentum ({base_momentum}, {max_momentum})")
-            print(f"Total nb steps : {total_nb_steps}  -- Nb steps per cycle : {cycle_step}")
+            print(f"Using cyclical LR : ({base_lr:.5},{max_lr:.5})  Momentum ({base_momentum:.5}, {max_momentum:.5})")
+            print(f"Total nb steps : {total_nb_steps} ({args.nb_epoch} epoch)  -- Nb steps per cycle : {cycle_step} "
+                  f"({cycle_step/len(train_dataloader)} epoch)")
 
             scheduler = CyclicLR(optimizer, base_lr=base_lr,
                                  max_lr=max_lr,
