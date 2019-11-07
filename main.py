@@ -562,7 +562,8 @@ def main(args):
     restore_model_weights = args.inference or continuing_training or args.visualize_grad_cam
     create_output_folder = not args.create_dict and not args.feature_extract and not args.write_clear_mean_to_config
     instantiate_model = not args.create_dict and not args.write_clear_mean_to_config and \
-                        'gamma_beta' not in task and 'random_answer' not in task
+                        'gamma_beta' not in task and 'random_answer' not in task and not args.prepare_images
+
     use_tensorboard = 'train' in task
     create_loss_criterion = args.training or args.lr_finder
     create_optimizer = args.training or args.lr_finder
