@@ -311,19 +311,16 @@ def get_lr_finder_curves(model, device, train_dataloader, output_dated_folder, n
     # FIXME : What momentum value should we use for SGD ???
     # Force momentum to 0
     initial_optimizer_state_dict = optimizer.state_dict()
-    zero_momentum_state_dict = optimizer.state_dict()
-    zero_momentum_state_dict['param_groups'][0]['momentum'] = 0
-    optimizer.load_state_dict(zero_momentum_state_dict)
-    # FIXME : Should force SGD when running lr_finder ?
+    optimizer.param_groups[0]['momentum'] = 0
+    optimizer.param_groups[0]['learning_rate'] = min_lr
 
     fig, ax = plt.subplots()
     lr_finder = LRFinder(model, optimizer, loss_criterion, device=device)
 
-    # There is probably a better way to set weight decay and learning rate that modifying state_dict and reloading
-    lr_finder.reset(weight_decay=weight_decay_list[0], learning_rate=min_lr)
-
     for weight_decay in weight_decay_list:
+        # Reset LR Finder and change weight decay
         lr_finder.reset(weight_decay=weight_decay)
+
         print(f"Learning Rate finder -- Running for {num_iter} batches with weight decay : {weight_decay:.5}")
         # FIXME : Should probably run with validation data?
         lr_finder.range_test(train_dataloader, val_loader=None, end_lr=100, num_iter=num_iter,
