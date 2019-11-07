@@ -580,7 +580,7 @@ def main(args):
         args.raw_img_resize_val = 224
 
     if continuing_training and args.film_model_weight_path is None:
-        args.film_mode_weight_path = 'latest'
+        args.film_model_weight_path = 'latest'
 
     # Make sure we are not normalizing beforce calculating mean and std
     if args.write_clear_mean_to_config:
