@@ -594,7 +594,7 @@ def main(args):
     film_model_config = get_config(args.config_path)
 
     early_stopping = not args.no_early_stopping and film_model_config['early_stopping']['enable']
-    film_model_config['early_stopping']['enable'] =  early_stopping
+    film_model_config['early_stopping']['enable'] = early_stopping
 
     if create_output_folder:
         # TODO : See if this is optimal file structure
@@ -651,7 +651,7 @@ def main(args):
                 stats = film_model_config['preprocessing']['imagenet_stats']
             else:
                 stats = film_model_config['preprocessing']['clear_stats']
-                
+
             transforms_list.append(NormalizeSample(mean=stats['mean'], std=stats['std'], inplace=True))
 
     else:
@@ -720,11 +720,6 @@ def main(args):
 
     #trickytest_dataloader = DataLoader(trickytest_dataset, batch_size=args.batch_size, shuffle=False,
     #                             num_workers=4, collate_fn=train_dataset.CLEAR_collate_fct)
-
-    # This should only be used once to get the dataset mean & std. We could write it to the data folder in json format
-    # FIXME : THIS IS AFFECTING THE RESULTS --> Should restore rng state if doing this
-    #mean, std = calc_mean_and_std(train_test_dataloader, device=device)
-
 
     ####################################
     #   Model Definition
