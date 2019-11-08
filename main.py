@@ -468,118 +468,121 @@ def random_weight_baseline(model, device, dataloader, output_folder=None):
 
 def validate_arguments(args):
     
-    mutually_exclusive_params = [args.training, args.inference, args.feature_extract, args.create_dict,
-                                 args.visualize_gamma_beta, args.visualize_grad_cam, args.lr_finder,
-                                 args.write_clear_mean_to_config, args.random_answer_baseline,
-                                 args.random_weight_baseline, args.prepare_images]
+    mutually_exclusive_params = [args['training'], args['inference'], args['feature_extract'], args['create_dict'],
+                                 args['visualize_gamma_beta'], args['visualize_grad_cam'], args['lr_finder'],
+                                 args['write_clear_mean_to_config'], args['random_answer_baseline'],
+                                 args['random_weight_baseline'], args['prepare_images']]
 
     assert sum(mutually_exclusive_params) == 1, \
         "[ERROR] Can only do one task at a time " \
         "(--training, --inference, --visualize_gamma_beta, --create_dict, --feature_extract --visualize_grad_cam " \
         "--prepare_images, --lr_finder, --write_clear_mean_to_config, --random_answer_baseline, --random_weight_baseline)"
 
-    mutually_exclusive_params = [args.raw_img_resize_based_on_height, args.raw_img_resize_based_on_width]
+    mutually_exclusive_params = [args['raw_img_resize_based_on_height'], args['raw_img_resize_based_on_width']]
     assert sum(mutually_exclusive_params) < 2, "[ERROR] Image resize can be either --raw_img_resize_based_on_height " \
                                                "or --raw_img_resize_based_on_width but not both"
 
-    mutually_exclusive_params = [args.pad_to_square_images, args.resize_to_square_images]
+    mutually_exclusive_params = [args['pad_to_square_images'], args['resize_to_square_images']]
     assert sum(mutually_exclusive_params) < 2, "[ERROR] Can either --pad_to_square_images or --resize_to_square_images"
 
 
 def get_task_from_args(args):
-    if args.training:
+    if args['training']:
         return "train_film"
-    elif args.inference:
+    elif args['inference']:
         return "inference"
-    elif args.visualize_gamma_beta:
+    elif args['visualize_gamma_beta']:
         return "visualize_gamma_beta"
-    elif args.visualize_grad_cam:
+    elif args['visualize_grad_cam']:
         return "visualize_grad_cam"
-    elif args.feature_extract:
+    elif args['feature_extract']:
         return "feature_extract"
-    elif args.prepare_images:
+    elif args['prepare_images']:
         return "prepare_images"
-    elif args.create_dict:
+    elif args['create_dict']:
         return "create_dict"
-    elif args.lr_finder:
+    elif args['lr_finder']:
         return 'lr_finder'
-    elif args.write_clear_mean_to_config:
+    elif args['write_clear_mean_to_config']:
         return 'write_clear_mean_to_config'
-    elif args.random_weight_baseline:
+    elif args['random_weight_baseline']:
         return 'random_weight_baseline'
-    elif args.random_answer_baseline:
+    elif args['random_answer_baseline']:
         return 'random_answer_baseline'
 
     assert False, "Arguments don't specify task"
 
+
 def main(args):
+    # Convert args object to dict
+    args = vars(args)
     # Parameter validation
     validate_arguments(args)
     task = get_task_from_args(args)
 
-    output_name = args.version_name + "_" + args.output_name_suffix if args.output_name_suffix else args.version_name
+    output_name = args['version_name'] + "_" + args['output_name_suffix'] if args['output_name_suffix'] else args['version_name']
     print("\nTask '%s' for version '%s'\n" % (task.replace('_', ' ').title(), output_name))
 
-    if args.random_seed is not None:
-        set_random_seed(args.random_seed)
+    if args['random_seed'] is not None:
+        set_random_seed(args['random_seed'])
 
     # Paths
-    data_path = "%s/%s" % (args.data_root_path, args.version_name)
+    data_path = "%s/%s" % (args['data_root_path'], args['version_name'])
 
-    output_task_folder = "%s/%s" % (args.output_root_path, task)
+    output_task_folder = "%s/%s" % (args['output_root_path'], task)
     output_experiment_folder = "%s/%s" % (output_task_folder, output_name)
     current_datetime = datetime.now()
     current_datetime_str = current_datetime.strftime("%Y-%m-%d_%Hh%M")
     output_dated_folder = "%s/%s" % (output_experiment_folder, current_datetime_str)
 
     # Flags
-    continuing_training = args.training and args.continue_training
-    restore_model_weights = args.inference or continuing_training or args.visualize_grad_cam
-    create_output_folder = not args.create_dict and not args.feature_extract and not args.write_clear_mean_to_config
-    instantiate_model = not args.create_dict and not args.write_clear_mean_to_config and \
-                        'gamma_beta' not in task and 'random_answer' not in task and not args.prepare_images
+    continuing_training = args['training'] and args['continue_training']
+    restore_model_weights = args['inference'] or continuing_training or args['visualize_grad_cam']
+    create_output_folder = not args['create_dict'] and not args['feature_extract'] and not args['write_clear_mean_to_config']
+    instantiate_model = not args['create_dict'] and not args['write_clear_mean_to_config'] and \
+                        'gamma_beta' not in task and 'random_answer' not in task and not args['prepare_images']
 
     use_tensorboard = 'train' in task
-    create_loss_criterion = args.training or args.lr_finder
-    create_optimizer = args.training or args.lr_finder
-    force_sgd_optimizer = args.lr_finder or args.cyclical_lr
-    if args.conv_feature_input:
+    create_loss_criterion = args['training'] or args['lr_finder']
+    create_optimizer = args['training'] or args['lr_finder']
+    force_sgd_optimizer = args['lr_finder'] or args['cyclical_lr']
+    if args['conv_feature_input']:
         input_image_type = "conv"
-    elif args.h5_image_input:
+    elif args['h5_image_input']:
         input_image_type = "raw_h5"
     else:
         input_image_type = "raw"
 
-    if input_image_type == 'raw' and args.raw_img_resize_val is None:
+    if input_image_type == 'raw' and args['raw_img_resize_val'] is None:
         # Default value when in raw mode
-        args.raw_img_resize_val = 224
+        args['raw_img_resize_val'] = 224
 
     if input_image_type == "raw":
         # Default value is True when working with raw images
-        args.normalize_zero_one = True
-    args.normalize_zero_one = args.normalize_zero_one and not args.keep_image_range
+        args['normalize_zero_one'] = True
+    args['normalize_zero_one'] = args['normalize_zero_one'] and not args['keep_image_range']
 
 
-    if continuing_training and args.film_model_weight_path is None:
-        args.film_model_weight_path = 'latest'
+    if continuing_training and args['film_model_weight_path'] is None:
+        args['film_model_weight_path'] = 'latest'
 
     # Make sure we are not normalizing beforce calculating mean and std
-    if args.write_clear_mean_to_config:
-        args.normalize_with_imagenet_stats = False
-        args.normalize_with_clear_stats = False
+    if args['write_clear_mean_to_config']:
+        args['normalize_with_imagenet_stats'] = False
+        args['normalize_with_clear_stats'] = False
 
-    args.dict_folder = args.preprocessed_folder_name if args.dict_folder is None else args.dict_folder
-    if args.dict_file_path is None:
-        args.dict_file_path = "%s/%s/dict.json" % (data_path, args.dict_folder)
+    args['dict_folder'] = args['preprocessed_folder_name'] if args['dict_folder'] is None else args['dict_folder']
+    if args['dict_file_path'] is None:
+        args['dict_file_path'] = "%s/%s/dict.json" % (data_path, args['dict_folder'])
 
-    film_model_config = get_config(args.config_path)
+    film_model_config = get_config(args['config_path'])
 
-    early_stopping = not args.no_early_stopping and film_model_config['early_stopping']['enable']
+    early_stopping = not args['no_early_stopping'] and film_model_config['early_stopping']['enable']
     film_model_config['early_stopping']['enable'] = early_stopping
 
     if create_output_folder:
         # TODO : See if this is optimal file structure
-        create_folder_if_necessary(args.output_root_path)
+        create_folder_if_necessary(args['output_root_path'])
         create_folder_if_necessary(output_task_folder)
         create_folder_if_necessary(output_experiment_folder)
         create_folder_if_necessary(output_dated_folder)
@@ -592,9 +595,9 @@ def main(args):
             save_json(film_model_config, output_dated_folder, filename='config_%s_input.json' % input_image_type)
 
             # Copy dictionary file used
-            shutil.copyfile(args.dict_file_path, "%s/dict.json" % output_dated_folder)
+            shutil.copyfile(args['dict_file_path'], "%s/dict.json" % output_dated_folder)
 
-    device = f'cuda:{args.gpu_index}' if torch.cuda.is_available() and not args.use_cpu else 'cpu'
+    device = f'cuda:{args["gpu_index"]}' if torch.cuda.is_available() and not args['use_cpu'] else 'cpu'
     print("Using device '%s'" % device)
 
     ####################################
@@ -605,30 +608,30 @@ def main(args):
 
     # Bundle together ToTensor and ImgBetweenZeroOne, need to be one after the other for other transforms to work
     to_tensor_transform = [ToTensor()]
-    if args.normalize_zero_one:
+    if args['normalize_zero_one']:
         to_tensor_transform.append(ImgBetweenZeroOne())
 
     if input_image_type.startswith('raw'):
 
-        if args.no_feature_extractor:
+        if args['no_feature_extractor']:
             feature_extractor_config = None
         else:
-            feature_extractor_config = {'version': 101, 'layer_index': args.feature_extractor_layer_index}   # Idx 6 -> Block3/unit22
+            feature_extractor_config = {'version': 101, 'layer_index': args['feature_extractor_layer_index']}   # Idx 6 -> Block3/unit22
 
-        if args.raw_img_resize_val:
-            if args.raw_img_resize_based_on_width:
+        if args['raw_img_resize_val']:
+            if args['raw_img_resize_based_on_width']:
                 resize_transform = ResizeImgBasedOnWidth
             else:
                 # By default, we resize according to height
                 resize_transform = ResizeImgBasedOnHeight
-            transforms_list.append(resize_transform(args.raw_img_resize_val))
+            transforms_list.append(resize_transform(args['raw_img_resize_val']))
 
         # TODO : Add data augmentation ?
 
         transforms_list += to_tensor_transform
 
-        if args.normalize_with_imagenet_stats or args.normalize_with_clear_stats:
-            if args.normalize_with_imagenet_stats:
+        if args['normalize_with_imagenet_stats'] or args['normalize_with_clear_stats']:
+            if args['normalize_with_imagenet_stats']:
                 stats = film_model_config['preprocessing']['imagenet_stats']
             else:
                 stats = film_model_config['preprocessing']['clear_stats']
@@ -642,42 +645,42 @@ def main(args):
     transforms_to_apply = transforms.Compose(transforms_list)
 
     print("Creating Datasets")
-    train_dataset = CLEAR_dataset(args.data_root_path, args.version_name, input_image_type, 'train',
-                                  dict_file_path=args.dict_file_path, transforms=transforms_to_apply,
-                                  tokenize_text=not args.create_dict,
-                                  preprocessed_folder_name=args.preprocessed_folder_name)
+    train_dataset = CLEAR_dataset(args['data_root_path'], args['version_name'], input_image_type, 'train',
+                                  dict_file_path=args['dict_file_path'], transforms=transforms_to_apply,
+                                  tokenize_text=not args['create_dict'],
+                                  preprocessed_folder_name=args['preprocessed_folder_name'])
 
-    val_dataset = CLEAR_dataset(args.data_root_path, args.version_name, input_image_type, 'val',
-                                dict_file_path=args.dict_file_path, transforms=transforms_to_apply,
-                                tokenize_text=not args.create_dict,
-                                preprocessed_folder_name=args.preprocessed_folder_name)
+    val_dataset = CLEAR_dataset(args['data_root_path'], args['version_name'], input_image_type, 'val',
+                                dict_file_path=args['dict_file_path'], transforms=transforms_to_apply,
+                                tokenize_text=not args['create_dict'],
+                                preprocessed_folder_name=args['preprocessed_folder_name'])
 
-    test_dataset = CLEAR_dataset(args.data_root_path, args.version_name, input_image_type, 'test',
-                                 dict_file_path=args.dict_file_path, transforms=transforms_to_apply,
-                                 tokenize_text=not args.create_dict,
-                                 preprocessed_folder_name=args.preprocessed_folder_name)
+    test_dataset = CLEAR_dataset(args['data_root_path'], args['version_name'], input_image_type, 'test',
+                                 dict_file_path=args['dict_file_path'], transforms=transforms_to_apply,
+                                 tokenize_text=not args['create_dict'],
+                                 preprocessed_folder_name=args['preprocessed_folder_name'])
 
     #trickytest_dataset = CLEAR_dataset(data_path, film_model_config['input'], 'trickytest',
     #                             dict_file_path=args.dict_file_path,
     #                             transforms=transforms.Compose(transforms_list + [ToTensor()]))
 
-    if args.pad_to_largest_image or args.pad_to_square_images:
+    if args['pad_to_largest_image'] or args['pad_to_square_images']:
         # We need the dataset object to retrieve images dims so we have to manually add transforms
         max_train_img_dims = train_dataset.get_max_width_image_dims()
         max_val_img_dims = val_dataset.get_max_width_image_dims()
         max_test_img_dims = test_dataset.get_max_width_image_dims()
 
-        if args.pad_to_largest_image:
+        if args['pad_to_largest_image']:
             train_dataset.add_transform(PadTensor(max_train_img_dims))
             val_dataset.add_transform(PadTensor(max_val_img_dims))
             test_dataset.add_transform(PadTensor(max_test_img_dims))
 
-        if args.pad_to_square_images or args.resize_to_square_images:
+        if args['pad_to_square_images'] or args['resize_to_square_images']:
             train_biggest_dim = max(max_train_img_dims)
             val_biggest_dim = max(max_val_img_dims)
             test_biggest_dim = max(max_test_img_dims)
 
-            if args.resize_to_square_images:
+            if args['resize_to_square_images']:
                 to_square_transform = ResizeTensor
             else:
                 to_square_transform = PadTensor
@@ -690,16 +693,17 @@ def main(args):
     print("Creating Dataloaders")
     collate_fct = CLEAR_collate_fct(padding_token=train_dataset.get_padding_token())
 
-    train_dataloader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True,
+    # FIXME : Should take into account --nb_process, or at least the nb of core on the machine
+    train_dataloader = DataLoader(train_dataset, batch_size=args['batch_size'], shuffle=True,
                                   num_workers=4, collate_fn=collate_fct)
 
-    val_dataloader = DataLoader(val_dataset, batch_size=args.batch_size, shuffle=True,
+    val_dataloader = DataLoader(val_dataset, batch_size=args['batch_size'], shuffle=True,
                                   num_workers=4, collate_fn=collate_fct)
 
-    test_dataloader = DataLoader(test_dataset, batch_size=args.batch_size, shuffle=False,
+    test_dataloader = DataLoader(test_dataset, batch_size=args['batch_size'], shuffle=False,
                                   num_workers=4, collate_fn=collate_fct)
 
-    #trickytest_dataloader = DataLoader(trickytest_dataset, batch_size=args.batch_size, shuffle=False,
+    #trickytest_dataloader = DataLoader(trickytest_dataset, batch_size=args['batch_size'], shuffle=False,
     #                             num_workers=4, collate_fn=train_dataset.CLEAR_collate_fct)
 
     ####################################
@@ -718,29 +722,29 @@ def main(args):
                                       feature_extraction_config=feature_extractor_config)
 
         if restore_model_weights:
-            assert args.film_model_weight_path is not None, 'Must provide path to model weights to ' \
+            assert args['film_model_weight_path'] is not None, 'Must provide path to model weights to ' \
                                                             'do inference or to continue training.'
 
             # If path specified is a date, we construct the path to the best model weights for the specified run
-            base_path = "%s/train_film/%s/%s" % (args.output_root_path, output_name, args.film_model_weight_path)
+            base_path = "%s/train_film/%s/%s" % (args['output_root_path'], output_name, args['film_model_weight_path'])
             # Note : We might redo some epoch when continuing training because the 'best' epoch is not necessarely the last
             suffix = "best/model.pt.tar"
 
-            if is_date_string(args.film_model_weight_path):
-                args.film_model_weight_path = "%s/%s" % (base_path, suffix)
-            elif args.film_model_weight_path == 'latest':
+            if is_date_string(args['film_model_weight_path']):
+                args['film_model_weight_path'] = "%s/%s" % (base_path, suffix)
+            elif args['film_model_weight_path'] == 'latest':
                 # The 'latest' symlink will be overriden by this run (If continuing training).
                 # Use real path of latest experiment
                 symlink_value = os.readlink(base_path)
-                clean_base_path = base_path[:-(len(args.film_model_weight_path) + 1)]
-                args.film_model_weight_path = '%s/%s/%s' % (clean_base_path, symlink_value, suffix)
+                clean_base_path = base_path[:-(len(args['film_model_weight_path']) + 1)]
+                args['film_model_weight_path'] = '%s/%s/%s' % (clean_base_path, symlink_value, suffix)
 
-            print(f"Restoring model weights from '{args.film_model_weight_path}'")
+            print(f"Restoring model weights from '{args['film_model_weight_path']}'")
 
-            save_json({'restored_film_weight_path': args.film_model_weight_path},
+            save_json({'restored_film_weight_path': args['film_model_weight_path']},
                       output_dated_folder, 'restored_from.json')
 
-            checkpoint = torch.load(args.film_model_weight_path, map_location=device)
+            checkpoint = torch.load(args['film_model_weight_path'], map_location=device)
 
             if device != 'cpu':
                 if 'torch' in checkpoint['rng_state']:
@@ -766,7 +770,7 @@ def main(args):
         if create_loss_criterion:
             loss_criterion_tmp = nn.CrossEntropyLoss()
 
-            if args.f1_score:
+            if args['f1_score']:
                 def loss_criterion(outputs, answers):
                     loss = loss_criterion_tmp(outputs, answers)
                     _, preds = torch.max(outputs, 1)
@@ -776,7 +780,7 @@ def main(args):
                 loss_criterion = loss_criterion_tmp
 
         if device != 'cpu':
-            if args.perf_over_determinist:
+            if args['perf_over_determinist']:
                 torch.backends.cudnn.benchmark = True
                 torch.backends.cudnn.deterministic = False
             else:
@@ -787,7 +791,7 @@ def main(args):
 
         print("Model ready to run")
 
-        if not args.no_model_summary:
+        if not args['no_model_summary']:
             # Printing summary affects the random state (Raw Vs Pre-Extracted Features).
             # We restore it to ensure reproducibility between input type
             random_state = get_random_state()
@@ -797,7 +801,7 @@ def main(args):
         if use_tensorboard:
             # FIXME : What happen with test set? I guess we don't really care, we got our own visualisations for test run
             # Create tensorboard writer
-            base_writer_path = '%s/%s/%s' % (args.tensorboard_folder, output_name, current_datetime_str)
+            base_writer_path = '%s/%s/%s' % (args['tensorboard_folder'], output_name, current_datetime_str)
 
             # TODO : Add 'comment' param with more infos on run. Ex : Raw vs Conv
             tensorboard = {
@@ -806,12 +810,12 @@ def main(args):
                     'val': SummaryWriter('%s/val' % base_writer_path)
                 },
                 'options': {
-                    'save_images': args.tensorboard_save_images,
-                    'save_texts': args.tensorboard_save_texts
+                    'save_images': args['tensorboard_save_images'],
+                    'save_texts': args['tensorboard_save_texts']
                 }
             }
 
-            if args.tensorboard_save_graph:
+            if args['tensorboard_save_graph']:
                 # FIXME : For now we are ignoring TracerWarnings. Not sure the saved graph is 100% accurate...
                 import warnings
                 warnings.filterwarnings('ignore', category=torch.jit.TracerWarning)
@@ -829,13 +833,13 @@ def main(args):
         create_symlink_to_latest_folder(output_experiment_folder, current_datetime_str)
 
     if task == "train_film":
-        if args.cyclical_lr:
+        if args['cyclical_lr']:
             base_lr = film_model_config['optimizer']['cyclical']['base_learning_rate']
             max_lr = film_model_config['optimizer']['cyclical']['max_learning_rate']
             base_momentum = film_model_config['optimizer']['cyclical']['base_momentum']
             max_momentum = film_model_config['optimizer']['cyclical']['max_momentum']
 
-            total_nb_steps = args.nb_epoch * len(train_dataloader)
+            total_nb_steps = args['nb_epoch'] * len(train_dataloader)
 
             cycle_length = film_model_config['optimizer']['cyclical']['cycle_length']
 
@@ -847,7 +851,7 @@ def main(args):
                 cycle_step = int(total_nb_steps * cycle_length)
 
             print(f"Using cyclical LR : ({base_lr:.5},{max_lr:.5})  Momentum ({base_momentum:.5}, {max_momentum:.5})")
-            print(f"Total nb steps : {total_nb_steps} ({args.nb_epoch} epoch)  -- Nb steps per cycle : {cycle_step} "
+            print(f"Total nb steps : {total_nb_steps} ({args['nb_epoch']} epoch)  -- Nb steps per cycle : {cycle_step} "
                   f"({cycle_step/len(train_dataloader)} epoch)")
 
             scheduler = CyclicLR(optimizer, base_lr=base_lr,
@@ -860,7 +864,7 @@ def main(args):
             scheduler = None
 
         start_epoch = 0
-        if args.continue_training:
+        if args['continue_training']:
             optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
             start_epoch = checkpoint['epoch'] + 1
             set_random_state(checkpoint['rng_state'])
@@ -870,8 +874,8 @@ def main(args):
 
         train_model(device=device, model=film_model, dataloaders={'train': train_dataloader, 'val': val_dataloader},
                     output_folder=output_dated_folder, criterion=loss_criterion, optimizer=optimizer,
-                    scheduler=scheduler, nb_epoch=args.nb_epoch,
-                    nb_epoch_to_keep=args.nb_epoch_stats_to_keep, start_epoch=start_epoch, tensorboard=tensorboard)
+                    scheduler=scheduler, nb_epoch=args['nb_epoch'],
+                    nb_epoch_to_keep=args['nb_epoch_stats_to_keep'], start_epoch=start_epoch, tensorboard=tensorboard)
 
     elif task == "inference":
         inference_dataloader = test_dataloader
@@ -879,21 +883,21 @@ def main(args):
                       output_folder=output_dated_folder)
 
     elif task == "create_dict":
-        create_dict_from_questions(train_dataset, force_all_answers=args.force_dict_all_answer,
-                                   output_folder_name=args.dict_folder, start_end_tokens=not args.no_start_end_tokens)
+        create_dict_from_questions(train_dataset, force_all_answers=args['force_dict_all_answer'],
+                                   output_folder_name=args['dict_folder'], start_end_tokens=not args['no_start_end_tokens'])
 
     elif task == "prepare_images":
         images_to_h5(dataloaders={'train': train_dataloader, 'val': val_dataloader, 'test': test_dataloader},
-                     square_image=args.pad_to_square_images or args.resize_to_square_images,
-                     output_folder_name=args.preprocessed_folder_name)
+                     square_image=args['pad_to_square_images'] or args['resize_to_square_images'],
+                     output_folder_name=args['preprocessed_folder_name'])
 
     elif task == "feature_extract":
         extract_features(device=device, feature_extractor=film_model.feature_extractor,
                          dataloaders={'train': train_dataloader, 'val': val_dataloader, 'test': test_dataloader},
-                         output_folder_name=args.preprocessed_folder_name)
+                         output_folder_name=args['preprocessed_folder_name'])
 
     elif task == "visualize_gamma_beta":
-        visualize_gamma_beta(args.gamma_beta_path,
+        visualize_gamma_beta(args['gamma_beta_path'],
                              datasets={'train': train_dataset, 'val': val_dataset, 'test': test_dataset},
                              output_folder=output_dated_folder)
 
@@ -902,12 +906,12 @@ def main(args):
                                output_folder=output_dated_folder)
 
     elif task == "lr_finder":
-        get_lr_finder_curves(film_model, device, train_dataloader, output_dated_folder, args.nb_epoch, optimizer,
+        get_lr_finder_curves(film_model, device, train_dataloader, output_dated_folder, args['nb_epoch'], optimizer,
                              val_dataloader=val_dataloader, loss_criterion=loss_criterion)
 
     elif task == "write_clear_mean_to_config":
-        write_clear_mean_to_config(train_dataloader, device, film_model_config, args.config_path,
-                                   args.overwrite_clear_mean)
+        write_clear_mean_to_config(train_dataloader, device, film_model_config, args['config_path'],
+                                   args['overwrite_clear_mean'])
 
     elif task == 'random_answer_baseline':
         random_answer_baseline(train_dataloader, output_dated_folder)
