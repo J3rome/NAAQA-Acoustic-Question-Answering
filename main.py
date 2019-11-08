@@ -135,36 +135,7 @@ parser.add_argument("--cyclical_lr", help="Will use cyclical learning rate (Boun
                     action='store_true')
 
 
-# TODO : Interactive mode
-def run_one_game(device, model, games, data_path, input_config, transforms_list=[]):
-
-    # TODO : Should be able to run from a specific image (Not necessarly inside data/experiment_name/images/set_type)
-
-    set_type = 'test'
-    game = {
-            "question_index" : 1,
-            "question": "How many loud things can we hear ?",
-            "answer": 3,
-            "scene_index": 3
-        }
-
-    game['scene_filename'] = "CLEAR_%s_%06d.png" % (set_type, game['scene_index'])
-
-    games = [
-        game
-    ]
-
-    test_dataset = CLEAR_dataset(data_path, input_config, set_type, questions=games,
-                                 dict_file_path=args.dict_file_path,
-                                 transforms=transforms.Compose(transforms_list + [ToTensor()]))
-
-    test_dataloader = DataLoader(test_dataset, batch_size=1, shuffle=False,
-                                  num_workers=1, collate_fn=test_dataset.CLEAR_collate_fct)
-
-    _, accuracy, predictions, gamma_beta = process_dataloader(False, device, model, test_dataloader)
-
-    print("Accuracy is : %f" % accuracy)
-
+# TODO : Interactive mode, One game at a time
 
 def set_inference(device, model, dataloader, criterion, output_folder, save_gamma_beta=True):
     set_type = dataloader.dataset.set
