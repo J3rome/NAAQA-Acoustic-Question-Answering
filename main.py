@@ -645,35 +645,37 @@ def main(args):
     transforms_to_apply = transforms.Compose(transforms_list)
 
     print("Creating Datasets")
-    train_dataset = CLEAR_dataset(args['data_root_path'], args['version_name'], input_image_type, 'train',
-                                  dict_file_path=args['dict_file_path'], transforms=transforms_to_apply,
-                                  tokenize_text=not args['create_dict'],
-                                  preprocessed_folder_name=args['preprocessed_folder_name'])
 
-    val_dataset = CLEAR_dataset(args['data_root_path'], args['version_name'], input_image_type, 'val',
-                                dict_file_path=args['dict_file_path'], transforms=transforms_to_apply,
-                                tokenize_text=not args['create_dict'],
-                                preprocessed_folder_name=args['preprocessed_folder_name'])
+    datasets = {
+        'train': CLEAR_dataset(args['data_root_path'], args['version_name'], input_image_type, 'train',
+                                      dict_file_path=args['dict_file_path'], transforms=transforms_to_apply,
+                                      tokenize_text=not args['create_dict'],
+                                      preprocessed_folder_name=args['preprocessed_folder_name']),
 
-    test_dataset = CLEAR_dataset(args['data_root_path'], args['version_name'], input_image_type, 'test',
-                                 dict_file_path=args['dict_file_path'], transforms=transforms_to_apply,
-                                 tokenize_text=not args['create_dict'],
-                                 preprocessed_folder_name=args['preprocessed_folder_name'])
+        'val': CLEAR_dataset(args['data_root_path'], args['version_name'], input_image_type, 'val',
+                                    dict_file_path=args['dict_file_path'], transforms=transforms_to_apply,
+                                    tokenize_text=not args['create_dict'],
+                                    preprocessed_folder_name=args['preprocessed_folder_name']),
 
+        'test': CLEAR_dataset(args['data_root_path'], args['version_name'], input_image_type, 'test',
+                                     dict_file_path=args['dict_file_path'], transforms=transforms_to_apply,
+                                     tokenize_text=not args['create_dict'],
+                                     preprocessed_folder_name=args['preprocessed_folder_name'])
+    }
     #trickytest_dataset = CLEAR_dataset(data_path, film_model_config['input'], 'trickytest',
     #                             dict_file_path=args.dict_file_path,
     #                             transforms=transforms.Compose(transforms_list + [ToTensor()]))
 
     if args['pad_to_largest_image'] or args['pad_to_square_images']:
         # We need the dataset object to retrieve images dims so we have to manually add transforms
-        max_train_img_dims = train_dataset.get_max_width_image_dims()
-        max_val_img_dims = val_dataset.get_max_width_image_dims()
-        max_test_img_dims = test_dataset.get_max_width_image_dims()
+        max_train_img_dims = datasets['train'].get_max_width_image_dims()
+        max_val_img_dims = datasets['val'].get_max_width_image_dims()
+        max_test_img_dims = datasets['test'].get_max_width_image_dims()
 
         if args['pad_to_largest_image']:
-            train_dataset.add_transform(PadTensor(max_train_img_dims))
-            val_dataset.add_transform(PadTensor(max_val_img_dims))
-            test_dataset.add_transform(PadTensor(max_test_img_dims))
+            datasets['train'].add_transform(PadTensor(max_train_img_dims))
+            datasets['val'].add_transform(PadTensor(max_val_img_dims))
+            datasets['test'].add_transform(PadTensor(max_test_img_dims))
 
         if args['pad_to_square_images'] or args['resize_to_square_images']:
             train_biggest_dim = max(max_train_img_dims)
@@ -685,23 +687,32 @@ def main(args):
             else:
                 to_square_transform = PadTensor
 
-            train_dataset.add_transform(to_square_transform((train_biggest_dim, train_biggest_dim)))
-            val_dataset.add_transform(to_square_transform((val_biggest_dim, val_biggest_dim)))
-            test_dataset.add_transform(to_square_transform((test_biggest_dim, test_biggest_dim)))
+            datasets['train'].add_transform(to_square_transform((train_biggest_dim, train_biggest_dim)))
+            datasets['val'].add_transform(to_square_transform((val_biggest_dim, val_biggest_dim)))
+            datasets['test'].add_transform(to_square_transform((test_biggest_dim, test_biggest_dim)))
 
 
     print("Creating Dataloaders")
-    collate_fct = CLEAR_collate_fct(padding_token=train_dataset.get_padding_token())
+    collate_fct = CLEAR_collate_fct(padding_token=datasets['train'].get_padding_token())
 
     # FIXME : Should take into account --nb_process, or at least the nb of core on the machine
-    train_dataloader = DataLoader(train_dataset, batch_size=args['batch_size'], shuffle=True,
-                                  num_workers=4, collate_fn=collate_fct)
+    dataloaders = {
+        'train': DataLoader(datasets['train'], batch_size=args['batch_size'], shuffle=True,
+                                      num_workers=4, collate_fn=collate_fct),
 
-    val_dataloader = DataLoader(val_dataset, batch_size=args['batch_size'], shuffle=True,
-                                  num_workers=4, collate_fn=collate_fct)
+        'val': DataLoader(datasets['val'], batch_size=args['batch_size'], shuffle=True,
+                                    num_workers=4, collate_fn=collate_fct),
 
-    test_dataloader = DataLoader(test_dataset, batch_size=args['batch_size'], shuffle=False,
-                                  num_workers=4, collate_fn=collate_fct)
+        'test': DataLoader(datasets['test'], batch_size=args['batch_size'], shuffle=False,
+                                     num_workers=4, collate_fn=collate_fct)
+    }
+
+    # Make sure all variables exists
+    optimizer = None
+    loss_criterion = None
+    tensorboard = None
+    checkpoint = None
+
 
     #trickytest_dataloader = DataLoader(trickytest_dataset, batch_size=args['batch_size'], shuffle=False,
     #                             num_workers=4, collate_fn=train_dataset.CLEAR_collate_fct)
@@ -712,9 +723,9 @@ def main(args):
     if instantiate_model:
         print("Creating model")
         # Retrieve informations to instantiate model
-        nb_words, nb_answers = train_dataset.get_token_counts()
-        input_image_torch_shape = train_dataset.get_input_shape(channel_first=True)  # Torch size have Channel as first dimension
-        padding_token = train_dataset.get_padding_token()
+        nb_words, nb_answers = datasets['train'].get_token_counts()
+        input_image_torch_shape = datasets['train'].get_input_shape(channel_first=True)  # Torch size have Channel as first dimension
+        padding_token = datasets['train'].get_padding_token()
 
         film_model = CLEAR_FiLM_model(film_model_config, input_image_channels=input_image_torch_shape[0],
                                       nb_words=nb_words, nb_answers=nb_answers,
@@ -832,16 +843,33 @@ def main(args):
         # We create the symlink here so that bug in initialisation won't create a new 'latest' folder
         create_symlink_to_latest_folder(output_experiment_folder, current_datetime_str)
 
+    execute_task(task, args, output_dated_folder, dataloaders, film_model, film_model_config, device,
+                 optimizer, loss_criterion, tensorboard)#, checkpoint=checkpoint)
+
+    if use_tensorboard:
+        close_tensorboard_writers(tensorboard['writers'])
+
+    time_elapsed = str(datetime.now() - current_datetime)
+
+    print("Execution took %s\n" % time_elapsed)
+
+    if create_output_folder:
+        save_json({'time_elapsed': time_elapsed}, output_dated_folder, filename='timing.json')
+
+
+# TODO : output_dated_folder in args ?
+def execute_task(task, args, output_dated_folder, dataloaders, model, model_config, device, optimizer=None,
+                 loss_criterion=None, tensorboard=None, checkpoint=None):
     if task == "train_film":
         if args['cyclical_lr']:
-            base_lr = film_model_config['optimizer']['cyclical']['base_learning_rate']
-            max_lr = film_model_config['optimizer']['cyclical']['max_learning_rate']
-            base_momentum = film_model_config['optimizer']['cyclical']['base_momentum']
-            max_momentum = film_model_config['optimizer']['cyclical']['max_momentum']
+            base_lr = model_config['optimizer']['cyclical']['base_learning_rate']
+            max_lr = model_config['optimizer']['cyclical']['max_learning_rate']
+            base_momentum = model_config['optimizer']['cyclical']['base_momentum']
+            max_momentum = model_config['optimizer']['cyclical']['max_momentum']
 
-            total_nb_steps = args['nb_epoch'] * len(train_dataloader)
+            total_nb_steps = args['nb_epoch'] * len(dataloaders['train'])
 
-            cycle_length = film_model_config['optimizer']['cyclical']['cycle_length']
+            cycle_length = model_config['optimizer']['cyclical']['cycle_length']
 
             if type(cycle_length) == int:
                 # Cycle length define the number of step in the cycle
@@ -852,7 +880,7 @@ def main(args):
 
             print(f"Using cyclical LR : ({base_lr:.5},{max_lr:.5})  Momentum ({base_momentum:.5}, {max_momentum:.5})")
             print(f"Total nb steps : {total_nb_steps} ({args['nb_epoch']} epoch)  -- Nb steps per cycle : {cycle_step} "
-                  f"({cycle_step/len(train_dataloader)} epoch)")
+                  f"({cycle_step/len(dataloaders['train'])} epoch)")
 
             scheduler = CyclicLR(optimizer, base_lr=base_lr,
                                  max_lr=max_lr,
@@ -865,6 +893,7 @@ def main(args):
 
         start_epoch = 0
         if args['continue_training']:
+            # FIXME : Do this when creating the optimizer
             optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
             start_epoch = checkpoint['epoch'] + 1
             set_random_state(checkpoint['rng_state'])
@@ -872,65 +901,50 @@ def main(args):
             if scheduler and 'scheduler_state_dict' in checkpoint:
                 scheduler.load_state_dict(checkpoint['scheduler_state_dict'])
 
-        train_model(device=device, model=film_model, dataloaders={'train': train_dataloader, 'val': val_dataloader},
+        train_model(device=device, model=model, dataloaders=dataloaders,
                     output_folder=output_dated_folder, criterion=loss_criterion, optimizer=optimizer,
                     scheduler=scheduler, nb_epoch=args['nb_epoch'],
                     nb_epoch_to_keep=args['nb_epoch_stats_to_keep'], start_epoch=start_epoch, tensorboard=tensorboard)
 
     elif task == "inference":
-        inference_dataloader = test_dataloader
-        set_inference(device=device, model=film_model, dataloader=inference_dataloader, criterion=nn.CrossEntropyLoss(),
+        set_inference(device=device, model=model, dataloader=dataloaders['test'], criterion=nn.CrossEntropyLoss(),
                       output_folder=output_dated_folder)
 
     elif task == "create_dict":
-        create_dict_from_questions(train_dataset, force_all_answers=args['force_dict_all_answer'],
+        create_dict_from_questions(dataloaders['train'].dataset, force_all_answers=args['force_dict_all_answer'],
                                    output_folder_name=args['dict_folder'], start_end_tokens=not args['no_start_end_tokens'])
 
     elif task == "prepare_images":
-        images_to_h5(dataloaders={'train': train_dataloader, 'val': val_dataloader, 'test': test_dataloader},
+        images_to_h5(dataloaders=dataloaders,
                      square_image=args['pad_to_square_images'] or args['resize_to_square_images'],
                      output_folder_name=args['preprocessed_folder_name'])
 
     elif task == "feature_extract":
-        extract_features(device=device, feature_extractor=film_model.feature_extractor,
-                         dataloaders={'train': train_dataloader, 'val': val_dataloader, 'test': test_dataloader},
+        extract_features(device=device, feature_extractor=model.feature_extractor, dataloaders=dataloaders,
                          output_folder_name=args['preprocessed_folder_name'])
 
     elif task == "visualize_gamma_beta":
-        visualize_gamma_beta(args['gamma_beta_path'],
-                             datasets={'train': train_dataset, 'val': val_dataset, 'test': test_dataset},
-                             output_folder=output_dated_folder)
+        visualize_gamma_beta(args['gamma_beta_path'], dataloaders=dataloaders, output_folder=output_dated_folder)
 
     elif task == "visualize_grad_cam":
-        grad_cam_visualization(device=device, model=film_model, dataloader=train_dataloader,
+        grad_cam_visualization(device=device, model=model, dataloader=dataloaders['train'],
                                output_folder=output_dated_folder)
 
     elif task == "lr_finder":
-        get_lr_finder_curves(film_model, device, train_dataloader, output_dated_folder, args['nb_epoch'], optimizer,
-                             val_dataloader=val_dataloader, loss_criterion=loss_criterion)
+        get_lr_finder_curves(model, device, dataloaders['train'], output_dated_folder, args['nb_epoch'], optimizer,
+                             val_dataloader=dataloaders['val'], loss_criterion=loss_criterion)
 
     elif task == "write_clear_mean_to_config":
-        write_clear_mean_to_config(train_dataloader, device, film_model_config, args['config_path'],
+        write_clear_mean_to_config(dataloaders['train'], device, model_config, args['config_path'],
                                    args['overwrite_clear_mean'])
 
     elif task == 'random_answer_baseline':
-        random_answer_baseline(train_dataloader, output_dated_folder)
-        random_answer_baseline(val_dataloader, output_dated_folder)
+        random_answer_baseline(dataloaders['train'], output_dated_folder)
+        random_answer_baseline(dataloaders['val'], output_dated_folder)
 
     elif task == 'random_weight_baseline':
-        random_weight_baseline(film_model, device, train_dataloader, output_dated_folder)
-        random_weight_baseline(film_model, device, val_dataloader, output_dated_folder)
-
-    if use_tensorboard:
-        close_tensorboard_writers(tensorboard['writers'])
-
-    time_elapsed = str(datetime.now() - current_datetime)
-
-    print("Execution took %s" % time_elapsed)
-    print()
-
-    if create_output_folder:
-        save_json({'time_elapsed': time_elapsed}, output_dated_folder, filename='timing.json')
+        random_weight_baseline(model, device, dataloaders['train'], output_dated_folder)
+        random_weight_baseline(model, device, dataloaders['val'], output_dated_folder)
 
 
 if __name__ == "__main__":
