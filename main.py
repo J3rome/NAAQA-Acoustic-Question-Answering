@@ -76,7 +76,11 @@ parser.add_argument("--raw_img_resize_based_on_width", action='store_true',
                          "the width in order to keep the ratio")
 
 
-parser.add_argument("--keep_image_range", help="Will NOT scale the image between 0-1 (RAW img)", action='store_true')
+parser.add_argument("--keep_image_range", help="Will NOT scale the image between 0-1 (Reverse --normalize_zero_one)",
+                    action='store_true')
+parser.add_argument("--normalize_zero_one", help="Will scale the image between 0-1 (This is set by default when"
+                                                 " working with RAW images. Can be overridden with --keep_image_range)",
+                    action='store_true')
 parser.add_argument("--pad_to_largest_image", help="If set, images will be padded to meet the largest image in the set."
                                                    "All input will have the same size.", action='store_true')
 parser.add_argument("--pad_to_square_images", help="If set, all images will be padded to make them square",
@@ -579,6 +583,12 @@ def main(args):
         # Default value when in raw mode
         args.raw_img_resize_val = 224
 
+    if input_image_type == "raw":
+        # Default value is True when working with raw images
+        args.normalize_zero_one = True
+    args.normalize_zero_one = args.normalize_zero_one and not args.keep_image_range
+
+
     if continuing_training and args.film_model_weight_path is None:
         args.film_model_weight_path = 'latest'
 
@@ -624,7 +634,7 @@ def main(args):
 
     # Bundle together ToTensor and ImgBetweenZeroOne, need to be one after the other for other transforms to work
     to_tensor_transform = [ToTensor()]
-    if not args.keep_image_range:
+    if args.normalize_zero_one:
         to_tensor_transform.append(ImgBetweenZeroOne())
 
     if input_image_type.startswith('raw'):
