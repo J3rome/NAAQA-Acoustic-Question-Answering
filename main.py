@@ -513,57 +513,40 @@ def get_task_from_args(args):
     assert False, "Arguments don't specify task"
 
 
-def main(args):
-    # Convert args object to dict
-    args = vars(args)
-    # Parameter validation
-    validate_arguments(args)
-    task = get_task_from_args(args)
+def create_flags(task, args):
+    flags = {}
 
-    output_name = args['version_name'] + "_" + args['output_name_suffix'] if args['output_name_suffix'] else args['version_name']
-    print("\nTask '%s' for version '%s'\n" % (task.replace('_', ' ').title(), output_name))
+    flags['continuing_training'] = args['training'] and args['continue_training']
+    flags['restore_model_weights'] = args['inference'] or flags['continuing_training'] or args['visualize_grad_cam']
+    flags['create_output_folder'] = not args['create_dict'] and not args['feature_extract'] and not args['write_clear_mean_to_config']
+    flags['use_tensorboard'] = 'train' in task
+    flags['create_loss_criterion'] = args['training'] or args['lr_finder']
+    flags['create_optimizer'] = args['training'] or args['lr_finder']
+    flags['force_sgd_optimizer'] = args['lr_finder'] or args['cyclical_lr']
+    flags['instantiate_model'] = not args['create_dict'] and not args['write_clear_mean_to_config'] and \
+                                 'gamma_beta' not in task and 'random_answer' not in task and not args['prepare_images']
 
-    if args['random_seed'] is not None:
-        set_random_seed(args['random_seed'])
+    return flags
 
-    # Paths
-    data_path = "%s/%s" % (args['data_root_path'], args['version_name'])
 
-    output_task_folder = "%s/%s" % (args['output_root_path'], task)
-    output_experiment_folder = "%s/%s" % (output_task_folder, output_name)
-    current_datetime = datetime.now()
-    current_datetime_str = current_datetime.strftime("%Y-%m-%d_%Hh%M")
-    output_dated_folder = "%s/%s" % (output_experiment_folder, current_datetime_str)
-
-    # Flags
-    continuing_training = args['training'] and args['continue_training']
-    restore_model_weights = args['inference'] or continuing_training or args['visualize_grad_cam']
-    create_output_folder = not args['create_dict'] and not args['feature_extract'] and not args['write_clear_mean_to_config']
-    instantiate_model = not args['create_dict'] and not args['write_clear_mean_to_config'] and \
-                        'gamma_beta' not in task and 'random_answer' not in task and not args['prepare_images']
-
-    use_tensorboard = 'train' in task
-    create_loss_criterion = args['training'] or args['lr_finder']
-    create_optimizer = args['training'] or args['lr_finder']
-    force_sgd_optimizer = args['lr_finder'] or args['cyclical_lr']
+def update_arguments(args, paths, flags):
     if args['conv_feature_input']:
-        input_image_type = "conv"
+        args['input_image_type'] = "conv"
     elif args['h5_image_input']:
-        input_image_type = "raw_h5"
+        args['input_image_type'] = "raw_h5"
     else:
-        input_image_type = "raw"
+        args['input_image_type'] = "raw"
 
-    if input_image_type == 'raw' and args['raw_img_resize_val'] is None:
-        # Default value when in raw mode
-        args['raw_img_resize_val'] = 224
-
-    if input_image_type == "raw":
-        # Default value is True when working with raw images
+    if args['input_image_type'] == 'raw':
+        # Default values when in RAW mode
         args['normalize_zero_one'] = True
+
+        if args['raw_img_resize_val'] is None:
+            args['raw_img_resize_val'] = 224
+
     args['normalize_zero_one'] = args['normalize_zero_one'] and not args['keep_image_range']
 
-
-    if continuing_training and args['film_model_weight_path'] is None:
+    if flags['continuing_training'] and args['film_model_weight_path'] is None:
         args['film_model_weight_path'] = 'latest'
 
     # Make sure we are not normalizing beforce calculating mean and std
@@ -573,37 +556,24 @@ def main(args):
 
     args['dict_folder'] = args['preprocessed_folder_name'] if args['dict_folder'] is None else args['dict_folder']
     if args['dict_file_path'] is None:
-        args['dict_file_path'] = "%s/%s/dict.json" % (data_path, args['dict_folder'])
+        args['dict_file_path'] = "%s/%s/dict.json" % (paths["data_path"], args['dict_folder'])
 
-    film_model_config = get_config(args['config_path'])
 
-    early_stopping = not args['no_early_stopping'] and film_model_config['early_stopping']['enable']
-    film_model_config['early_stopping']['enable'] = early_stopping
+def get_paths(task, args):
+    paths = {}
 
-    if create_output_folder:
-        # TODO : See if this is optimal file structure
-        create_folder_if_necessary(args['output_root_path'])
-        create_folder_if_necessary(output_task_folder)
-        create_folder_if_necessary(output_experiment_folder)
-        create_folder_if_necessary(output_dated_folder)
+    paths["output_name"] = args['version_name'] + "_" + args['output_name_suffix'] if args['output_name_suffix'] else args['version_name']
+    paths["data_path"] = "%s/%s" % (args['data_root_path'], args['version_name'])
+    paths["output_task_folder"] = "%s/%s" % (args['output_root_path'], task)
+    paths["output_experiment_folder"] = "%s/%s" % (paths["output_task_folder"], paths["output_name"])
+    paths["current_datetime"] = datetime.now()
+    paths["current_datetime_str"] = paths["current_datetime"].strftime("%Y-%m-%d_%Hh%M")
+    paths["output_dated_folder"] = "%s/%s" % (paths["output_experiment_folder"], paths["current_datetime_str"])
 
-        # Save arguments & config to output folder
-        save_json(args, output_dated_folder, filename="arguments.json")
-        save_git_revision(output_dated_folder)
+    return paths
 
-        if instantiate_model:
-            save_json(film_model_config, output_dated_folder, filename='config_%s_input.json' % input_image_type)
 
-            # Copy dictionary file used
-            shutil.copyfile(args['dict_file_path'], "%s/dict.json" % output_dated_folder)
-
-    device = f'cuda:{args["gpu_index"]}' if torch.cuda.is_available() and not args['use_cpu'] else 'cpu'
-    print("Using device '%s'" % device)
-
-    ####################################
-    #   Dataloading
-    ####################################
-
+def get_transforms_from_args(args, preprocessing_config):
     transforms_list = []
 
     # Bundle together ToTensor and ImgBetweenZeroOne, need to be one after the other for other transforms to work
@@ -611,12 +581,7 @@ def main(args):
     if args['normalize_zero_one']:
         to_tensor_transform.append(ImgBetweenZeroOne())
 
-    if input_image_type.startswith('raw'):
-
-        if args['no_feature_extractor']:
-            feature_extractor_config = None
-        else:
-            feature_extractor_config = {'version': 101, 'layer_index': args['feature_extractor_layer_index']}   # Idx 6 -> Block3/unit22
+    if args['input_image_type'].startswith('raw'):
 
         if args['raw_img_resize_val']:
             if args['raw_img_resize_based_on_width']:
@@ -632,9 +597,9 @@ def main(args):
 
         if args['normalize_with_imagenet_stats'] or args['normalize_with_clear_stats']:
             if args['normalize_with_imagenet_stats']:
-                stats = film_model_config['preprocessing']['imagenet_stats']
+                stats = preprocessing_config['imagenet_stats']
             else:
-                stats = film_model_config['preprocessing']['clear_stats']
+                stats = preprocessing_config['clear_stats']
 
             transforms_list.append(NormalizeSample(mean=stats['mean'], std=stats['std'], inplace=True))
 
@@ -642,29 +607,36 @@ def main(args):
         transforms_list += to_tensor_transform
         feature_extractor_config = None
 
-    transforms_to_apply = transforms.Compose(transforms_list)
+    return transforms.Compose(transforms_list)
 
+
+def get_feature_extractor_config(args):
+    if args['no_feature_extractor']:
+        return None
+    else:
+        return {'version': 101, 'layer_index': args['feature_extractor_layer_index']}  # Idx 6 -> Block3/unit22
+
+
+def create_datasets(args, preprocessing_config):
     print("Creating Datasets")
+    transforms_to_apply = get_transforms_from_args(args, preprocessing_config)
 
     datasets = {
-        'train': CLEAR_dataset(args['data_root_path'], args['version_name'], input_image_type, 'train',
-                                      dict_file_path=args['dict_file_path'], transforms=transforms_to_apply,
-                                      tokenize_text=not args['create_dict'],
-                                      preprocessed_folder_name=args['preprocessed_folder_name']),
+        'train': CLEAR_dataset(args['data_root_path'], args['version_name'], args['input_image_type'], 'train',
+                               dict_file_path=args['dict_file_path'], transforms=transforms_to_apply,
+                               tokenize_text=not args['create_dict'],
+                               preprocessed_folder_name=args['preprocessed_folder_name']),
 
-        'val': CLEAR_dataset(args['data_root_path'], args['version_name'], input_image_type, 'val',
-                                    dict_file_path=args['dict_file_path'], transforms=transforms_to_apply,
-                                    tokenize_text=not args['create_dict'],
-                                    preprocessed_folder_name=args['preprocessed_folder_name']),
+        'val': CLEAR_dataset(args['data_root_path'], args['version_name'], args['input_image_type'], 'val',
+                             dict_file_path=args['dict_file_path'], transforms=transforms_to_apply,
+                             tokenize_text=not args['create_dict'],
+                             preprocessed_folder_name=args['preprocessed_folder_name']),
 
-        'test': CLEAR_dataset(args['data_root_path'], args['version_name'], input_image_type, 'test',
-                                     dict_file_path=args['dict_file_path'], transforms=transforms_to_apply,
-                                     tokenize_text=not args['create_dict'],
-                                     preprocessed_folder_name=args['preprocessed_folder_name'])
+        'test': CLEAR_dataset(args['data_root_path'], args['version_name'], args['input_image_type'], 'test',
+                              dict_file_path=args['dict_file_path'], transforms=transforms_to_apply,
+                              tokenize_text=not args['create_dict'],
+                              preprocessed_folder_name=args['preprocessed_folder_name'])
     }
-    #trickytest_dataset = CLEAR_dataset(data_path, film_model_config['input'], 'trickytest',
-    #                             dict_file_path=args.dict_file_path,
-    #                             transforms=transforms.Compose(transforms_list + [ToTensor()]))
 
     if args['pad_to_largest_image'] or args['pad_to_square_images']:
         # We need the dataset object to retrieve images dims so we have to manually add transforms
@@ -691,170 +663,113 @@ def main(args):
             datasets['val'].add_transform(to_square_transform((val_biggest_dim, val_biggest_dim)))
             datasets['test'].add_transform(to_square_transform((test_biggest_dim, test_biggest_dim)))
 
+    return datasets
 
+
+def create_dataloaders(args, datasets, nb_process=8):
     print("Creating Dataloaders")
     collate_fct = CLEAR_collate_fct(padding_token=datasets['train'].get_padding_token())
 
     # FIXME : Should take into account --nb_process, or at least the nb of core on the machine
-    dataloaders = {
+    return {
         'train': DataLoader(datasets['train'], batch_size=args['batch_size'], shuffle=True,
-                                      num_workers=4, collate_fn=collate_fct),
+                            num_workers=4, collate_fn=collate_fct),
 
         'val': DataLoader(datasets['val'], batch_size=args['batch_size'], shuffle=True,
-                                    num_workers=4, collate_fn=collate_fct),
+                          num_workers=4, collate_fn=collate_fct),
 
         'test': DataLoader(datasets['test'], batch_size=args['batch_size'], shuffle=False,
-                                     num_workers=4, collate_fn=collate_fct)
+                           num_workers=4, collate_fn=collate_fct)
     }
 
-    # Make sure all variables exists
-    optimizer = None
-    loss_criterion = None
-    tensorboard = None
-    checkpoint = None
 
+def prepare_model(args, flags, paths, datasets, device, model_config, input_image_torch_shape, feature_extractor_config=None):
+    print("Creating model")
+    # Retrieve informations to instantiate model
+    nb_words, nb_answers = datasets['train'].get_token_counts()
+    padding_token = datasets['train'].get_padding_token()
 
-    #trickytest_dataloader = DataLoader(trickytest_dataset, batch_size=args['batch_size'], shuffle=False,
-    #                             num_workers=4, collate_fn=train_dataset.CLEAR_collate_fct)
+    film_model = CLEAR_FiLM_model(model_config, input_image_channels=input_image_torch_shape[0],
+                                  nb_words=nb_words, nb_answers=nb_answers,
+                                  sequence_padding_idx=padding_token,
+                                  feature_extraction_config=feature_extractor_config)
 
-    ####################################
-    #   Model Definition
-    ####################################
-    if instantiate_model:
-        print("Creating model")
-        # Retrieve informations to instantiate model
-        nb_words, nb_answers = datasets['train'].get_token_counts()
-        input_image_torch_shape = datasets['train'].get_input_shape(channel_first=True)  # Torch size have Channel as first dimension
-        padding_token = datasets['train'].get_padding_token()
+    # Default values
+    optimizer, loss_criterion, scheduler = None, None, None
 
-        film_model = CLEAR_FiLM_model(film_model_config, input_image_channels=input_image_torch_shape[0],
-                                      nb_words=nb_words, nb_answers=nb_answers,
-                                      sequence_padding_idx=padding_token,
-                                      feature_extraction_config=feature_extractor_config)
+    if flags['restore_model_weights']:
+        assert args['film_model_weight_path'] is not None, 'Must provide path to model weights to ' \
+                                                           'do inference or to continue training.'
 
-        if restore_model_weights:
-            assert args['film_model_weight_path'] is not None, 'Must provide path to model weights to ' \
-                                                            'do inference or to continue training.'
+        # If path specified is a date, we construct the path to the best model weights for the specified run
+        base_path = "%s/train_film/%s/%s" % (args['output_root_path'], paths["output_name"], args['film_model_weight_path'])
+        # Note : We might redo some epoch when continuing training because the 'best' epoch is not necessarely the last
+        suffix = "best/model.pt.tar"
 
-            # If path specified is a date, we construct the path to the best model weights for the specified run
-            base_path = "%s/train_film/%s/%s" % (args['output_root_path'], output_name, args['film_model_weight_path'])
-            # Note : We might redo some epoch when continuing training because the 'best' epoch is not necessarely the last
-            suffix = "best/model.pt.tar"
+        if is_date_string(args['film_model_weight_path']):
+            args['film_model_weight_path'] = "%s/%s" % (base_path, suffix)
+        elif args['film_model_weight_path'] == 'latest':
+            # The 'latest' symlink will be overriden by this run (If continuing training).
+            # Use real path of latest experiment
+            symlink_value = os.readlink(base_path)
+            clean_base_path = base_path[:-(len(args['film_model_weight_path']) + 1)]
+            args['film_model_weight_path'] = '%s/%s/%s' % (clean_base_path, symlink_value, suffix)
 
-            if is_date_string(args['film_model_weight_path']):
-                args['film_model_weight_path'] = "%s/%s" % (base_path, suffix)
-            elif args['film_model_weight_path'] == 'latest':
-                # The 'latest' symlink will be overriden by this run (If continuing training).
-                # Use real path of latest experiment
-                symlink_value = os.readlink(base_path)
-                clean_base_path = base_path[:-(len(args['film_model_weight_path']) + 1)]
-                args['film_model_weight_path'] = '%s/%s/%s' % (clean_base_path, symlink_value, suffix)
+        print(f"Restoring model weights from '{args['film_model_weight_path']}'")
 
-            print(f"Restoring model weights from '{args['film_model_weight_path']}'")
+        save_json({'restored_film_weight_path': args['film_model_weight_path']},
+                  paths["output_dated_folder"], 'restored_from.json')
 
-            save_json({'restored_film_weight_path': args['film_model_weight_path']},
-                      output_dated_folder, 'restored_from.json')
-
-            checkpoint = torch.load(args['film_model_weight_path'], map_location=device)
-
-            if device != 'cpu':
-                if 'torch' in checkpoint['rng_state']:
-                    checkpoint['rng_state']['torch'] = checkpoint['rng_state']['torch'].cpu()
-
-                if 'torch_cuda' in checkpoint['rng_state']:
-                    checkpoint['rng_state']['torch_cuda'] = checkpoint['rng_state']['torch_cuda'].cpu()
-
-            # We need non-strict because feature extractor weight are not included in the saved state dict
-            film_model.load_state_dict(checkpoint['model_state_dict'], strict=False)
-
-        trainable_parameters = filter(lambda p: p.requires_grad, film_model.parameters())
-
-        if create_optimizer:
-            if film_model_config['optimizer'].get('type', '') == 'sgd' or force_sgd_optimizer:
-                optimizer = torch.optim.SGD(trainable_parameters, lr=film_model_config['optimizer']['learning_rate'],
-                                            momentum=film_model_config['optimizer']['momentum'],
-                                            weight_decay=film_model_config['optimizer']['weight_decay'])
-            else:
-                optimizer = torch.optim.Adam(trainable_parameters, lr=film_model_config['optimizer']['learning_rate'],
-                                             weight_decay=film_model_config['optimizer']['weight_decay'])
-
-        if create_loss_criterion:
-            loss_criterion_tmp = nn.CrossEntropyLoss()
-
-            if args['f1_score']:
-                def loss_criterion(outputs, answers):
-                    loss = loss_criterion_tmp(outputs, answers)
-                    _, preds = torch.max(outputs, 1)
-
-                    return loss + (1 - calc_f1_score(preds, answers))
-            else:
-                loss_criterion = loss_criterion_tmp
+        checkpoint = torch.load(args['film_model_weight_path'], map_location=device)
 
         if device != 'cpu':
-            if args['perf_over_determinist']:
-                torch.backends.cudnn.benchmark = True
-                torch.backends.cudnn.deterministic = False
-            else:
-                torch.backends.cudnn.benchmark = False
-                torch.backends.cudnn.deterministic = True
+            if 'torch' in checkpoint['rng_state']:
+                checkpoint['rng_state']['torch'] = checkpoint['rng_state']['torch'].cpu()
 
-        film_model.to(device)
+            if 'torch_cuda' in checkpoint['rng_state']:
+                checkpoint['rng_state']['torch_cuda'] = checkpoint['rng_state']['torch_cuda'].cpu()
 
-        print("Model ready to run")
+        # We need non-strict because feature extractor weight are not included in the saved state dict
+        film_model.load_state_dict(checkpoint['model_state_dict'], strict=False)
 
-        if not args['no_model_summary']:
-            # Printing summary affects the random state (Raw Vs Pre-Extracted Features).
-            # We restore it to ensure reproducibility between input type
-            random_state = get_random_state()
-            summary(film_model, [(22,), (1,), input_image_torch_shape], device=device)
-            set_random_state(random_state)
+    trainable_parameters = filter(lambda p: p.requires_grad, film_model.parameters())
 
-        if use_tensorboard:
-            # FIXME : What happen with test set? I guess we don't really care, we got our own visualisations for test run
-            # Create tensorboard writer
-            base_writer_path = '%s/%s/%s' % (args['tensorboard_folder'], output_name, current_datetime_str)
-
-            # TODO : Add 'comment' param with more infos on run. Ex : Raw vs Conv
-            tensorboard = {
-                'writers': {
-                    'train': SummaryWriter('%s/train' % base_writer_path),
-                    'val': SummaryWriter('%s/val' % base_writer_path)
-                },
-                'options': {
-                    'save_images': args['tensorboard_save_images'],
-                    'save_texts': args['tensorboard_save_texts']
-                }
-            }
-
-            if args['tensorboard_save_graph']:
-                # FIXME : For now we are ignoring TracerWarnings. Not sure the saved graph is 100% accurate...
-                import warnings
-                warnings.filterwarnings('ignore', category=torch.jit.TracerWarning)
-
-                # FIXME : Test on GPU
-                dummy_input = [torch.ones(2, 22, dtype=torch.long),
-                               torch.ones(2, 1, dtype=torch.long),
-                               torch.ones(2, *input_image_torch_shape, dtype=torch.float)]
-                tensorboard['writers']['train'].add_graph(film_model, dummy_input)
+    if flags['create_optimizer']:
+        if model_config['optimizer'].get('type', '') == 'sgd' or flags["force_sgd_optimizer"]:
+            optimizer = torch.optim.SGD(trainable_parameters, lr=model_config['optimizer']['learning_rate'],
+                                        momentum=model_config['optimizer']['momentum'],
+                                        weight_decay=model_config['optimizer']['weight_decay'])
         else:
-            tensorboard = None
+            optimizer = torch.optim.Adam(trainable_parameters, lr=model_config['optimizer']['learning_rate'],
+                                         weight_decay=model_config['optimizer']['weight_decay'])
 
-    if create_output_folder:
-        # We create the symlink here so that bug in initialisation won't create a new 'latest' folder
-        create_symlink_to_latest_folder(output_experiment_folder, current_datetime_str)
+    # TODO : Add cyclical LR here
 
-    execute_task(task, args, output_dated_folder, dataloaders, film_model, film_model_config, device,
-                 optimizer, loss_criterion, tensorboard)#, checkpoint=checkpoint)
+    if flags['create_loss_criterion']:
+        loss_criterion_tmp = nn.CrossEntropyLoss()
 
-    if use_tensorboard:
-        close_tensorboard_writers(tensorboard['writers'])
+        if args['f1_score']:
+            def loss_criterion(outputs, answers):
+                loss = loss_criterion_tmp(outputs, answers)
+                _, preds = torch.max(outputs, 1)
 
-    time_elapsed = str(datetime.now() - current_datetime)
+                return loss + (1 - calc_f1_score(preds, answers))
+        else:
+            loss_criterion = loss_criterion_tmp
 
-    print("Execution took %s\n" % time_elapsed)
+    if device != 'cpu':
+        if args['perf_over_determinist']:
+            torch.backends.cudnn.benchmark = True
+            torch.backends.cudnn.deterministic = False
+        else:
+            torch.backends.cudnn.benchmark = False
+            torch.backends.cudnn.deterministic = True
 
-    if create_output_folder:
-        save_json({'time_elapsed': time_elapsed}, output_dated_folder, filename='timing.json')
+    film_model.to(device)
+
+    print("Model ready to run")
+
+    return film_model, optimizer, loss_criterion, scheduler
 
 
 # TODO : output_dated_folder in args ?
@@ -947,6 +862,150 @@ def execute_task(task, args, output_dated_folder, dataloaders, model, model_conf
         random_weight_baseline(model, device, dataloaders['val'], output_dated_folder)
 
 
+def create_folders_save_config(args, paths, flags, model_config):
+    if flags['create_output_folder']:
+        # TODO : See if this is optimal file structure
+        create_folder_if_necessary(args['output_root_path'])
+        create_folder_if_necessary(paths["output_task_folder"])
+        create_folder_if_necessary(paths["output_experiment_folder"])
+        create_folder_if_necessary(paths["output_dated_folder"])
+
+        # Save arguments & config to output folder
+        save_json(args, paths["output_dated_folder"], filename="arguments.json")
+        save_git_revision(paths["output_dated_folder"])
+
+        if flags['instantiate_model']:
+            save_json(model_config, paths["output_dated_folder"],
+                      filename='config_%s_input.json' % args['input_image_type'])
+
+            # Copy dictionary file used
+            shutil.copyfile(args['dict_file_path'], "%s/dict.json" % paths["output_dated_folder"])
+
+
+def prepare_tensorboard(args, flags, paths):
+    if flags['use_tensorboard']:
+        # FIXME : What happen with test set? I guess we don't really care, we got our own visualisations for test run
+        # Create tensorboard writer
+        base_writer_path = '%s/%s/%s' % (
+        args['tensorboard_folder'], paths["output_name"], paths["current_datetime_str"])
+
+        # TODO : Add 'comment' param with more infos on run. Ex : Raw vs Conv
+        tensorboard = {
+            'writers': {
+                'train': SummaryWriter('%s/train' % base_writer_path),
+                'val': SummaryWriter('%s/val' % base_writer_path)
+            },
+            'options': {
+                'save_images': args['tensorboard_save_images'],
+                'save_texts': args['tensorboard_save_texts']
+            }
+        }
+    else:
+        tensorboard = None
+
+    return tensorboard
+
+
+def save_graph_to_tensorboard(model, tensorboard, input_image_torch_shape):
+    # FIXME : For now we are ignoring TracerWarnings. Not sure the saved graph is 100% accurate...
+    import warnings
+    warnings.filterwarnings('ignore', category=torch.jit.TracerWarning)
+
+    # FIXME : Test on GPU
+    dummy_input = [torch.ones(2, 22, dtype=torch.long),
+                   torch.ones(2, 1, dtype=torch.long),
+                   torch.ones(2, *input_image_torch_shape, dtype=torch.float)]
+    tensorboard['writers']['train'].add_graph(model, dummy_input)
+
+
+def print_model_summary(model, input_image_torch_shape, device="cpu"):
+    # Printing summary affects the random state (Raw Vs Pre-Extracted Features).
+    # We restore it to ensure reproducibility between input type
+    random_state = get_random_state()
+    summary(model, [(22,), (1,), input_image_torch_shape], device=device)
+    set_random_state(random_state)
+
+
+def main(args):
+    ####################################
+    #   Argument & Config parsing
+    ####################################
+    args = vars(args) # Convert args object to dict
+    validate_arguments(args)
+    task = get_task_from_args(args)
+    paths = get_paths(task, args)
+    flags = create_flags(task, args)
+    update_arguments(args, paths, flags)
+    device = f'cuda:{args["gpu_index"]}' if torch.cuda.is_available() and not args['use_cpu'] else 'cpu'
+
+    if args['random_seed'] is not None:
+        set_random_seed(args['random_seed'])
+
+    print("\nTask '%s' for version '%s'\n" % (task.replace('_', ' ').title(), paths["output_name"]))
+    print("Using device '%s'" % device)
+
+    film_model_config = get_config(args['config_path'])
+    # FIXME : Should be in args ?
+    early_stopping = not args['no_early_stopping'] and film_model_config['early_stopping']['enable']
+    film_model_config['early_stopping']['enable'] = early_stopping
+
+    # Create required folders if necessary
+    create_folders_save_config(args, paths, flags, film_model_config)
+
+    # Make sure all variables exists
+    film_model, optimizer, loss_criterion, tensorboard = None, None, None, None
+
+    ####################################
+    #   Dataloading
+    ####################################
+    datasets = create_datasets(args, film_model_config['preprocessing'])
+    dataloaders = create_dataloaders(args, datasets, nb_process=8)
+
+    ####################################
+    #   Model Definition
+    ####################################
+    if flags['instantiate_model']:
+
+        input_image_torch_shape = datasets['train'].get_input_shape(channel_first=True)  # Torch size have Channel as first dimension
+        feature_extractor_config = get_feature_extractor_config(args)
+
+        film_model, optimizer, loss_criterion, scheduler = prepare_model(args, flags, paths, datasets, device,
+                                                                         film_model_config, input_image_torch_shape,
+                                                                         feature_extractor_config)
+
+        if not args['no_model_summary']:
+            print_model_summary(film_model, input_image_torch_shape, device)
+
+        if flags['use_tensorboard']:
+            tensorboard = prepare_tensorboard(args, flags, paths)
+            if args['tensorboard_save_graph']:
+                save_graph_to_tensorboard(film_model, tensorboard, input_image_torch_shape)
+
+    ####################################
+    #   Task Execution
+    ####################################
+
+    if flags['create_output_folder']:
+        # We create the symlink here so that bug in initialisation won't create a new 'latest' folder
+        create_symlink_to_latest_folder(paths["output_experiment_folder"], paths["current_datetime_str"])
+
+    execute_task(task, args, paths["output_dated_folder"], dataloaders, film_model, film_model_config, device,
+                 optimizer, loss_criterion, tensorboard)#, checkpoint=checkpoint)
+
+    ####################################
+    #   Exit
+    ####################################
+    if flags['use_tensorboard']:
+        close_tensorboard_writers(tensorboard['writers'])
+
+    time_elapsed = str(datetime.now() - paths["current_datetime"])
+
+    print("Execution took %s\n" % time_elapsed)
+
+    if flags['create_output_folder']:
+        save_json({'time_elapsed': time_elapsed}, paths["output_dated_folder"], filename='timing.json')
+
+# FIXME : Args is a namespace so it is available everywhere. Not a great idea to shadow it (But we get a dict key error if we try to access it so it is easiy catchable
 if __name__ == "__main__":
     args = parser.parse_args()
     main(args)
