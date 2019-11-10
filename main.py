@@ -558,6 +558,9 @@ def update_arguments(args, paths, flags):
     if args['dict_file_path'] is None:
         args['dict_file_path'] = "%s/%s/dict.json" % (paths["data_path"], args['dict_folder'])
 
+    # By default the start_epoch should is 0. Will only be modified if loading from checkpoint
+    args["start_epoch"] = 0
+
 
 def get_paths(task, args):
     paths = {}
@@ -683,11 +686,13 @@ def create_dataloaders(args, datasets, nb_process=8):
     }
 
 
-def prepare_model(args, flags, paths, datasets, device, model_config, input_image_torch_shape, feature_extractor_config=None):
+def prepare_model(args, flags, paths, dataloaders, device, model_config, input_image_torch_shape,
+                  feature_extractor_config=None):
     print("Creating model")
     # Retrieve informations to instantiate model
-    nb_words, nb_answers = datasets['train'].get_token_counts()
-    padding_token = datasets['train'].get_padding_token()
+    train_dataset = dataloaders['train'].dataset
+    nb_words, nb_answers = train_dataset.get_token_counts()
+    padding_token = train_dataset.get_padding_token()
 
     film_model = CLEAR_FiLM_model(model_config, input_image_channels=input_image_torch_shape[0],
                                   nb_words=nb_words, nb_answers=nb_answers,
@@ -696,6 +701,55 @@ def prepare_model(args, flags, paths, datasets, device, model_config, input_imag
 
     # Default values
     optimizer, loss_criterion, scheduler = None, None, None
+    trainable_parameters = filter(lambda p: p.requires_grad, film_model.parameters())
+
+    if flags['create_optimizer']:
+        if model_config['optimizer'].get('type', '') == 'sgd' or flags["force_sgd_optimizer"]:
+            optimizer = torch.optim.SGD(trainable_parameters, lr=model_config['optimizer']['learning_rate'],
+                                        momentum=model_config['optimizer']['momentum'],
+                                        weight_decay=model_config['optimizer']['weight_decay'])
+        else:
+            optimizer = torch.optim.Adam(trainable_parameters, lr=model_config['optimizer']['learning_rate'],
+                                         weight_decay=model_config['optimizer']['weight_decay'])
+
+    if flags['create_loss_criterion']:
+        loss_criterion_tmp = nn.CrossEntropyLoss()
+
+        if args['f1_score']:
+            def loss_criterion(outputs, answers):
+                loss = loss_criterion_tmp(outputs, answers)
+                _, preds = torch.max(outputs, 1)
+
+                return loss + (1 - calc_f1_score(preds, answers))
+        else:
+            loss_criterion = loss_criterion_tmp
+
+    if args['cyclical_lr']:
+        base_lr = model_config['optimizer']['cyclical']['base_learning_rate']
+        max_lr = model_config['optimizer']['cyclical']['max_learning_rate']
+        base_momentum = model_config['optimizer']['cyclical']['base_momentum']
+        max_momentum = model_config['optimizer']['cyclical']['max_momentum']
+
+        total_nb_steps = args['nb_epoch'] * len(dataloaders['train'])
+
+        cycle_length = model_config['optimizer']['cyclical']['cycle_length']
+
+        if type(cycle_length) == int:
+            # Cycle length define the number of step in the cycle
+            cycle_step = cycle_length
+        elif type(cycle_length) == float:
+            # Cycle length is a ratio of the total nb steps
+            cycle_step = int(total_nb_steps * cycle_length)
+
+        print(f"Using cyclical LR : ({base_lr:.5},{max_lr:.5})  Momentum ({base_momentum:.5}, {max_momentum:.5})")
+        print(f"Total nb steps : {total_nb_steps} ({args['nb_epoch']} epoch)  -- Nb steps per cycle : {cycle_step} "
+              f"({cycle_step / len(dataloaders['train'])} epoch)")
+
+        scheduler = CyclicLR(optimizer, base_lr=base_lr,
+                             max_lr=max_lr,
+                             step_size_up=cycle_step // 2,
+                             base_momentum=base_momentum,
+                             max_momentum=max_momentum)
 
     if flags['restore_model_weights']:
         assert args['film_model_weight_path'] is not None, 'Must provide path to model weights to ' \
@@ -722,40 +776,27 @@ def prepare_model(args, flags, paths, datasets, device, model_config, input_imag
 
         checkpoint = torch.load(args['film_model_weight_path'], map_location=device)
 
-        if device != 'cpu':
-            if 'torch' in checkpoint['rng_state']:
-                checkpoint['rng_state']['torch'] = checkpoint['rng_state']['torch'].cpu()
+        if 'epoch' in checkpoint:
+            args['start_epoch'] = checkpoint['epoch'] + 1
 
-            if 'torch_cuda' in checkpoint['rng_state']:
-                checkpoint['rng_state']['torch_cuda'] = checkpoint['rng_state']['torch_cuda'].cpu()
+        if 'rng_state' in checkpoint:
+            if device != 'cpu':
+                if 'torch' in checkpoint['rng_state']:
+                    checkpoint['rng_state']['torch'] = checkpoint['rng_state']['torch'].cpu()
+
+                if 'torch_cuda' in checkpoint['rng_state']:
+                    checkpoint['rng_state']['torch_cuda'] = checkpoint['rng_state']['torch_cuda'].cpu()
+
+            set_random_state(checkpoint['rng_state'])
 
         # We need non-strict because feature extractor weight are not included in the saved state dict
         film_model.load_state_dict(checkpoint['model_state_dict'], strict=False)
 
-    trainable_parameters = filter(lambda p: p.requires_grad, film_model.parameters())
+        if optimizer and "optimizer_state_dict" in checkpoint:
+            optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
 
-    if flags['create_optimizer']:
-        if model_config['optimizer'].get('type', '') == 'sgd' or flags["force_sgd_optimizer"]:
-            optimizer = torch.optim.SGD(trainable_parameters, lr=model_config['optimizer']['learning_rate'],
-                                        momentum=model_config['optimizer']['momentum'],
-                                        weight_decay=model_config['optimizer']['weight_decay'])
-        else:
-            optimizer = torch.optim.Adam(trainable_parameters, lr=model_config['optimizer']['learning_rate'],
-                                         weight_decay=model_config['optimizer']['weight_decay'])
-
-    # TODO : Add cyclical LR here
-
-    if flags['create_loss_criterion']:
-        loss_criterion_tmp = nn.CrossEntropyLoss()
-
-        if args['f1_score']:
-            def loss_criterion(outputs, answers):
-                loss = loss_criterion_tmp(outputs, answers)
-                _, preds = torch.max(outputs, 1)
-
-                return loss + (1 - calc_f1_score(preds, answers))
-        else:
-            loss_criterion = loss_criterion_tmp
+        if scheduler and 'scheduler_state_dict' in checkpoint:
+            scheduler.load_state_dict(checkpoint['scheduler_state_dict'])
 
     if device != 'cpu':
         if args['perf_over_determinist']:
@@ -767,59 +808,20 @@ def prepare_model(args, flags, paths, datasets, device, model_config, input_imag
 
     film_model.to(device)
 
-    print("Model ready to run")
+    print("Model ready to run\n")
 
     return film_model, optimizer, loss_criterion, scheduler
 
 
 # TODO : output_dated_folder in args ?
 def execute_task(task, args, output_dated_folder, dataloaders, model, model_config, device, optimizer=None,
-                 loss_criterion=None, tensorboard=None, checkpoint=None):
+                 loss_criterion=None, scheduler=None, tensorboard=None):
     if task == "train_film":
-        if args['cyclical_lr']:
-            base_lr = model_config['optimizer']['cyclical']['base_learning_rate']
-            max_lr = model_config['optimizer']['cyclical']['max_learning_rate']
-            base_momentum = model_config['optimizer']['cyclical']['base_momentum']
-            max_momentum = model_config['optimizer']['cyclical']['max_momentum']
-
-            total_nb_steps = args['nb_epoch'] * len(dataloaders['train'])
-
-            cycle_length = model_config['optimizer']['cyclical']['cycle_length']
-
-            if type(cycle_length) == int:
-                # Cycle length define the number of step in the cycle
-                cycle_step = cycle_length
-            elif type(cycle_length) == float:
-                # Cycle length is a ratio of the total nb steps
-                cycle_step = int(total_nb_steps * cycle_length)
-
-            print(f"Using cyclical LR : ({base_lr:.5},{max_lr:.5})  Momentum ({base_momentum:.5}, {max_momentum:.5})")
-            print(f"Total nb steps : {total_nb_steps} ({args['nb_epoch']} epoch)  -- Nb steps per cycle : {cycle_step} "
-                  f"({cycle_step/len(dataloaders['train'])} epoch)")
-
-            scheduler = CyclicLR(optimizer, base_lr=base_lr,
-                                 max_lr=max_lr,
-                                 step_size_up=cycle_step//2,
-                                 base_momentum=base_momentum,
-                                 max_momentum=max_momentum)
-
-        else:
-            scheduler = None
-
-        start_epoch = 0
-        if args['continue_training']:
-            # FIXME : Do this when creating the optimizer
-            optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
-            start_epoch = checkpoint['epoch'] + 1
-            set_random_state(checkpoint['rng_state'])
-
-            if scheduler and 'scheduler_state_dict' in checkpoint:
-                scheduler.load_state_dict(checkpoint['scheduler_state_dict'])
-
         train_model(device=device, model=model, dataloaders=dataloaders,
                     output_folder=output_dated_folder, criterion=loss_criterion, optimizer=optimizer,
                     scheduler=scheduler, nb_epoch=args['nb_epoch'],
-                    nb_epoch_to_keep=args['nb_epoch_stats_to_keep'], start_epoch=start_epoch, tensorboard=tensorboard)
+                    nb_epoch_to_keep=args['nb_epoch_stats_to_keep'], start_epoch=args['start_epoch'],
+                    tensorboard=tensorboard)
 
     elif task == "inference":
         set_inference(device=device, model=model, dataloader=dataloaders['test'], criterion=nn.CrossEntropyLoss(),
@@ -827,9 +829,11 @@ def execute_task(task, args, output_dated_folder, dataloaders, model, model_conf
 
     elif task == "create_dict":
         create_dict_from_questions(dataloaders['train'].dataset, force_all_answers=args['force_dict_all_answer'],
-                                   output_folder_name=args['dict_folder'], start_end_tokens=not args['no_start_end_tokens'])
+                                   output_folder_name=args['dict_folder'],
+                                   start_end_tokens=not args['no_start_end_tokens'])
 
     elif task == "prepare_images":
+        # TODO : Merge write_clear_mean_to_config here
         images_to_h5(dataloaders=dataloaders,
                      square_image=args['pad_to_square_images'] or args['resize_to_square_images'],
                      output_folder_name=args['preprocessed_folder_name'])
@@ -930,7 +934,7 @@ def main(args):
     ####################################
     #   Argument & Config parsing
     ####################################
-    args = vars(args) # Convert args object to dict
+    args = vars(args)       # Convert args object to dict
     validate_arguments(args)
     task = get_task_from_args(args)
     paths = get_paths(task, args)
@@ -965,11 +969,10 @@ def main(args):
     #   Model Definition
     ####################################
     if flags['instantiate_model']:
-
         input_image_torch_shape = datasets['train'].get_input_shape(channel_first=True)  # Torch size have Channel as first dimension
         feature_extractor_config = get_feature_extractor_config(args)
 
-        film_model, optimizer, loss_criterion, scheduler = prepare_model(args, flags, paths, datasets, device,
+        film_model, optimizer, loss_criterion, scheduler = prepare_model(args, flags, paths, dataloaders, device,
                                                                          film_model_config, input_image_torch_shape,
                                                                          feature_extractor_config)
 
@@ -990,7 +993,7 @@ def main(args):
         create_symlink_to_latest_folder(paths["output_experiment_folder"], paths["current_datetime_str"])
 
     execute_task(task, args, paths["output_dated_folder"], dataloaders, film_model, film_model_config, device,
-                 optimizer, loss_criterion, tensorboard)#, checkpoint=checkpoint)
+                 optimizer, loss_criterion, scheduler, tensorboard)
 
     ####################################
     #   Exit
