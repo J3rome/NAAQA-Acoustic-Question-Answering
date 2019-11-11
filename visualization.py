@@ -75,7 +75,6 @@ def gamma_beta_2d_vis_per_feature_map(gamma_per_resblock, beta_per_resblock, res
             fig.show()
 
 
-
 def do_tsne(values, with_cuda=False):
     if with_cuda:
         TSNE = cuda_TSNE
@@ -111,11 +110,11 @@ def stack_gamma_beta_resblocks(gammas_betas):
     return np.stack(gammas, axis=0), np.stack(betas, axis=0), question_indexes
 
 
-def visualize_gamma_beta(gamma_beta_path, datasets, output_folder):
+def visualize_gamma_beta(gamma_beta_path, dataloaders, output_folder):
     set_type, gammas_betas_dict = read_gamma_beta_h5(gamma_beta_path)
     gammas, betas, question_indexes = stack_gamma_beta_resblocks(gammas_betas_dict)
     gammas_betas = np.concatenate([gammas, betas], axis=2)
-    dataset = datasets[set_type]
+    dataset = dataloaders[set_type].dataset
 
     # This is redundant for continuous id datasets, only useful if non continuous
     idx_to_questions = {}
@@ -231,7 +230,6 @@ def get_tagged_scene(dataset, game_id, remove_padding=False):
               prop=font_manager.FontProperties(family='sans-serif', size='small'))
     fig.tight_layout()
     plt.show()
-    print("yo")
 
 
     # TODO : Define vertical lines position
@@ -240,7 +238,8 @@ def get_tagged_scene(dataset, game_id, remove_padding=False):
 def grad_cam_visualization(device, model, dataloader, output_folder, nb_game_per_img=10, limit_dataset=45):
     orig_dataloader = dataloader
 
-    assert orig_dataloader.dataset.is_raw_img(), 'Only support raw img config for now'
+    # FIXME : Should only be allowed for raw and raw_h5 ?
+    #assert orig_dataloader.dataset.is_raw_img(), 'Only support raw img config for now'
 
     if limit_dataset is None:
         dataset = dataloader.dataset
@@ -269,6 +268,12 @@ def grad_cam_visualization(device, model, dataloader, output_folder, nb_game_per
         questions = batch['question'].to(device)
         answers = batch['answer'].to(device)
         seq_lengths = batch['seq_length'].to(device)
+
+        # Those are not processed by the network, only used to create statistics. Therefore, no need to copy to GPU
+        questions_id = batch['id']
+        scenes_id = batch['scene_id']
+        images_padding = batch['image_padding']
+
         batch_size = input_images.size(0)
 
         # TODO : We might want to use something else than ground truths for class_idx (Ex : Highest prob prediction -> Pass class_idx = None)
@@ -278,8 +283,8 @@ def grad_cam_visualization(device, model, dataloader, output_folder, nb_game_per
         _, preds = torch.max(model_outputs, 1)
 
         processed_predictions = process_predictions(dataloader.dataset, preds.tolist(), answers.tolist(),
-                                                          batch['id'].tolist(), batch['scene_id'].tolist(),
-                                                          model_outputs.tolist())
+                                                    questions_id.tolist(), scenes_id.tolist(),
+                                                    model_outputs.tolist(), images_padding.tolist())
 
         iterator = zip(range(batch_size), saliency_maps, input_images, confidences, processed_predictions)
         for i, saliency_map, input_image, confidence, processed_prediction in iterator:
