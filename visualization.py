@@ -47,12 +47,12 @@ special_intermediary_nodes_correspondence = {
 
 
 def get_question_type(question_nodes):
-  last_node_type = question_nodes[-1]['type']
+    last_node_type = question_nodes[-1]['type']
 
-  if last_node_type in special_ending_nodes_correspondence:
-    last_node_type = special_ending_nodes_correspondence[last_node_type]
+    if last_node_type in special_ending_nodes_correspondence:
+        last_node_type = special_ending_nodes_correspondence[last_node_type]
 
-  return last_node_type.title().replace('_', ' ')
+    return last_node_type.title().replace('_', ' ')
 
 
 def gamma_beta_2d_vis_per_feature_map(gamma_per_resblock, beta_per_resblock, resblock_keys, nb_dim_resblock, questions_type):
