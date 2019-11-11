@@ -188,28 +188,13 @@ def get_paths_from_args(task, args):
 
 
 def get_task_from_args(args):
-    if args['training']:
-        return "train_film"
-    elif args['inference']:
-        return "inference"
-    elif args['visualize_gamma_beta']:
-        return "visualize_gamma_beta"
-    elif args['visualize_grad_cam']:
-        return "visualize_grad_cam"
-    elif args['feature_extract']:
-        return "feature_extract"
-    elif args['prepare_images']:
-        return "prepare_images"
-    elif args['create_dict']:
-        return "create_dict"
-    elif args['lr_finder']:
-        return 'lr_finder'
-    elif args['write_clear_mean_to_config']:
-        return 'write_clear_mean_to_config'
-    elif args['random_weight_baseline']:
-        return 'random_weight_baseline'
-    elif args['random_answer_baseline']:
-        return 'random_answer_baseline'
+    tasks = ['training', 'inference', 'visualize_gamma_beta', 'visualize_grad_cam', 'feature_extract', 'prepare_images',
+             'create_dict', 'lr_finder', 'write_clear_mean_to_config', 'random_weight_baseline',
+             'random_answer_baseline']
+
+    for task in tasks:
+        if task in args and args[task]:
+            return task
 
     assert False, "Arguments don't specify task"
 
@@ -360,7 +345,7 @@ def create_dataloaders(args, datasets, nb_process=8):
 
 def execute_task(task, args, output_dated_folder, dataloaders, model, model_config, device, optimizer=None,
                  loss_criterion=None, scheduler=None, tensorboard=None):
-    if task == "train_film":
+    if task == "training":
         train_model(device=device, model=model, dataloaders=dataloaders,
                     output_folder=output_dated_folder, criterion=loss_criterion, optimizer=optimizer,
                     scheduler=scheduler, nb_epoch=args['nb_epoch'],
