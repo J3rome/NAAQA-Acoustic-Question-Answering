@@ -15,14 +15,14 @@ import matplotlib.patches as patches
 import matplotlib.font_manager as font_manager
 
 from models.gradcam import GradCAM
+from models.torchsummary import summary     # Custom version of torchsummary to fix bugs with input
 from torchvision.utils import make_grid
 
 from data_interfaces.CLEAR_dataset import CLEAR_dataset
 from torch.utils.data import DataLoader
 from torchvision import transforms
-from tqdm import tqdm
 import torch
-from utils import process_predictions, read_json, visualize_cam
+from utils import process_predictions, visualize_cam, get_random_state, set_random_state
 
 special_ending_nodes_correspondence = {
   'add': 'count',
@@ -53,6 +53,26 @@ def get_question_type(question_nodes):
         last_node_type = special_ending_nodes_correspondence[last_node_type]
 
     return last_node_type.title().replace('_', ' ')
+
+
+def save_graph_to_tensorboard(model, tensorboard, input_image_torch_shape):
+    # FIXME : For now we are ignoring TracerWarnings. Not sure the saved graph is 100% accurate...
+    import warnings
+    warnings.filterwarnings('ignore', category=torch.jit.TracerWarning)
+
+    # FIXME : Test on GPU
+    dummy_input = [torch.ones(2, 22, dtype=torch.long),
+                   torch.ones(2, 1, dtype=torch.long),
+                   torch.ones(2, *input_image_torch_shape, dtype=torch.float)]
+    tensorboard['writers']['train'].add_graph(model, dummy_input)
+
+
+def print_model_summary(model, input_image_torch_shape, device="cpu"):
+    # Printing summary affects the random state (Raw Vs Pre-Extracted Features).
+    # We restore it to ensure reproducibility between input type
+    random_state = get_random_state()
+    summary(model, [(22,), (1,), input_image_torch_shape], device=device)
+    set_random_state(random_state)
 
 
 def gamma_beta_2d_vis_per_feature_map(gamma_per_resblock, beta_per_resblock, resblock_keys, nb_dim_resblock, questions_type):

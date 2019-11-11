@@ -6,10 +6,64 @@ from collections import defaultdict
 from random import shuffle
 
 from data_interfaces.CLEAR_dataset import CLEARTokenizer
-from utils import create_folder_if_necessary, save_json, read_json, set_random_state, get_random_state
+from utils import create_folder_if_necessary, save_json, read_json, calc_mean_and_std, update_mean_in_config
 
 from torch.utils.data import DataLoader
 import torch
+import torch.nn as nn
+
+from models.lr_finder import LRFinder
+import matplotlib.pyplot as plt
+
+
+def get_lr_finder_curves(model, device, train_dataloader, output_dated_folder, num_iter, optimizer, val_dataloader=None,
+                         loss_criterion=nn.CrossEntropyLoss(), weight_decay_list=None, min_lr=1e-10):
+    if type(weight_decay_list) != list:
+        weight_decay_list = [0., 3e-1, 3e-2, 3e-3, 3e-4, 3e-5, 3e-6, 3e-7]
+
+    # TODO : The order of the data probably affect the LR curves. Shuffling and doing multiple time should help
+
+    # FIXME : What momentum value should we use for SGD ???
+    # Force momentum to 0
+    initial_optimizer_state_dict = optimizer.state_dict()
+    optimizer.param_groups[0]['momentum'] = 0
+    optimizer.param_groups[0]['lr'] = min_lr
+
+    fig, ax = plt.subplots()
+    lr_finder = LRFinder(model, optimizer, loss_criterion, device=device)
+
+    for weight_decay in weight_decay_list:
+        # Reset LR Finder and change weight decay
+        lr_finder.reset(weight_decay=weight_decay)
+
+        print(f"Learning Rate finder -- Running for {num_iter} batches with weight decay : {weight_decay:.5}")
+        # FIXME : Should probably run with validation data?
+        lr_finder.range_test(train_dataloader, val_loader=None, end_lr=100, num_iter=num_iter,
+                             num_iter_val=100)
+
+        fig, ax = lr_finder.plot(fig_ax=(fig, ax), legend_label=f"Weight Decay : {weight_decay:.5}", show_fig=False)
+
+    filepath = "%s/%s" % (output_dated_folder, 'lr_finder_plot.png')
+    fig.savefig(filepath)
+
+    # Reset optimiser config
+    optimizer.load_state_dict(initial_optimizer_state_dict)
+
+
+def write_clear_mean_to_config(dataloader, device, current_config, config_file_path, overwrite_mean=False):
+    assert os.path.isfile(config_file_path), f"Config file '{config_file_path}' doesn't exist"
+
+    key = "clear_stats"
+
+    if not overwrite_mean and 'preprocessing' in current_config and key in current_config['preprocessing'] \
+       and type(current_config['preprocessing'][key]) == list:
+        assert False, "CLEAR mean is already present in config."
+
+    dataloader.dataset.keep_1_game_per_scene()
+
+    mean, std = calc_mean_and_std(dataloader, device=device)
+
+    update_mean_in_config(mean, std, config_file_path, current_config=current_config, key=key)
 
 
 # >>> Feature Extraction
