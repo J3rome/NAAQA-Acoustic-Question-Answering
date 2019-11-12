@@ -31,12 +31,14 @@ def validate_arguments(args):
     mutually_exclusive_params = [args['pad_to_square_images'], args['resize_to_square_images']]
     assert sum(mutually_exclusive_params) < 2, "[ERROR] Can either --pad_to_square_images or --resize_to_square_images"
 
+    assert not args['continue_training'] or (args['training'] and args['continue_training']), \
+        "[ERROR] Must be in --training mode for --continue_training"
+
 
 def create_flags_from_args(task, args):
     flags = {}
 
-    flags['continuing_training'] = args['training'] and args['continue_training']
-    flags['restore_model_weights'] = args['inference'] or flags['continuing_training'] or args['visualize_grad_cam']
+    flags['restore_model_weights'] = args['inference'] or args['continue_training'] or args['visualize_grad_cam']
     flags['create_output_folder'] = not args['create_dict'] and not args['feature_extract'] and not args[
         'write_clear_mean_to_config']
     flags['use_tensorboard'] = 'train' in task
@@ -52,8 +54,7 @@ def create_flags_from_args(task, args):
 def get_paths_from_args(task, args):
     paths = {}
 
-    paths["output_name"] = args['version_name'] + "_" + args['output_name_suffix'] if args['output_name_suffix'] else \
-    args['version_name']
+    paths["output_name"] = args['version_name'] + "_" + args['output_name_suffix'] if args['output_name_suffix'] else args['version_name']
     paths["data_path"] = "%s/%s" % (args['data_root_path'], args['version_name'])
     paths["output_task_folder"] = "%s/%s" % (args['output_root_path'], task)
     paths["output_experiment_folder"] = "%s/%s" % (paths["output_task_folder"], paths["output_name"])
@@ -93,9 +94,6 @@ def update_arguments(args, paths, flags):
 
     args['normalize_zero_one'] = args['normalize_zero_one'] and not args['keep_image_range']
 
-    if flags['continuing_training'] and args['film_model_weight_path'] is None:
-        args['film_model_weight_path'] = 'latest'
-
     # Make sure we are not normalizing beforce calculating mean and std
     if args['write_clear_mean_to_config']:
         args['normalize_with_imagenet_stats'] = False
@@ -106,6 +104,10 @@ def update_arguments(args, paths, flags):
         args['dict_file_path'] = "%s/%s/dict.json" % (paths["data_path"], args['dict_folder'])
 
     if flags['restore_model_weights']:
+        if args['continue_training'] and args['film_model_weight_path'] is None:
+            # Use latest by default when continuing training
+            args['film_model_weight_path'] = 'latest'
+
         assert args['film_model_weight_path'] is not None, 'Must provide path to model weights to ' \
                                                            'do inference or to continue training.'
 
