@@ -9,9 +9,11 @@ import torch.nn as nn
 from torch.optim.lr_scheduler import CyclicLR
 
 from models.CLEAR_film_model import CLEAR_FiLM_model
-from utils import process_predictions, process_gamma_beta, save_gamma_beta_h5, create_folder_if_necessary
-from utils import save_json, save_training_stats, get_random_state, sort_stats, calc_f1_score, is_date_string
-from utils import set_random_state
+from models.metrics import calc_f1_score
+from utils.generic import is_date_string, sort_stats, save_training_stats
+from utils.random import get_random_state, set_random_state
+from utils.processing import process_predictions, process_gamma_beta
+from utils.file import create_folder_if_necessary, save_json, save_gamma_beta_h5
 
 
 def prepare_model(args, flags, paths, dataloaders, device, model_config, input_image_torch_shape,

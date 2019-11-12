@@ -6,9 +6,9 @@ from collections import defaultdict
 from random import shuffle
 
 from data_interfaces.CLEAR_dataset import CLEARTokenizer
-from utils import create_folder_if_necessary, save_json, read_json, calc_mean_and_std, update_mean_in_config
+from utils.file import create_folder_if_necessary, save_json, read_json
+from utils.processing import calc_mean_and_std, update_mean_in_config
 
-from torch.utils.data import DataLoader
 import torch
 import torch.nn as nn
 

@@ -5,7 +5,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torchvision
 
-from utils import set_random_state, get_random_state
+from utils.random import set_random_state, get_random_state
 
 # Replicate tensorflow 'SAME' padding (Taken from https://github.com/mlperf/inference/blob/master/others/edge/object_detection/ssd_mobilenet/pytorch/utils.py#L40)
 class Conv2d_tf(nn.Conv2d):

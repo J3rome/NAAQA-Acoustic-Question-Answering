@@ -1,39 +1,27 @@
 import argparse
-from _datetime import datetime
-import subprocess
-import shutil
-import os
-import random
+from datetime import datetime
 
-from tqdm import tqdm
-
-from utils import set_random_seed, create_folder_if_necessary, get_config, process_predictions, process_gamma_beta
-from utils import create_symlink_to_latest_folder, save_training_stats, save_json, sort_stats, is_date_string
-from utils import save_gamma_beta_h5, save_git_revision, get_random_state, set_random_state, close_tensorboard_writers
-from utils import calc_mean_and_std, update_mean_in_config, calc_f1_score
-
-from runner import train_model, set_inference, prepare_model
-from visualization import visualize_gamma_beta, grad_cam_visualization, print_model_summary, save_graph_to_tensorboard
-from preprocessing import create_dict_from_questions, extract_features, images_to_h5, get_lr_finder_curves
-from preprocessing import write_clear_mean_to_config
-from baselines import random_answer_baseline, random_weight_baseline
-
-# NEW IMPORTS
-from models.CLEAR_film_model import CLEAR_FiLM_model
-from data_interfaces.CLEAR_dataset import CLEAR_dataset, CLEAR_collate_fct
-from data_interfaces.transforms import ToTensor, ImgBetweenZeroOne, ResizeImgBasedOnHeight, ResizeImgBasedOnWidth, PadTensor, NormalizeSample, ResizeTensor
-from models.torchsummary import summary
 import torch
-import time
 from torch.utils.data import DataLoader
-
 import torch.nn as nn
 from torchvision import transforms
-from tensorboardX import SummaryWriter
+
+from runner import train_model, set_inference, prepare_model
+from baselines import random_answer_baseline, random_weight_baseline
+from preprocessing import create_dict_from_questions, extract_features, images_to_h5, get_lr_finder_curves
+from preprocessing import write_clear_mean_to_config
+from visualization import visualize_gamma_beta, grad_cam_visualization, print_model_summary, save_graph_to_tensorboard
+from data_interfaces.CLEAR_dataset import CLEAR_dataset, CLEAR_collate_fct
+from data_interfaces.transforms import ToTensor, ImgBetweenZeroOne, ResizeImgBasedOnHeight, ResizeImgBasedOnWidth
+from data_interfaces.transforms import PadTensor, NormalizeSample, ResizeTensor
+
+from utils.file import save_model_config, save_json, read_json, create_symlink_to_latest_folder, create_folders_save_args
+from utils.random import set_random_seed
+from utils.argument_parsing import validate_arguments, create_flags_from_args, get_task_from_args, update_arguments
+from utils.argument_parsing import get_paths_from_args, get_feature_extractor_config_from_args
+from utils.logging import create_tensorboard_writers, close_tensorboard_writers
 
 
-# TODO : Add option for custom test file --> Already available by specifying different inference_set ? The according dataset & dataloader should be created..
-#       Maybe not a good idea to instantiate everything out of the "task" functions.. Or maybe we could just instantiate it inside for the test inference
 parser = argparse.ArgumentParser('FiLM model for CLEAR Dataset (Acoustic Question Answering)', fromfile_prefix_chars='@')
 
 parser.add_argument("--training", help="FiLM model training", action='store_true')
@@ -136,102 +124,6 @@ parser.add_argument("--cyclical_lr", help="Will use cyclical learning rate (Boun
                     action='store_true')
 
 
-# Argument handling
-def validate_arguments(args):
-    
-    mutually_exclusive_params = [args['training'], args['inference'], args['feature_extract'], args['create_dict'],
-                                 args['visualize_gamma_beta'], args['visualize_grad_cam'], args['lr_finder'],
-                                 args['write_clear_mean_to_config'], args['random_answer_baseline'],
-                                 args['random_weight_baseline'], args['prepare_images']]
-
-    assert sum(mutually_exclusive_params) == 1, \
-        "[ERROR] Can only do one task at a time " \
-        "(--training, --inference, --visualize_gamma_beta, --create_dict, --feature_extract --visualize_grad_cam " \
-        "--prepare_images, --lr_finder, --write_clear_mean_to_config, --random_answer_baseline, --random_weight_baseline)"
-
-    mutually_exclusive_params = [args['raw_img_resize_based_on_height'], args['raw_img_resize_based_on_width']]
-    assert sum(mutually_exclusive_params) < 2, "[ERROR] Image resize can be either --raw_img_resize_based_on_height " \
-                                               "or --raw_img_resize_based_on_width but not both"
-
-    mutually_exclusive_params = [args['pad_to_square_images'], args['resize_to_square_images']]
-    assert sum(mutually_exclusive_params) < 2, "[ERROR] Can either --pad_to_square_images or --resize_to_square_images"
-
-
-def create_flags_from_args(task, args):
-    flags = {}
-
-    flags['continuing_training'] = args['training'] and args['continue_training']
-    flags['restore_model_weights'] = args['inference'] or flags['continuing_training'] or args['visualize_grad_cam']
-    flags['create_output_folder'] = not args['create_dict'] and not args['feature_extract'] and not args['write_clear_mean_to_config']
-    flags['use_tensorboard'] = 'train' in task
-    flags['create_loss_criterion'] = args['training'] or args['lr_finder']
-    flags['create_optimizer'] = args['training'] or args['lr_finder']
-    flags['force_sgd_optimizer'] = args['lr_finder'] or args['cyclical_lr']
-    flags['instantiate_model'] = not args['create_dict'] and not args['write_clear_mean_to_config'] and \
-                                 'gamma_beta' not in task and 'random_answer' not in task and not args['prepare_images']
-
-    return flags
-
-
-def get_paths_from_args(task, args):
-    paths = {}
-
-    paths["output_name"] = args['version_name'] + "_" + args['output_name_suffix'] if args['output_name_suffix'] else args['version_name']
-    paths["data_path"] = "%s/%s" % (args['data_root_path'], args['version_name'])
-    paths["output_task_folder"] = "%s/%s" % (args['output_root_path'], task)
-    paths["output_experiment_folder"] = "%s/%s" % (paths["output_task_folder"], paths["output_name"])
-    paths["current_datetime"] = datetime.now()
-    paths["current_datetime_str"] = paths["current_datetime"].strftime("%Y-%m-%d_%Hh%M")
-    paths["output_dated_folder"] = "%s/%s" % (paths["output_experiment_folder"], paths["current_datetime_str"])
-
-    return paths
-
-
-def get_task_from_args(args):
-    tasks = ['training', 'inference', 'visualize_gamma_beta', 'visualize_grad_cam', 'feature_extract', 'prepare_images',
-             'create_dict', 'lr_finder', 'write_clear_mean_to_config', 'random_weight_baseline',
-             'random_answer_baseline']
-
-    for task in tasks:
-        if task in args and args[task]:
-            return task
-
-    assert False, "Arguments don't specify task"
-
-
-def update_arguments(args, paths, flags):
-    if args['conv_feature_input']:
-        args['input_image_type'] = "conv"
-    elif args['h5_image_input']:
-        args['input_image_type'] = "raw_h5"
-    else:
-        args['input_image_type'] = "raw"
-
-    if args['input_image_type'] == 'raw':
-        # Default values when in RAW mode
-        args['normalize_zero_one'] = True
-
-        if args['raw_img_resize_val'] is None:
-            args['raw_img_resize_val'] = 224
-
-    args['normalize_zero_one'] = args['normalize_zero_one'] and not args['keep_image_range']
-
-    if flags['continuing_training'] and args['film_model_weight_path'] is None:
-        args['film_model_weight_path'] = 'latest'
-
-    # Make sure we are not normalizing beforce calculating mean and std
-    if args['write_clear_mean_to_config']:
-        args['normalize_with_imagenet_stats'] = False
-        args['normalize_with_clear_stats'] = False
-
-    args['dict_folder'] = args['preprocessed_folder_name'] if args['dict_folder'] is None else args['dict_folder']
-    if args['dict_file_path'] is None:
-        args['dict_file_path'] = "%s/%s/dict.json" % (paths["data_path"], args['dict_folder'])
-
-    # By default the start_epoch should is 0. Will only be modified if loading from checkpoint
-    args["start_epoch"] = 0
-
-
 def get_transforms_from_args(args, preprocessing_config):
     transforms_list = []
 
@@ -264,16 +156,8 @@ def get_transforms_from_args(args, preprocessing_config):
 
     else:
         transforms_list += to_tensor_transform
-        feature_extractor_config = None
 
     return transforms.Compose(transforms_list)
-
-
-def get_feature_extractor_config_from_args(args):
-    if args['no_feature_extractor']:
-        return None
-    else:
-        return {'version': 101, 'layer_index': args['feature_extractor_layer_index']}  # Idx 6 -> Block3/unit22
 
 
 # Data loading & preparation
@@ -395,50 +279,6 @@ def execute_task(task, args, output_dated_folder, dataloaders, model, model_conf
         random_weight_baseline(model, device, dataloaders['val'], output_dated_folder)
 
 
-def create_folders_save_config(args, paths, flags, model_config):
-    if flags['create_output_folder']:
-        # TODO : See if this is optimal file structure
-        create_folder_if_necessary(args['output_root_path'])
-        create_folder_if_necessary(paths["output_task_folder"])
-        create_folder_if_necessary(paths["output_experiment_folder"])
-        create_folder_if_necessary(paths["output_dated_folder"])
-
-        # Save arguments & config to output folder
-        save_json(args, paths["output_dated_folder"], filename="arguments.json")
-        save_git_revision(paths["output_dated_folder"])
-
-        if flags['instantiate_model']:
-            save_json(model_config, paths["output_dated_folder"],
-                      filename='config_%s_input.json' % args['input_image_type'])
-
-            # Copy dictionary file used
-            shutil.copyfile(args['dict_file_path'], "%s/dict.json" % paths["output_dated_folder"])
-
-
-def prepare_tensorboard(args, flags, paths):
-    if flags['use_tensorboard']:
-        # FIXME : What happen with test set? I guess we don't really care, we got our own visualisations for test run
-        # Create tensorboard writer
-        base_writer_path = '%s/%s/%s' % (
-        args['tensorboard_folder'], paths["output_name"], paths["current_datetime_str"])
-
-        # TODO : Add 'comment' param with more infos on run. Ex : Raw vs Conv
-        tensorboard = {
-            'writers': {
-                'train': SummaryWriter('%s/train' % base_writer_path),
-                'val': SummaryWriter('%s/val' % base_writer_path)
-            },
-            'options': {
-                'save_images': args['tensorboard_save_images'],
-                'save_texts': args['tensorboard_save_texts']
-            }
-        }
-    else:
-        tensorboard = None
-
-    return tensorboard
-
-
 def prepare_for_task(args):
     ####################################
     #   Argument & Config parsing
@@ -457,13 +297,17 @@ def prepare_for_task(args):
     print("\nTask '%s' for version '%s'\n" % (task.replace('_', ' ').title(), paths["output_name"]))
     print("Using device '%s'" % device)
 
-    film_model_config = get_config(args['config_path'])
+    film_model_config = read_json(args['config_path'])
     # FIXME : Should be in args ?
     early_stopping = not args['no_early_stopping'] and film_model_config['early_stopping']['enable']
     film_model_config['early_stopping']['enable'] = early_stopping
 
     # Create required folders if necessary
-    create_folders_save_config(args, paths, flags, film_model_config)
+    if flags['create_output_folder']:
+        create_folders_save_args(args, paths)
+
+        if flags['instantiate_model']:
+            save_model_config(args, paths, film_model_config)
 
     # Make sure all variables exists
     film_model, optimizer, loss_criterion, tensorboard, scheduler = None, None, None, None, None
@@ -490,7 +334,7 @@ def prepare_for_task(args):
             print_model_summary(film_model, input_image_torch_shape, device)
 
         if flags['use_tensorboard']:
-            tensorboard = prepare_tensorboard(args, flags, paths)
+            tensorboard = create_tensorboard_writers(args, paths)
             if args['tensorboard_save_graph']:
                 save_graph_to_tensorboard(film_model, tensorboard, input_image_torch_shape)
 
@@ -499,18 +343,6 @@ def prepare_for_task(args):
         dataloaders,
         (film_model_config, film_model, optimizer, loss_criterion, scheduler, tensorboard)
     )
-
-
-def on_exit_action(flags, paths, tensorboard):
-    if flags['use_tensorboard']:
-        close_tensorboard_writers(tensorboard['writers'])
-
-    time_elapsed = str(datetime.now() - paths["current_datetime"])
-
-    print("Execution took %s\n" % time_elapsed)
-
-    if flags['create_output_folder']:
-        save_json({'time_elapsed': time_elapsed}, paths["output_dated_folder"], filename='timing.json')
 
 
 def main(args):
@@ -533,6 +365,18 @@ def main(args):
     #   Exit
     ####################################
     on_exit_action(flags, paths, tensorboard)
+
+
+def on_exit_action(flags, paths, tensorboard):
+    if flags['use_tensorboard']:
+        close_tensorboard_writers(tensorboard['writers'])
+
+    time_elapsed = str(datetime.now() - paths["current_datetime"])
+
+    print("Execution took %s\n" % time_elapsed)
+
+    if flags['create_output_folder']:
+        save_json({'time_elapsed': time_elapsed}, paths["output_dated_folder"], filename='timing.json')
 
 
 # FIXME : Args is a namespace so it is available everywhere. Not a great idea to shadow it (But we get a dict key error if we try to access it so it is easiy catchable

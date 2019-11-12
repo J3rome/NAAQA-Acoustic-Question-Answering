@@ -9,7 +9,8 @@ import torch.nn.functional as F
 from torchvision import transforms
 
 from data_interfaces.CLEAR_image_loader import get_img_builder, CLEARImage
-from utils import read_json, get_size_from_image_header, get_answer_to_family_map
+from utils.file import read_json, get_size_from_image_header
+from utils.generic import get_answer_to_family_map
 from data_interfaces.transforms import ResizeImgBasedOnHeight, ResizeImgBasedOnWidth
 
 import multiprocessing

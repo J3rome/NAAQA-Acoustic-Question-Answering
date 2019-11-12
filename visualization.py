@@ -2,7 +2,9 @@ import numpy as np
 
 from collections import defaultdict
 
-from utils import read_gamma_beta_h5
+from utils.file import read_gamma_beta_h5
+from utils.random import get_random_state, set_random_state
+from utils.processing import process_predictions
 
 import plotly.graph_objects as go
 from plotly.io import write_html
@@ -22,7 +24,7 @@ from data_interfaces.CLEAR_dataset import CLEAR_dataset
 from torch.utils.data import DataLoader
 from torchvision import transforms
 import torch
-from utils import process_predictions, visualize_cam, get_random_state, set_random_state
+from tqdm import tqdm
 
 special_ending_nodes_correspondence = {
   'add': 'count',
@@ -336,3 +338,27 @@ def grad_cam_visualization(device, model, dataloader, output_folder, nb_game_per
         grid.save(filepath)
 
     print("GradCAM Visualization Done. See %s for results" % output_folder)
+
+
+def visualize_cam(mask, img):
+    """ Taken from https://github.com/vickyliin/gradcam_plus_plus-pytorch
+    Make heatmap from mask and synthesize GradCAM result image using heatmap and img.
+    Args:
+        mask (torch.tensor): mask shape of (1, 1, H, W) and each element has value in range [0, 1]
+        img (torch.tensor): img shape of (1, 3, H, W) and each pixel value is in range [0, 1]
+
+    Return:
+        heatmap (torch.tensor): heatmap img shape of (3, H, W)
+        result (torch.tensor): synthesized GradCAM result of same shape with heatmap.
+    """
+    import cv2       # Not an official dependency
+    heatmap = (255 * mask.squeeze()).type(torch.uint8).cpu().numpy()
+    heatmap = cv2.applyColorMap(heatmap, cv2.COLORMAP_JET)
+    heatmap = torch.from_numpy(heatmap).permute(2, 0, 1).float().div(255)
+    b, g, r = heatmap.split(1)
+    heatmap = torch.cat([r, g, b])
+
+    result = heatmap+img.cpu()
+    result = result.div(result.max()).squeeze()
+
+    return heatmap, result
