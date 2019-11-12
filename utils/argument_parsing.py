@@ -1,5 +1,6 @@
 from datetime import datetime
-
+from utils.generic import is_date_string
+import os
 
 # Argument handling
 def get_args_task_flags_paths(args):
@@ -103,6 +104,24 @@ def update_arguments(args, paths, flags):
     args['dict_folder'] = args['preprocessed_folder_name'] if args['dict_folder'] is None else args['dict_folder']
     if args['dict_file_path'] is None:
         args['dict_file_path'] = "%s/%s/dict.json" % (paths["data_path"], args['dict_folder'])
+
+    if flags['restore_model_weights']:
+        assert args['film_model_weight_path'] is not None, 'Must provide path to model weights to ' \
+                                                           'do inference or to continue training.'
+
+        # If path specified is a date, we construct the path to the best model weights for the specified run
+        base_path = "%s/training/%s/%s" % (args['output_root_path'], paths["output_name"], args['film_model_weight_path'])
+        # Note : We might redo some epoch when continuing training because the 'best' epoch is not necessarely the last
+        suffix = "best/model.pt.tar"
+
+        if is_date_string(args['film_model_weight_path']):
+            args['film_model_weight_path'] = "%s/%s" % (base_path, suffix)
+        elif args['film_model_weight_path'] == 'latest':
+            # The 'latest' symlink will be overriden by this run (If continuing training).
+            # Use real path of latest experiment
+            symlink_value = os.readlink(base_path)
+            clean_base_path = base_path[:-(len(args['film_model_weight_path']) + 1)]
+            args['film_model_weight_path'] = '%s/%s/%s' % (clean_base_path, symlink_value, suffix)
 
     # By default the start_epoch should is 0. Will only be modified if loading from checkpoint
     args["start_epoch"] = 0

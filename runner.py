@@ -1,6 +1,5 @@
 import shutil
 from datetime import datetime
-import os
 
 import subprocess
 from tqdm import tqdm
@@ -82,27 +81,7 @@ def prepare_model(args, flags, paths, dataloaders, device, model_config, input_i
                              max_momentum=max_momentum)
 
     if flags['restore_model_weights']:
-        assert args['film_model_weight_path'] is not None, 'Must provide path to model weights to ' \
-                                                           'do inference or to continue training.'
-
-        # If path specified is a date, we construct the path to the best model weights for the specified run
-        base_path = "%s/training/%s/%s" % (args['output_root_path'], paths["output_name"], args['film_model_weight_path'])
-        # Note : We might redo some epoch when continuing training because the 'best' epoch is not necessarely the last
-        suffix = "best/model.pt.tar"
-
-        if is_date_string(args['film_model_weight_path']):
-            args['film_model_weight_path'] = "%s/%s" % (base_path, suffix)
-        elif args['film_model_weight_path'] == 'latest':
-            # The 'latest' symlink will be overriden by this run (If continuing training).
-            # Use real path of latest experiment
-            symlink_value = os.readlink(base_path)
-            clean_base_path = base_path[:-(len(args['film_model_weight_path']) + 1)]
-            args['film_model_weight_path'] = '%s/%s/%s' % (clean_base_path, symlink_value, suffix)
-
         print(f"Restoring model weights from '{args['film_model_weight_path']}'")
-
-        save_json({'restored_film_weight_path': args['film_model_weight_path']},
-                  paths["output_dated_folder"], 'restored_from.json')
 
         checkpoint = torch.load(args['film_model_weight_path'], map_location=device)
 
