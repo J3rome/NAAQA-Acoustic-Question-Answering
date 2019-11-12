@@ -2,8 +2,6 @@ from collections import defaultdict
 
 import matplotlib.pyplot as plt
 import numpy as np
-from sklearn.metrics import confusion_matrix
-from sklearn.utils.multiclass import unique_labels
 
 from utils.notebook.plot import plot_2d_matrix, plot_discrete_hist
 
