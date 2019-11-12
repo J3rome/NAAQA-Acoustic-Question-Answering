@@ -17,8 +17,7 @@ from data_interfaces.transforms import PadTensor, NormalizeSample, ResizeTensor
 
 from utils.file import save_model_config, save_json, read_json, create_symlink_to_latest_folder, create_folders_save_args
 from utils.random import set_random_seed
-from utils.argument_parsing import validate_arguments, create_flags_from_args, get_task_from_args, update_arguments
-from utils.argument_parsing import get_paths_from_args, get_feature_extractor_config_from_args
+from utils.argument_parsing import get_args_task_flags_paths, get_feature_extractor_config_from_args
 from utils.logging import create_tensorboard_writers, close_tensorboard_writers
 
 
@@ -283,12 +282,7 @@ def prepare_for_task(args):
     ####################################
     #   Argument & Config parsing
     ####################################
-    args = vars(args)  # Convert args object to dict
-    validate_arguments(args)
-    task = get_task_from_args(args)
-    paths = get_paths_from_args(task, args)
-    flags = create_flags_from_args(task, args)
-    update_arguments(args, paths, flags)
+    args, task, flags, paths = get_args_task_flags_paths(args)
     device = f'cuda:{args["gpu_index"]}' if torch.cuda.is_available() and not args['use_cpu'] else 'cpu'
 
     if args['random_seed'] is not None:
@@ -346,7 +340,7 @@ def prepare_for_task(args):
 
 
 def main(args):
-
+    args = vars(args)  # Convert args object to dict
     task_and_more, dataloaders, model_and_more = prepare_for_task(args)
     task, args, flags, paths, device = task_and_more
     film_model_config, film_model, optimizer, loss_criterion, scheduler, tensorboard = model_and_more
@@ -377,6 +371,10 @@ def on_exit_action(flags, paths, tensorboard):
 
     if flags['create_output_folder']:
         save_json({'time_elapsed': time_elapsed}, paths["output_dated_folder"], filename='timing.json')
+
+
+def parse_args_string(string):
+    return parser.parse_args(string)
 
 
 # FIXME : Args is a namespace so it is available everywhere. Not a great idea to shadow it (But we get a dict key error if we try to access it so it is easiy catchable

@@ -1,6 +1,17 @@
 from datetime import datetime
 
+
 # Argument handling
+def get_args_task_flags_paths(args):
+    validate_arguments(args)
+    task = get_task_from_args(args)
+    paths = get_paths_from_args(task, args)
+    flags = create_flags_from_args(task, args)
+    update_arguments(args, paths, flags)
+
+    return args, task, flags, paths
+
+
 def validate_arguments(args):
     mutually_exclusive_params = [args['training'], args['inference'], args['feature_extract'], args['create_dict'],
                                  args['visualize_gamma_beta'], args['visualize_grad_cam'], args['lr_finder'],
