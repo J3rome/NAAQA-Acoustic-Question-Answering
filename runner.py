@@ -332,6 +332,7 @@ def train_model(device, model, dataloaders, output_folder, criterion, optimizer,
         sorted_stats = sort_stats(stats)
 
         if nb_epoch_to_keep is not None:
+            # FIXME : Look like it's broken when --continue_training and can't get better score in current run
             # FIXME : Probably not the most efficient way to do this
             epoch_to_remove = sorted_stats[nb_epoch_to_keep:]
 
