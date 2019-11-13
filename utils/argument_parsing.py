@@ -2,6 +2,7 @@ from datetime import datetime
 from utils.generic import is_date_string
 import os
 
+
 # Argument handling
 def get_args_task_flags_paths(args):
     validate_arguments(args)
