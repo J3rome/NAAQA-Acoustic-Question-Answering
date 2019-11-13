@@ -21,10 +21,15 @@ def sort_stats_by_time(stats, reverse=False):
 
 
 def chain_load_experiment_stats(output_experiment_dated_folder, continue_training=False, film_model_weight_path=None,
-                                stats_filename="stats.json", arguments_filename="arguments.json"):
+                                cast_to_float=False, stats_filename="stats.json", arguments_filename="arguments.json"):
     stats_file_path = f"{output_experiment_dated_folder}/{stats_filename}"
     if os.path.isfile(stats_file_path):
         stats = sort_stats_by_time(read_json(stats_file_path))
+        if cast_to_float:
+            for s in stats:
+                for key in s.keys():
+                    if 'epoch' not in key and 'time' not in key:
+                        s[key] = float(s[key])
     else:
         stats = []
 
