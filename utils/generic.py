@@ -86,8 +86,7 @@ def save_training_stats(stats_output_file, epoch_nb, train_accuracy, train_loss,
 
     stats = sort_stats(stats)
 
-    with open(stats_output_file, 'w') as f:
-        ujson.dump(stats, f, indent=2, sort_keys=True)
+    save_json(stats, stats_output_file, sort_keys=True)
 
     return stats
 
