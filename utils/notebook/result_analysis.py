@@ -25,39 +25,6 @@ def load_experiment_predictions(experiment_output_path, epoch_folder='best', set
     return predictions
 
 
-def load_experiment_stats(experiment_output_path, set_type='val', sorted_by_time=True, only_epoch=None):
-    full_stats = read_json(experiment_output_path, 'stats.json')
-
-    if only_epoch:
-        if only_epoch == 'best':
-            stats = [full_stats[0]]
-        else:
-            epoch_folder = format_epoch_folder(only_epoch)
-
-            stats = [s for s in full_stats if s['epoch'] == epoch_folder]
-    else:
-        stats = full_stats
-        if sorted_by_time:
-            stats = sorted(stats, key=lambda s: int(s['epoch'].split('_')[1]))
-
-    stats = [{'epoch': s['epoch'],
-              'acc': s[f'{set_type}_acc'],
-              'loss': s[f'{set_type}_loss']
-              } for s in stats]
-
-    return stats
-
-
-def load_chained_experiment_stats(experiment_output_path, set_type='val', stats_filename="stats.json",
-                                  args_filename="arguments.json"):
-    stats = read_json(experiment_output_path, stats_filename)
-    stats = sorted(stats, key=lambda s: int(s['epoch'].split('_')[1]))
-    arguments = read_json(experiment_output_path, args_filename)
-
-    if arguments['continue_training']:
-        print("YOLO")
-
-
 def sort_correct_incorrect_predictions(predictions):
     correct_predictions = []
     correct_family_predictions = []
