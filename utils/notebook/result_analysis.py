@@ -45,6 +45,29 @@ def sort_correct_incorrect_predictions(predictions):
     }
 
 
+def plot_acc_loss_by_epoch(epoch_stats_per_set, show_fig=False, fig_ax=None):
+
+    if fig_ax:
+        fig, axs = fig_ax
+    else:
+        fig, axs = plt.subplots(2, 1)
+
+    axs[0].set_title("Accuracy by Epoch")
+    axs[1].set_title("Loss by Epoch")
+
+    for set_type, epoch_stats in epoch_stats_per_set.items():
+        axs[0].plot([s['acc'] for s in epoch_stats], label=f"{set_type.capitalize()} Accuracy")
+        axs[1].plot([s['loss'] for s in epoch_stats], label=f"{set_type.capitalize()} Loss")
+
+    axs[0].legend()
+    axs[1].legend()
+
+    fig.tight_layout()
+
+    if show_fig:
+        fig.show()
+
+
 def plot_predictions_distribution_per_question_family(train_predictions, val_predictions, all_x_labels=None, norm_hist=False,
                                           show_fig=False):
     keys_titles = [('correct', 'Correct Answer'),

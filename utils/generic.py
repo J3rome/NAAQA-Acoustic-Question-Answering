@@ -18,6 +18,29 @@ def sort_stats_by_time(stats, reverse=False):
     return sorted(stats, key=lambda s: int(s['epoch'].split('_')[1]), reverse=reverse)
 
 
+def separate_stats_by_set(stats, set_types=['train, val']):
+    all_set_stats = tuple()
+    for set_type in set_types:
+        acc_key = f'{set_type}_acc'
+        loss_key = f'{set_type}_loss'
+        if acc_key in stats[0]:
+            set_stats = [
+                {
+                    'epoch': s['epoch'],
+                    'acc': s[acc_key],
+                    'loss': s[loss_key]
+                }
+                for s in stats
+            ]
+
+            all_set_stats += (set_stats,)
+        else:
+            # Requested set is not in stats
+            continue
+
+    return all_set_stats
+
+
 def chain_load_experiment_stats(output_experiment_dated_folder, continue_training=False, film_model_weight_path=None,
                                 cast_to_float=False, stats_filename="stats.json", arguments_filename="arguments.json"):
     stats_file_path = f"{output_experiment_dated_folder}/{stats_filename}"
