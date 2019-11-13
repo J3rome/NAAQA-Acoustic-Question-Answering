@@ -65,6 +65,31 @@ def chain_load_experiment_stats(output_experiment_dated_folder, continue_trainin
     return stats
 
 
+# FIXME : When continuing training, we won't have the previous batch metrics. We should chain load them before run (Similar to stats chain loading)
+def save_batch_metrics(epoch, train_metrics, val_metrics, output_dated_folder, filename="batch_metrics.json"):
+
+    filepath = f"{output_dated_folder}/{filename}"
+
+    if os.path.isfile(filepath):
+        metrics = read_json(filepath)
+    else:
+        metrics = []
+
+    for batch_idx, (train_metric, val_metric) in enumerate(zip(train_metrics, val_metrics)):
+        metrics.append({
+            'epoch': epoch,
+            'batch_idx': batch_idx,
+            'train_lr': train_metric[0],
+            'train_loss': train_metric[1],
+            'train_acc': train_metric[2],
+            'val_lr': val_metric[0],
+            'val_loss': val_metric[1],
+            'val_acc': val_metric[2]
+        })
+
+    save_json(metrics, filepath, sort_keys=True)
+
+
 def save_training_stats(stats_output_file, epoch_nb, train_accuracy, train_loss, val_accuracy,
                         val_loss, epoch_train_time):
     """

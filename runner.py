@@ -10,7 +10,7 @@ from torch.optim.lr_scheduler import CyclicLR
 
 from models.CLEAR_film_model import CLEAR_FiLM_model
 from models.metrics import calc_f1_score
-from utils.generic import is_date_string, sort_stats, save_training_stats, chain_load_experiment_stats
+from utils.generic import save_batch_metrics, sort_stats, save_training_stats, chain_load_experiment_stats
 from utils.random import get_random_state, set_random_state
 from utils.processing import process_predictions, process_gamma_beta
 from utils.file import create_folder_if_necessary, save_json, save_gamma_beta_h5
@@ -143,6 +143,9 @@ def process_dataloader(is_training, device, model, dataloader, criterion=None, o
     batch_size = dataloader.batch_size
     running_loss = 0.0
     running_corrects = 0
+    batch_losses = []
+    batch_accs = []
+    batch_lrs = []
 
     processed_predictions = []
     processed_gammas_betas = []
@@ -170,11 +173,18 @@ def process_dataloader(is_training, device, model, dataloader, criterion=None, o
             _, preds = torch.max(outputs, 1)
             if criterion:
                 loss = criterion(outputs, answers)
+                loss_value = loss.item()
+                batch_losses.append(loss_value)
+                running_loss += loss_value * dataloader.batch_size
+                correct_in_batch = torch.sum(preds == answers.data).item()
+                running_corrects += correct_in_batch
+                batch_accs.append(correct_in_batch/batch_size)
 
             if is_training:
                 # backward + optimize only if in training phase
                 loss.backward()
                 optimizer.step()
+                batch_lrs.append(optimizer.param_groups[0]['lr'])
 
                 if scheduler:
                     scheduler.step()
@@ -204,11 +214,6 @@ def process_dataloader(is_training, device, model, dataloader, criterion=None, o
                                                  nb_vals=dataset_size, start_idx=nb_written)
                 processed_gammas_betas = []
 
-        # statistics
-        if criterion:
-            running_loss += loss.item() * dataloader.batch_size
-        running_corrects += torch.sum(preds == answers.data).item()
-
     nb_left_to_write = len(processed_gammas_betas)
     if gamma_beta_path is not None and nb_left_to_write > 0:
         save_gamma_beta_h5(processed_gammas_betas, dataloader.dataset.set, gamma_beta_path, nb_vals=dataset_size,
@@ -233,7 +238,11 @@ def process_dataloader(is_training, device, model, dataloader, criterion=None, o
         tensorboard['writer'].add_scalar('Results/Loss', epoch_loss, global_step=epoch_id)
         tensorboard['writer'].add_scalar('Results/Accuracy', epoch_acc, global_step=epoch_id)
 
-    return epoch_loss, epoch_acc, processed_predictions
+    if len(batch_lrs) == 0:
+        # We don't save any lr when we are not training. Set to 0
+        batch_lrs = [0] * len(batch_losses)
+
+    return epoch_loss, epoch_acc, processed_predictions, zip(batch_lrs, batch_losses, batch_accs)
 
 
 def train_model(device, model, dataloaders, output_folder, criterion, optimizer, scheduler=None,
@@ -281,23 +290,27 @@ def train_model(device, model, dataloaders, output_folder, criterion, optimizer,
 
         epoch_time = datetime.now()
         tensorboard_per_set['writer'] = tensorboard['writers']['train']
-        train_loss, train_acc, train_predictions = process_dataloader(True, device, model,
-                                                                      dataloaders['train'],
-                                                                      criterion, optimizer, scheduler=scheduler,
-                                                                      epoch_id=epoch, tensorboard=tensorboard_per_set,
-                                                                      gamma_beta_path="%s/train_gamma_beta.h5" % epoch_output_folder_path)
+        train_loss, train_acc, train_predictions, train_metrics = process_dataloader(True, device, model,
+                                                                                        dataloaders['train'],
+                                                                                        criterion, optimizer,
+                                                                                        scheduler=scheduler,
+                                                                                        epoch_id=epoch,
+                                                                                        tensorboard=tensorboard_per_set,
+                                                                                        gamma_beta_path="%s/train_gamma_beta.h5" % epoch_output_folder_path)
         epoch_train_time = datetime.now() - epoch_time
 
         print('\n{} Loss: {:.4f} Acc: {:.4f}'.format('Train', train_loss, train_acc))
 
         tensorboard_per_set['writer'] = tensorboard['writers']['val']
-        val_loss, val_acc, val_predictions = process_dataloader(False, device, model,
-                                                                dataloaders['val'], criterion,
-                                                                epoch_id=epoch, tensorboard=tensorboard_per_set,
-                                                                gamma_beta_path="%s/val_gamma_beta.h5" % epoch_output_folder_path)
+        val_loss, val_acc, val_predictions, val_metrics = process_dataloader(False, device, model,
+                                                                                dataloaders['val'], criterion,
+                                                                                epoch_id=epoch,
+                                                                                tensorboard=tensorboard_per_set,
+                                                                                gamma_beta_path="%s/val_gamma_beta.h5" % epoch_output_folder_path)
         print('\n{} Loss: {:.4f} Acc: {:.4f}'.format('Val', val_loss, val_acc))
 
         stats = save_training_stats(stats_file_path, epoch, train_acc, train_loss, val_acc, val_loss, epoch_train_time)
+        save_batch_metrics(epoch, train_metrics, val_metrics, output_folder, filename="batch_metrics.json")
 
         save_json(train_predictions, epoch_output_folder_path, filename="train_predictions.json")
         save_json(val_predictions, epoch_output_folder_path, filename="val_predictions.json")
