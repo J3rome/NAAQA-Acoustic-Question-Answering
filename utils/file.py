@@ -7,7 +7,7 @@ import h5py
 import ujson
 
 
-def save_json(results, output_folder, filename=None, indented=True):
+def save_json(results, output_folder, filename=None, indented=True, sort_keys=False):
     if filename is None:
         # First parameter is full path
         path = output_folder
@@ -15,7 +15,7 @@ def save_json(results, output_folder, filename=None, indented=True):
         path = '%s/%s' % (output_folder, filename)
 
     with open(path, 'w') as f:
-        ujson.dump(results, f, indent=2 if indented else None, escape_forward_slashes=False)
+        ujson.dump(results, f, sort_keys=sort_keys, indent=2 if indented else None, escape_forward_slashes=False)
 
 
 def read_json(folder, filename=None):
