@@ -46,6 +46,8 @@ def chain_load_experiment_stats(output_experiment_dated_folder, continue_trainin
         else:
             model_path = film_model_weight_path
 
+        # FIXME : We have to be running from the same CWD for this to work.
+        # TODO : Find "output" folder and create absolute path from it
         continued_experiment_path = '/'.join(model_path.split('/')[:-2])
 
         continued_experiment_stats = chain_load_experiment_stats(continued_experiment_path,
