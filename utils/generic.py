@@ -2,9 +2,7 @@ import re
 import os
 import signal
 
-import ujson
-
-from utils.file import read_json
+from utils.file import read_json, save_json
 from utils.logging import close_tensorboard_writers
 
 
