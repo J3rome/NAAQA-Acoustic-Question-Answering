@@ -1,3 +1,4 @@
+import os
 import shutil
 from datetime import datetime
 
@@ -9,7 +10,7 @@ from torch.optim.lr_scheduler import CyclicLR
 
 from models.CLEAR_film_model import CLEAR_FiLM_model
 from models.metrics import calc_f1_score
-from utils.generic import is_date_string, sort_stats, save_training_stats
+from utils.generic import is_date_string, sort_stats, save_training_stats, chain_load_experiment_stats
 from utils.random import get_random_state, set_random_state
 from utils.processing import process_predictions, process_gamma_beta
 from utils.file import create_folder_if_necessary, save_json, save_gamma_beta_h5
@@ -106,6 +107,12 @@ def prepare_model(args, flags, paths, dataloaders, device, model_config, input_i
 
         if scheduler and 'scheduler_state_dict' in checkpoint:
             scheduler.load_state_dict(checkpoint['scheduler_state_dict'])
+
+    if args['continue_training']:
+        # Recover stats from previous run
+        stats = chain_load_experiment_stats(paths['output_dated_folder'], continue_training=True,
+                                            film_model_weight_path=args['film_model_weight_path'])
+        save_json(stats, paths['output_dated_folder'], 'stats.json')
 
     if device != 'cpu':
         if args['perf_over_determinist']:
@@ -316,10 +323,15 @@ def train_model(device, model, dataloaders, output_folder, criterion, optimizer,
             epoch_to_remove = sorted_stats[nb_epoch_to_keep:]
 
             for epoch_stat in epoch_to_remove:
-                if epoch_stat['epoch'] not in removed_epoch:
-                    removed_epoch.append(epoch_stat['epoch'])
+                to_remove_path = "%s/%s" % (output_folder, epoch_stat['epoch'])
+                if os.path.exists(to_remove_path):
+                    if epoch_stat['epoch'] not in removed_epoch:
+                        removed_epoch.append(epoch_stat['epoch'])
 
-                    shutil.rmtree("%s/%s" % (output_folder, epoch_stat['epoch']))
+                        shutil.rmtree(to_remove_path)
+                else:
+                    # Add epoch from previous experiments to the "removed" list so we don't try to remove them
+                    removed_epoch.append(epoch_stat['epoch'])
 
         print("Epoch took %s" % str(datetime.now() - epoch_time))
 

@@ -16,14 +16,57 @@ def sort_stats(stats, reverse=False):
     return sorted(stats, key=lambda e: float(e['val_loss']), reverse=reverse)
 
 
+def sort_stats_by_time(stats, reverse=False):
+    return sorted(stats, key=lambda s: int(s['epoch'].split('_')[1]), reverse=reverse)
+
+
+def chain_load_experiment_stats(output_experiment_dated_folder, continue_training=False, film_model_weight_path=None,
+                                stats_filename="stats.json", arguments_filename="arguments.json"):
+    stats_file_path = f"{output_experiment_dated_folder}/{stats_filename}"
+    if os.path.isfile(stats_file_path):
+        stats = sort_stats_by_time(read_json(stats_file_path))
+    else:
+        stats = []
+
+    if film_model_weight_path is None:
+        # Read path to model weight in arguments json file
+        arguments = read_json(output_experiment_dated_folder, arguments_filename)
+
+        continue_training = arguments['continue_training']
+        film_model_weight_path = arguments['film_model_weight_path']
+
+    if continue_training:
+
+        if film_model_weight_path == "latest":
+            # Path for fallback with old behaviour
+            model_path = read_json(output_experiment_dated_folder, 'restored_from.json')['restored_film_weight_path']
+        else:
+            model_path = film_model_weight_path
+
+        continued_experiment_path = '/'.join(model_path.split('/')[:-2])
+
+        continued_experiment_stats = chain_load_experiment_stats(continued_experiment_path,
+                                                                 continue_training=continue_training,
+                                                                 film_model_weight_path=None,
+                                                                 stats_filename=stats_filename)
+
+        if len(stats) > 0:
+            start_epoch = int(stats[0]['epoch'].split("_")[1])
+            continued_experiment_stats = [s for s in continued_experiment_stats if
+                                          int(s['epoch'].split('_')[1]) < start_epoch]
+
+        stats = continued_experiment_stats + stats
+
+    return stats
+
+
 def save_training_stats(stats_output_file, epoch_nb, train_accuracy, train_loss, val_accuracy,
                         val_loss, epoch_train_time):
     """
     Will read the stats file from disk and append new epoch stats (Will create the file if not present)
     """
     if os.path.isfile(stats_output_file):
-        with open(stats_output_file, 'r') as f:
-            stats = ujson.load(f)
+        stats = read_json(stats_output_file)
     else:
         stats = []
 

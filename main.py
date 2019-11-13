@@ -15,7 +15,8 @@ from data_interfaces.CLEAR_dataset import CLEAR_dataset, CLEAR_collate_fct
 from data_interfaces.transforms import ToTensor, ImgBetweenZeroOne, ResizeImgBasedOnHeight, ResizeImgBasedOnWidth
 from data_interfaces.transforms import PadTensor, NormalizeSample, ResizeTensor
 
-from utils.file import save_model_config, save_json, read_json, create_symlink_to_latest_folder, create_folders_save_args
+from utils.file import save_model_config, save_json, read_json, create_symlink_to_latest_folder
+from utils.file import create_folders_save_args, fix_best_epoch_symlink_if_necessary
 from utils.random import set_random_seed
 from utils.argument_parsing import get_args_task_flags_paths, get_feature_extractor_config_from_args
 from utils.logging import create_tensorboard_writers, close_tensorboard_writers
@@ -358,12 +359,15 @@ def main(args):
     ####################################
     #   Exit
     ####################################
-    on_exit_action(flags, paths, tensorboard)
+    on_exit_action(args, flags, paths, tensorboard)
 
 
-def on_exit_action(flags, paths, tensorboard):
+def on_exit_action(args, flags, paths, tensorboard):
     if flags['use_tensorboard']:
         close_tensorboard_writers(tensorboard['writers'])
+
+    if args['continue_training']:
+        fix_best_epoch_symlink_if_necessary(paths['output_dated_folder'], args['film_model_weight_path'])
 
     time_elapsed = str(datetime.now() - paths["current_datetime"])
 

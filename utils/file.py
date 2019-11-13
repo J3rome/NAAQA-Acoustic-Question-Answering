@@ -156,6 +156,17 @@ def create_symlink_to_latest_folder(experiment_folder, dated_folder_name, symlin
     subprocess.run('cd %s && ln -s %s %s' % (experiment_folder, dated_folder_name, symlink_name), shell=True)
 
 
+def fix_best_epoch_symlink_if_necessary(output_dated_folder, film_model_weight_path):
+    best_epoch_symlink_path = f"{output_dated_folder}/best"
+    best_epoch_symlink_value = os.readlink(best_epoch_symlink_path)
+    full_linked_path = f"{output_dated_folder}/{best_epoch_symlink_value}"
+    if not os.path.exists(full_linked_path):
+        # 'best' epoch symlink is broken. This will only happen if we --continue_training
+        # and we can't beat the val loss of the last experiment
+        previous_experiment_date = film_model_weight_path.split('/')[-3]
+        subprocess.run(f"ln -snf ../{previous_experiment_date}/best {best_epoch_symlink_path}", shell=True)
+
+
 def save_git_revision(output_folder, filename='git.revision'):
     output_path = '%s/%s' % (output_folder, filename)
 
