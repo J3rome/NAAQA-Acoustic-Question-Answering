@@ -220,6 +220,9 @@ class CLEAR_dataset(Dataset):
             'scene_id': image.id
         }
 
+        if 'program' in requested_game:
+            game_with_image['program'] = requested_game['program']
+
         if self.transforms:
             game_with_image = self.transforms(game_with_image)
 

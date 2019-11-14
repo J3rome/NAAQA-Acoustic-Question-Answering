@@ -16,13 +16,18 @@ class ToTensor(object):
         # numpy image: H x W x C
         # torch image: C X H X W
         image = np.array(sample['image']).transpose((2, 0, 1))      # FIXME : Transpose in pytorch
-        return {
+        to_return = {
             'image': torch.from_numpy(image).float(),
             'question': torch.from_numpy(sample['question']).int(),
             'answer': torch.from_numpy(sample['answer']),
             'id': sample['id'],             # Not processed by the network, no need to transform to tensor.. Seems to be transfered to tensor in collate function anyways
             'scene_id': sample['scene_id']  # Not processed by the network, no need to transform to tensor
         }
+
+        if 'program' in sample:
+            to_return['program'] = sample['program']    # Not processed by the network, no need to transform to tensor
+
+        return to_return
 
 
 class ImgBetweenZeroOne(object):
