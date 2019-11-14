@@ -35,6 +35,8 @@ parser.add_argument("--random_answer_baseline", help="Spit out a random answer f
 parser.add_argument("--random_weight_baseline", help="Use randomly initialised Neural Network to answer the question",
                     action='store_true')
 parser.add_argument("--lr_finder", help="Create LR Finder plot", action='store_true')
+parser.add_argument("--notebook_data_analysis", help="Will prepare dataloaders for analysis in notebook "
+                                                     "(Should not be run via main.py)", action='store_true')
 parser.add_argument("--write_clear_mean_to_config", help="Will calculate the mean and std of the dataset and write it "
                                                          "to the config file", action='store_true')
 
@@ -277,6 +279,9 @@ def execute_task(task, args, output_dated_folder, dataloaders, model, model_conf
     elif task == 'random_weight_baseline':
         random_weight_baseline(model, device, dataloaders['train'], output_dated_folder)
         random_weight_baseline(model, device, dataloaders['val'], output_dated_folder)
+
+    assert not task.startswith('notebook'), "Task not meant to be run from main.py. " \
+                                            "Used to prepare dataloaders & model for analysis in notebook"
 
 
 def prepare_for_task(args):

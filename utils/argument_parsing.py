@@ -18,12 +18,13 @@ def validate_arguments(args):
     mutually_exclusive_params = [args['training'], args['inference'], args['feature_extract'], args['create_dict'],
                                  args['visualize_gamma_beta'], args['visualize_grad_cam'], args['lr_finder'],
                                  args['write_clear_mean_to_config'], args['random_answer_baseline'],
-                                 args['random_weight_baseline'], args['prepare_images']]
+                                 args['random_weight_baseline'], args['prepare_images'], args['notebook_data_analysis']]
 
     assert sum(mutually_exclusive_params) == 1, \
         "[ERROR] Can only do one task at a time " \
         "(--training, --inference, --visualize_gamma_beta, --create_dict, --feature_extract --visualize_grad_cam " \
-        "--prepare_images, --lr_finder, --write_clear_mean_to_config, --random_answer_baseline, --random_weight_baseline)"
+        "--prepare_images, --lr_finder, --write_clear_mean_to_config, --random_answer_baseline, " \
+        "--random_weight_baseline, --notebook_data_analysis)"
 
     mutually_exclusive_params = [args['raw_img_resize_based_on_height'], args['raw_img_resize_based_on_width']]
     assert sum(mutually_exclusive_params) < 2, "[ERROR] Image resize can be either --raw_img_resize_based_on_height " \
@@ -39,15 +40,19 @@ def validate_arguments(args):
 def create_flags_from_args(task, args):
     flags = {}
 
-    flags['restore_model_weights'] = args['inference'] or args['continue_training'] or args['visualize_grad_cam']
-    flags['create_output_folder'] = not args['create_dict'] and not args['feature_extract'] and not args[
-        'write_clear_mean_to_config']
+    flags['restore_model_weights'] = task in ['inference', 'visualize_grad_cam'] or args['continue_training']
     flags['use_tensorboard'] = 'train' in task
-    flags['create_loss_criterion'] = args['training'] or args['lr_finder']
-    flags['create_optimizer'] = args['training'] or args['lr_finder']
-    flags['force_sgd_optimizer'] = args['lr_finder'] or args['cyclical_lr']
-    flags['instantiate_model'] = not args['create_dict'] and not args['write_clear_mean_to_config'] and \
-                                 'gamma_beta' not in task and 'random_answer' not in task and not args['prepare_images']
+    flags['create_loss_criterion'] = task in ['training', 'lr_finder']
+    flags['create_optimizer'] = task in ['training', 'lr_finder']
+    flags['force_sgd_optimizer'] = task == 'lr_finder' or args['cyclical_lr']
+    flags['create_output_folder'] = task not in ['create_dict', 'feature_extract',
+                                                 'write_clear_mean_to_config'] and not task.startswith('notebook')
+    flags['instantiate_model'] = task in ['training',
+                                          'inference',
+                                          'visualize_grad_cam',
+                                          'feature_extract',
+                                          'lr_finder',
+                                          'random_weight_baseline']
 
     return flags
 
@@ -69,7 +74,7 @@ def get_paths_from_args(task, args):
 def get_task_from_args(args):
     tasks = ['training', 'inference', 'visualize_gamma_beta', 'visualize_grad_cam', 'feature_extract', 'prepare_images',
              'create_dict', 'lr_finder', 'write_clear_mean_to_config', 'random_weight_baseline',
-             'random_answer_baseline']
+             'random_answer_baseline', 'notebook_data_analysis']
 
     for task in tasks:
         if task in args and args[task]:
