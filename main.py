@@ -383,7 +383,7 @@ def on_exit_action(args, flags, paths, tensorboard):
 
 
 def parse_args_string(string):
-    return parser.parse_args(string)
+    return vars(parser.parse_args(string.strip().split(' ')))
 
 
 # FIXME : Args is a namespace so it is available everywhere. Not a great idea to shadow it (But we get a dict key error if we try to access it so it is easiy catchable
