@@ -163,24 +163,24 @@ def get_transforms_from_args(args, preprocessing_config):
 
 
 # Data loading & preparation
-def create_datasets(args, preprocessing_config):
+def create_datasets(args, preprocessing_config, load_question_program=False):
     print("Creating Datasets")
     transforms_to_apply = get_transforms_from_args(args, preprocessing_config)
 
     datasets = {
         'train': CLEAR_dataset(args['data_root_path'], args['version_name'], args['input_image_type'], 'train',
                                dict_file_path=args['dict_file_path'], transforms=transforms_to_apply,
-                               tokenize_text=not args['create_dict'],
+                               tokenize_text=not args['create_dict'], load_question_program=load_question_program,
                                preprocessed_folder_name=args['preprocessed_folder_name']),
 
         'val': CLEAR_dataset(args['data_root_path'], args['version_name'], args['input_image_type'], 'val',
                              dict_file_path=args['dict_file_path'], transforms=transforms_to_apply,
-                             tokenize_text=not args['create_dict'],
+                             tokenize_text=not args['create_dict'], load_question_program=load_question_program,
                              preprocessed_folder_name=args['preprocessed_folder_name']),
 
         'test': CLEAR_dataset(args['data_root_path'], args['version_name'], args['input_image_type'], 'test',
                               dict_file_path=args['dict_file_path'], transforms=transforms_to_apply,
-                              tokenize_text=not args['create_dict'],
+                              tokenize_text=not args['create_dict'], load_question_program=load_question_program,
                               preprocessed_folder_name=args['preprocessed_folder_name'])
     }
 
@@ -315,7 +315,7 @@ def prepare_for_task(args):
     ####################################
     #   Dataloading
     ####################################
-    datasets = create_datasets(args, film_model_config['preprocessing'])
+    datasets = create_datasets(args, film_model_config['preprocessing'], flags['load_question_program'])
     dataloaders = create_dataloaders(datasets, args['batch_size'], nb_process=8)
 
     ####################################

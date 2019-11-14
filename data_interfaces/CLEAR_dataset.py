@@ -22,8 +22,9 @@ import re
 
 class CLEAR_dataset(Dataset):
 
-    def __init__(self, folder, version_name, input_image_type, set_type, questions=None,
-                 preprocessed_folder_name="preprocessed", transforms=None, dict_file_path=None, tokenize_text=True):
+    def __init__(self, folder, version_name, input_image_type, set_type, questions=None, transforms=None,
+                 dict_file_path=None, load_question_program=False, preprocessed_folder_name="preprocessed",
+                 tokenize_text=True):
 
         self.root_folder_path = "%s/%s" % (folder, version_name)
         self.version_name = version_name
@@ -85,12 +86,17 @@ class CLEAR_dataset(Dataset):
                 # Backward compatibility with older CLEVR format
                 image_filename = sample["image_filename"].replace('AQA_', 'CLEAR_')
 
-            self.games[i] = self.prepare_game({
+            game = {
                 'id': question_id,
                 'image': {'id': image_id, 'filename': image_filename, 'set': self.set},
                 'question': question,
                 'answer': answer
-            })
+            }
+
+            if load_question_program:
+                game['program'] = sample['program'] if 'program' in sample else []
+
+            self.games[i] = self.prepare_game(game)
 
             if image_id not in self.scenes:
                 self.scenes[image_id] = {
