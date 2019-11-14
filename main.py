@@ -210,19 +210,19 @@ def create_datasets(args, preprocessing_config):
     return datasets
 
 
-def create_dataloaders(args, datasets, nb_process=8):
+def create_dataloaders(datasets, batch_size, nb_process=8):
     print("Creating Dataloaders")
     collate_fct = CLEAR_collate_fct(padding_token=datasets['train'].get_padding_token())
 
     # FIXME : Should take into account --nb_process, or at least the nb of core on the machine
     return {
-        'train': DataLoader(datasets['train'], batch_size=args['batch_size'], shuffle=True,
+        'train': DataLoader(datasets['train'], batch_size=batch_size, shuffle=True,
                             num_workers=4, collate_fn=collate_fct),
 
-        'val': DataLoader(datasets['val'], batch_size=args['batch_size'], shuffle=True,
+        'val': DataLoader(datasets['val'], batch_size=batch_size, shuffle=True,
                           num_workers=4, collate_fn=collate_fct),
 
-        'test': DataLoader(datasets['test'], batch_size=args['batch_size'], shuffle=False,
+        'test': DataLoader(datasets['test'], batch_size=batch_size, shuffle=False,
                            num_workers=4, collate_fn=collate_fct)
     }
 
@@ -311,7 +311,7 @@ def prepare_for_task(args):
     #   Dataloading
     ####################################
     datasets = create_datasets(args, film_model_config['preprocessing'])
-    dataloaders = create_dataloaders(args, datasets, nb_process=8)
+    dataloaders = create_dataloaders(datasets, args['batch_size'], nb_process=8)
 
     ####################################
     #   Model Definition
