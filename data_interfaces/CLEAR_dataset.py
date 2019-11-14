@@ -349,6 +349,9 @@ class CLEARTokenizer:
         if remove_padding:
             tokens = [tok for tok in tokens if tok != self.padding_token]
 
+        if self.start_token:
+            tokens = tokens[1:-1]
+
         return ' '.join([self.i2word[tok] for tok in tokens])
 
     def encode_answer(self, answer, to_lowercase=True):
