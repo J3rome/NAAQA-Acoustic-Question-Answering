@@ -30,7 +30,7 @@ def plot_discrete_hist(data, key=None, title=None, legend_label=None, sort_key_f
         total = sum(counts)
         counts = [count/total for count in counts]
 
-    if capitalize:
+    if capitalize and type(labels[0]) == 'str':
         labels = [l.capitalize() for l in labels]
 
     if fig_ax:
