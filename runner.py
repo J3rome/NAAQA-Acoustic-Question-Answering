@@ -11,6 +11,7 @@ from torch.optim.lr_scheduler import CyclicLR
 from models.CLEAR_film_model import CLEAR_FiLM_model
 from models.metrics import calc_f1_score
 from utils.generic import save_batch_metrics, sort_stats, save_training_stats, chain_load_experiment_stats
+from utils.generic import optimizer_load_state_dict
 from utils.random import get_random_state, set_random_state
 from utils.processing import process_predictions, process_gamma_beta
 from utils.file import create_folder_if_necessary, save_json, save_gamma_beta_h5
@@ -103,7 +104,7 @@ def prepare_model(args, flags, paths, dataloaders, device, model_config, input_i
         film_model.load_state_dict(checkpoint['model_state_dict'], strict=False)
 
         if optimizer and "optimizer_state_dict" in checkpoint:
-            optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+            optimizer_load_state_dict(optimizer, checkpoint['optimizer_state_dict'], device)
 
         if scheduler and 'scheduler_state_dict' in checkpoint:
             scheduler.load_state_dict(checkpoint['scheduler_state_dict'])

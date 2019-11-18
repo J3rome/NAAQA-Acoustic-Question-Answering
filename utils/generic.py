@@ -2,6 +2,8 @@ import re
 import os
 import signal
 
+import torch
+
 from utils.file import read_json, save_json
 from utils.logging import close_tensorboard_writers
 
@@ -158,6 +160,18 @@ def get_answer_to_family_map(attributes_filepath, to_lowercase=True, reduced_tex
                 answer_to_family[the_answer] = family
 
     return answer_to_family
+
+
+def optimizer_load_state_dict(optimizer, state_dict, device):
+    """
+    Load optimizer state_dict and send everything to specified device (https://github.com/pytorch/pytorch/issues/2830)
+    """
+    optimizer.load_state_dict(state_dict)
+
+    for state in optimizer.state.values():
+        for k, v in state.items():
+            if torch.is_tensor(v):
+                state[k] = v.to(device)
 
 
 # FIXME: Not working, cause error with dataloader if using exit, called multiple time (Multiple threads receive the signal)
