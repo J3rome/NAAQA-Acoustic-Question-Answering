@@ -112,7 +112,7 @@ def prepare_model(args, flags, paths, dataloaders, device, model_config, input_i
         # Recover stats from previous run
         stats = chain_load_experiment_stats(paths['output_dated_folder'], continue_training=True,
                                             film_model_weight_path=args['film_model_weight_path'])
-        save_json(stats, paths['output_dated_folder'], 'stats.json')
+        save_json(sort_stats(stats), paths['output_dated_folder'], 'stats.json')
 
     if device != 'cpu':
         if args['perf_over_determinist']:
