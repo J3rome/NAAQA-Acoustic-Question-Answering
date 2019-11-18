@@ -102,6 +102,8 @@ def plot_hist(predictions, key=None, filter_fct=None, title=None, label=None, no
     if show_fig:
         plt.show()
 
+    return fig, ax
+
 
 def plot_2d_matrix(matrix, xlabels, ylabels=None, title=None, xaxis_name='predictions', yaxis_name="ground truth",
                    show_fig=True, colormap=plt.cm.Blues, add_annotations=True, normalize=False):
