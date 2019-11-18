@@ -13,7 +13,7 @@
     <option name="ADD_SOURCE_ROOTS" value="true" />
     <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
     <option name="SCRIPT_NAME" value="main.py" />
-    <option name="PARAMETERS" value="--training --nb_epoch 5 --nb_epoch_stats_to_keep 2 --version_name v3_fixed_0.50k_40_inst_1024_win_50_overlap --config_path config/film_raw.json --batch_size 16 --random_seed 667 --dict_folder questions --resize_to_square_images --pad_to_largest_image --raw_img_resize_based_on_width" />
+    <option name="PARAMETERS" value="--training --nb_epoch 3 --nb_epoch_stats_to_keep 1 --version_name v3_fixed_0.50k_40_inst_1024_win_50_overlap --config_path config/film_reduced.json --batch_size 4 --random_seed 667 --dict_folder questions --resize_to_square_images --pad_to_largest_image --raw_img_resize_based_on_width --output_name_suffix trouttt --no_feature_extractor --normalize_with_clear_stats --f1_score --cyclical_lr" />
     <option name="SHOW_COMMAND_LINE" value="false" />
     <option name="EMULATE_TERMINAL" value="false" />
     <option name="MODULE_MODE" value="false" />
