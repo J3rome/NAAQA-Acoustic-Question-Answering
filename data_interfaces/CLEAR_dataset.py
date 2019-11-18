@@ -44,6 +44,7 @@ class CLEAR_dataset(Dataset):
         self.all_image_sizes = None
 
         self.answer_to_family = get_answer_to_family_map('%s/%s' % (self.root_folder_path, 'attributes.json'))
+        self.answer_families = list(set(self.answer_to_family.values()))
 
         # Questions can either be read from file or provided as an array
         if questions is None:

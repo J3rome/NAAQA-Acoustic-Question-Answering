@@ -13,7 +13,7 @@
     <option name="ADD_SOURCE_ROOTS" value="true" />
     <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
     <option name="SCRIPT_NAME" value="main.py" />
-    <option name="PARAMETERS" value="--inference --version_name v2.0.0_1k_scenes_1_inst_per_scene --config_path config/film_raw.json --batch_size 32 --random_seed 667 --film_model_weight_path latest" />
+    <option name="PARAMETERS" value="--inference --version_name v3_fixed_0.50k_40_inst_1024_win_50_overlap --config_path config/film_raw.json --batch_size 4 --random_seed 667 --dict_folder questions --resize_to_square_images --pad_to_largest_image --raw_img_resize_based_on_width --film_model_weight_path output/train_film/v3_fixed_0.50k_40_inst_1024_win_50_overlap_trouttt/latest/best/model.pt.tar" />
     <option name="SHOW_COMMAND_LINE" value="false" />
     <option name="EMULATE_TERMINAL" value="false" />
     <option name="MODULE_MODE" value="false" />

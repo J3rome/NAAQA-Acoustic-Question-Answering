@@ -3,9 +3,10 @@ from collections import defaultdict
 import matplotlib.pyplot as plt
 import numpy as np
 
-from utils.notebook.plot import plot_2d_matrix, plot_discrete_hist
+from utils.notebook.plot import plot_2d_matrix, plot_discrete_hist, plot_hist
 
 
+# Scene analysis
 def scene_object_per_position(scenes, attribute='instrument', max_scene_length=None, attribute_processing=None):
     if max_scene_length is None:
         # Assume fixed scenes. We could also rerieve the max scene length
@@ -73,4 +74,68 @@ def plot_scene_distribution_per_attribute(scenes, attribute_name, title=None, le
     fig_ax = plot_discrete_hist(attribute_list, title=title,
                                 fig_ax=fig_ax, legend_label=legend_label, norm_hist=norm_hist, show_fig=show_fig)
 
+    fig_ax[0].tight_layout()
+
+    return fig_ax
+
+
+def plot_scene_duration_hist(scenes, title=None, legend_label=None, fig_ax=None, norm_hist=False, show_fig=False):
+    durations = []
+
+    for scene_info in scenes:
+        scene = scene_info['definition']
+        durations.append(
+            scene['silence_before'] + sum(obj['duration'] + obj['silence_after'] for obj in scene['objects']))
+
+        if title is None:
+            title = "Scene durations"
+
+    fig_ax = plot_discrete_hist(durations, title=title, fig_ax=fig_ax, legend_label=legend_label, norm_hist=norm_hist,
+                                show_fig=show_fig)
+
+    fig_ax[0].tight_layout()
+
+    return fig_ax
+
+
+def plot_scene_total_silence_distribution(scenes, title=None, legend_label=None, fig_ax=None, norm_hist=False,
+                                          show_fig=False):
+    silences = []
+
+    for scene_info in scenes:
+        scene = scene_info['definition']
+        silences.append(scene['silence_before'] + sum(obj['silence_after'] for obj in scene['objects']))
+
+    if title is None:
+        title = "Total silence distribution"
+
+    fig_ax = plot_hist(silences, title=title, fig_ax=fig_ax, label=legend_label, norm_hist=norm_hist, show_fig=show_fig)
+
+    fig_ax[0].tight_layout()
+
+    return fig_ax
+
+
+def plot_scene_silence_by_position_distribution(scenes, title=None, legend_label=None, fig_ax=None, norm_hist=False,
+                                                show_fig=False):
+    silences_by_position = defaultdict(list)
+
+    for scene_info in scenes:
+        scene = scene_info['definition']
+        nb_obj = len(scene['objects'])
+        silences_by_position[0].append(scene['silence_before'])
+
+        for i in range(nb_obj):
+            silences_by_position[i + 1].append(scene['objects'][i]['silence_after'])
+
+    if title is None:
+        title = "Silence by position"
+
+    for i, (pos, values) in enumerate(silences_by_position.items()):
+        new_fig_ax = plot_hist(values, title=f"[Position {pos}]{title}", fig_ax=fig_ax, label=legend_label,
+                               norm_hist=norm_hist, show_fig=show_fig)
+
+        new_fig_ax[0].tight_layout()
+
+    # FIXME : We are returning the original fig_ax.. not all of them
     return fig_ax
