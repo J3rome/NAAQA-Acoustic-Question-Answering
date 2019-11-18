@@ -63,40 +63,24 @@ class ErrorImgLoader(AbstractImgLoader):
 
 
 class RawImageBuilder(AbstractImgBuilder):
-    def __init__(self, img_dir, width, height, normalize_image=True, per_channel_mean_to_substract=None):
+    def __init__(self, img_dir):
         AbstractImgBuilder.__init__(self, img_dir, is_raw=True, require_process=True)
-        self.width = width
-        self.height = height
-        self.per_channel_mean_to_substract = per_channel_mean_to_substract
-        self.normalize_image = normalize_image
 
     def build(self, image_id, filename, which_set, **kwargs):
         img_path = os.path.join(self.img_dir, which_set, filename)
-        return RawImageLoader(img_path, self.width, self.height, normalize_image=self.normalize_image,
-                              per_channel_mean_to_substract=self.per_channel_mean_to_substract)
+        return RawImageLoader(img_path)
+
 
 class RawImageLoader(AbstractImgLoader):
-    def __init__(self, img_path, width, height, normalize_image, per_channel_mean_to_substract):
+    def __init__(self, img_path):
         AbstractImgLoader.__init__(self, img_path)
-        self.width = width
-        self.height = height
-        self.per_channel_mean_to_substract = per_channel_mean_to_substract
-        self.normalize_image = normalize_image
 
 
     def get_image(self, **kwargs):
+        # Our images are saved as RGBA. The A dimension is always 1.
+        # We could simply get rid of it instead of converting
+        #img = io.imread(self.img_path)[:,:,:3]
         img = Image.open(self.img_path).convert('RGB')
-
-        img = resize_image(img, self.width , self.height)
-        img = np.array(img, dtype=np.float32)
-
-        if self.normalize_image:
-            img_min = img.min()
-            img = (img - img_min) / (img.max() - img_min)
-            
-        # FIXME : This is clashing with the normalize image
-        if self.per_channel_mean_to_substract is not None:
-            img -= self.per_channel_mean_to_substract[None, None, :]
 
         return img
 
@@ -173,25 +157,49 @@ class h5FeatureBufloader(AbstractImgLoader):
 
 
 
-def get_img_builder(config, data_dir, bufferize=None):
+def get_img_builder(input_image_type, data_dir, preprocessed_folder_name='preprocessed', bufferize=None):
 
-    input_type = config["type"]
+    input_type = input_image_type
 
     # FIXME: Figure out why there is the fc8 and fc7 cases with inversed buffersize logic
     if input_type in ["fc8", "fc7"]:
         bufferize = bufferize if bufferize is not None else True
-        # TODO : Make the 'preprocessed' path parametrable
-        loader = h5FeatureBuilder(os.path.join(data_dir, 'preprocessed'), bufferize=bufferize)
+        loader = h5FeatureBuilder(os.path.join(data_dir, preprocessed_folder_name), bufferize=bufferize)
     elif input_type in ["conv", "raw_h5"]:
+
+        # NOTE : When testing multiple dataset configurations, Images and questions are generated in separate folder and
+        #        linked together so we don't have multiple copies of the dataset (And multiple preprocessing runs)
+        #
+        #        If we can't find the 'preprocessed_folder_name', we follow the default preprocessed folder symlink.
+        #        If the requested 'preprocessed_folder_name' is present in this folder, we create a symlink to it so we
+        #        can have access to it.
+        #
+        #        If "preprocessed" is not a symlink, 'output_folder_name' will be created in requested 'data_path'
+
+        preprocessed_folder_path = "%s/%s" % (data_dir, preprocessed_folder_name)
+        preprocessed_exist = os.path.exists(preprocessed_folder_path)
+        preprocessed_default_folder_path = '%s/preprocessed' % data_dir
+        if not preprocessed_exist:
+            if os.path.exists(preprocessed_default_folder_path) and os.path.islink(preprocessed_default_folder_path):
+
+                # Retrieve paths from symlink
+                default_link_value = os.readlink(preprocessed_default_folder_path)
+                new_link_value = default_link_value.replace('preprocessed', preprocessed_folder_name)
+
+                real_preprocessed_folder_path = "%s/%s" % (data_dir, new_link_value)
+                if os.path.isdir(real_preprocessed_folder_path):
+                    # Create symlink
+                    os.symlink(new_link_value, preprocessed_folder_path)
+                else:
+                    assert False, "Preprocessed folder '%s' doesn't exist" % preprocessed_folder_path
+            else:
+                assert False, "Preprocessed folder '%s' doesn't exist" % preprocessed_folder_path
+
         bufferize = bufferize if bufferize is not None else False
-        # TODO : Make the 'preprocessed' path parametrable
-        loader = h5FeatureBuilder(os.path.join(data_dir, 'preprocessed'), bufferize=bufferize)
+        loader = h5FeatureBuilder(os.path.join(data_dir, preprocessed_folder_name), bufferize=bufferize)
     elif input_type == "raw":
         # TODO : Make the 'images' path parametrable
-        loader = RawImageBuilder(os.path.join(data_dir, 'images'),
-                                height=config["dim"][0],
-                                width=config["dim"][1],
-                                per_channel_mean_to_substract=config.get("per_channel_mean_to_substract", None))
+        loader = RawImageBuilder(os.path.join(data_dir, 'images'))
     else:
         assert False, "incorrect image input: {}".format(input_type)
 

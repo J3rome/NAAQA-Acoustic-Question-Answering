@@ -1,408 +1,392 @@
 import argparse
-from collections import defaultdict
-from _datetime import datetime
-import subprocess
-import shutil
+from datetime import datetime
 
-import tensorflow as tf
-from tensorboard.plugins.beholder import Beholder
-from tqdm import tqdm
-import numpy as np
-import ujson
+import torch
+from torch.utils.data import DataLoader
+import torch.nn as nn
+from torchvision import transforms
 
-from utils import set_random_seed, create_folder_if_necessary, get_config, process_predictions, process_gamma_beta
-from utils import create_symlink_to_latest_folder, save_training_stats, save_json
-from utils import is_tensor_optimizer, is_tensor_prediction, is_tensor_scalar, is_tensor_beta_list, is_tensor_gamma_list, is_tensor_summary
+from runner import train_model, set_inference, prepare_model
+from baselines import random_answer_baseline, random_weight_baseline
+from preprocessing import create_dict_from_questions, extract_features, images_to_h5, get_lr_finder_curves
+from preprocessing import write_clear_mean_to_config
+from visualization import visualize_gamma_beta, grad_cam_visualization, print_model_summary, save_graph_to_tensorboard
+from data_interfaces.CLEAR_dataset import CLEAR_dataset, CLEAR_collate_fct
+from data_interfaces.transforms import ToTensor, ImgBetweenZeroOne, ResizeImgBasedOnHeight, ResizeImgBasedOnWidth
+from data_interfaces.transforms import PadTensor, NormalizeSample, ResizeTensor
 
-from models.film_network_wrapper import FiLM_Network_Wrapper
-from data_interfaces.CLEAR_dataset import CLEARDataset
-from visualization import grad_cam_visualization
-from preprocessing import preextract_features, create_dict_from_questions
+from utils.file import save_model_config, save_json, read_json, create_symlink_to_latest_folder
+from utils.file import create_folders_save_args, fix_best_epoch_symlink_if_necessary
+from utils.random import set_random_seed
+from utils.argument_parsing import get_args_task_flags_paths, get_feature_extractor_config_from_args
+from utils.logging import create_tensorboard_writers, close_tensorboard_writers
+
 
 parser = argparse.ArgumentParser('FiLM model for CLEAR Dataset (Acoustic Question Answering)', fromfile_prefix_chars='@')
 
 parser.add_argument("--training", help="FiLM model training", action='store_true')
 parser.add_argument("--inference", help="FiLM model inference", action='store_true')
-parser.add_argument("--visualize", help="FiLM model visualization", action='store_true')
-parser.add_argument("--preprocessing", help="Data preprocessing (Word tokenization & Feature Pre-Extraction",
-                    action='store_true')
+parser.add_argument("--visualize_grad_cam", help="Class Activation Maps - GradCAM", action='store_true')
+parser.add_argument("--visualize_gamma_beta", help="FiLM model parameters visualization (T-SNE)", action='store_true')
+parser.add_argument("--prepare_images", help="Save images in h5 file for faster retrieving", action='store_true')
 parser.add_argument("--feature_extract", help="Feature Pre-Extraction", action='store_true')
 parser.add_argument("--create_dict", help="Create word dictionary (for tokenization)", action='store_true')
+parser.add_argument("--random_answer_baseline", help="Spit out a random answer for each question", action='store_true')
+parser.add_argument("--random_weight_baseline", help="Use randomly initialised Neural Network to answer the question",
+                    action='store_true')
+parser.add_argument("--lr_finder", help="Create LR Finder plot", action='store_true')
+parser.add_argument("--notebook_data_analysis", help="Will prepare dataloaders for analysis in notebook "
+                                                     "(Should not be run via main.py)", action='store_true')
+parser.add_argument("--write_clear_mean_to_config", help="Will calculate the mean and std of the dataset and write it "
+                                                         "to the config file", action='store_true')
 
 # Input parameters
 parser.add_argument("--data_root_path", type=str, default='data', help="Directory with data")
 parser.add_argument("--version_name", type=str, help="Name of the dataset version")
-parser.add_argument("--resnet_ckpt_path", type=str, default=None, help="Path to resnet-101 ckpt file")
-parser.add_argument("--film_ckpt_path", type=str, default=None, help="Path to Film pretrained ckpt file")
-parser.add_argument("--config_path", type=str, default='config/film.json', help="Path to Film pretrained ckpt file")         # FIXME : Add default value
-parser.add_argument("--inference_set", type=str, default='test', help="Define on which set the inference should be runned")
+parser.add_argument("--film_model_weight_path", type=str, default=None, help="Path to Film pretrained weight file")
+parser.add_argument("--config_path", type=str, default='config/film.json', help="Path to Film pretrained ckpt file")
+parser.add_argument("--h5_image_input", help="If set, images will be read from h5 file in preprocessed folder",
+                    action='store_true')
+parser.add_argument("--conv_feature_input", help="If set, conv feature will be read from h5 file in preprocessed folder",
+                    action='store_true')
+parser.add_argument("--inference_set", type=str, default='test', help="Define on which set the inference will run")
 parser.add_argument("--dict_file_path", type=str, default=None, help="Define what dictionnary file should be used")
+parser.add_argument("--normalize_with_imagenet_stats", help="Will normalize input images according to"
+                                                       "ImageNet mean & std (Only with RAW input)", action='store_true')
+parser.add_argument("--normalize_with_clear_stats", help="Will normalize input images according to"
+                                                         "CLEAR mean & std (Only with RAW input)", action='store_true')
+parser.add_argument("--raw_img_resize_val", type=int, default=None,
+                    help="Specify the size to which the image will be resized (when working with RAW img)"
+                         "The width is calculated according to the height in order to keep the ratio")
+parser.add_argument("--raw_img_resize_based_on_height", action='store_true',
+                    help="If set (with --raw_img_resize_val), the width of the image will be calculated according to "
+                         "the height in order to keep the ratio. [Default option if neither "
+                         "--raw_img_resize_based_on_height and --raw_img_resize_based_on_width are set]")
+parser.add_argument("--raw_img_resize_based_on_width", action='store_true',
+                    help="If set (with --raw_img_resize_val), the height of the image will be calculated according to "
+                         "the width in order to keep the ratio")
 
-# TODO : Add option for custom test file
+
+parser.add_argument("--keep_image_range", help="Will NOT scale the image between 0-1 (Reverse --normalize_zero_one)",
+                    action='store_true')
+parser.add_argument("--normalize_zero_one", help="Will scale the image between 0-1 (This is set by default when"
+                                                 " working with RAW images. Can be overridden with --keep_image_range)",
+                    action='store_true')
+parser.add_argument("--pad_to_largest_image", help="If set, images will be padded to meet the largest image in the set."
+                                                   "All input will have the same size.", action='store_true')
+parser.add_argument("--pad_to_square_images", help="If set, all images will be padded to make them square",
+                    action='store_true')
+parser.add_argument("--resize_to_square_images", help="If set, all images will be resized to make them square",
+                    action='store_true')
+parser.add_argument("--gamma_beta_path", type=str, default=None, help="Path where gamma_beta values are stored "
+                                                                          "(when using --visualize_gamma_beta)")
+parser.add_argument("--no_early_stopping", help="Override the early stopping config", action='store_true')
+parser.add_argument("--feature_extractor_layer_index", type=int, default=6, help="Layer id of the pretrained Resnet")
+parser.add_argument("--no_feature_extractor", help="Raw images won't go through Resnet feature extractor before "
+                                                    "training", action='store_true')
+
 
 # Output parameters
-parser.add_argument("-output_root_path", type=str, default='output', help="Directory with image")
+parser.add_argument("--output_root_path", type=str, default='output', help="Directory with image")
+parser.add_argument("--preprocessed_folder_name", type=str, default='preprocessed',
+                    help="Directory where to store/are stored extracted features and token dictionary")
+parser.add_argument("--output_name_suffix", type=str, default='', help="Suffix that will be appended to the version "
+                                                                       "name (output & tensorboard)")
+parser.add_argument("--no_start_end_tokens", help="Constants tokens won't be added to the question "
+                                                  "(<start> & <end> tokens)", action='store_true')
+parser.add_argument("--dict_folder", type=str, default=None,
+                    help="Directory where to store/retrieve generated dictionary. "
+                         "If --dict_file_path is used, this will be ignored")
+parser.add_argument("--tensorboard_folder", type=str, default='tensorboard',
+                    help="Path where tensorboard data should be stored.")
+parser.add_argument("--tensorboard_save_graph", help="Save model graph to tensorboard", action='store_true')
+parser.add_argument("--tensorboard_save_images", help="Save input images to tensorboard", action='store_true')
+parser.add_argument("--tensorboard_save_texts", help="Save input texts to tensorboard", action='store_true')
+parser.add_argument("--gpu_index", type=str, default='0', help="Index of the GPU to use")
+
 
 # Other parameters
 parser.add_argument("--nb_epoch", type=int, default=15, help="Nb of epoch for training")
 parser.add_argument("--nb_epoch_stats_to_keep", type=int, default=5, help="Nb of epoch stats to keep for training")
 parser.add_argument("--batch_size", type=int, default=32, help="Batch size (For training and inference)")
+parser.add_argument("--continue_training", help="Will use the --film_model_weight_path as  training starting point",
+                    action='store_true')
 parser.add_argument("--random_seed", type=int, default=None, help="Random seed used for the experiment")
+parser.add_argument("--use_cpu", help="Model will be run/train on CPU", action='store_true')
 parser.add_argument("--force_dict_all_answer", help="Will make sure that all answers are included in the dict" +
-                                                    "(not just the one appearing in the train set)", action='store_true')
+                                                    "(not just the one appearing in the train set)" +
+                                                    " -- Preprocessing option" , action='store_true')
+parser.add_argument("--no_model_summary", help="Will hide the model summary", action='store_true')
+parser.add_argument("--perf_over_determinist", help="Will let torch use nondeterministic algorithms (Better "
+                                                    "performance but less reproductibility)", action='store_true')
+parser.add_argument("--overwrite_clear_mean", help="Will overwrite the Mean and Std of the CLEAR dataset stored in "
+                                                   "config file", action='store_true')
+parser.add_argument("--f1_score", help="Use f1 score in loss calculation", action='store_true')
+parser.add_argument("--cyclical_lr", help="Will use cyclical learning rate (Bounds in config.json)",
+                    action='store_true')
 
 
-# TODO : Arguments Handling
-#   Tasks :
-#       Train from extracted features (No resnet - preprocessed)
-#       Train from Raw Images (Resnet with fixed weights)
-#       Train from Raw Images (Resnet or similar retrained (Only firsts couple layers))
-#       Run from extracted features (No resnet - preprocessed)
-#       Run from Raw Images (Resnet With fixed weights)
-#       Run from Raw Images with VISUALIZATION
-#
+def get_transforms_from_args(args, preprocessing_config):
+    transforms_list = []
 
-# >>> Training
-def do_one_epoch(sess, batchifier, network_wrapper, outputs_var, epoch_index, writer=None, beholder=None):
-    # check for optimizer to define training/eval mode
-    is_training = any([is_tensor_optimizer(x) for x in outputs_var])
+    # Bundle together ToTensor and ImgBetweenZeroOne, need to be one after the other for other transforms to work
+    to_tensor_transform = [ToTensor()]
+    if args['normalize_zero_one']:
+        to_tensor_transform.append(ImgBetweenZeroOne())
 
-    aggregated_outputs = defaultdict(lambda : [])
-    gamma_beta = {'gamma': [], 'beta': []}
-    processed_predictions = []
-    processed_gamma_beta = []
+    if args['input_image_type'].startswith('raw'):
 
-    summary_index = epoch_index * batchifier.batch_size
+        if args['raw_img_resize_val']:
+            if args['raw_img_resize_based_on_width']:
+                resize_transform = ResizeImgBasedOnWidth
+            else:
+                # By default, we resize according to height
+                resize_transform = ResizeImgBasedOnHeight
+            transforms_list.append(resize_transform(args['raw_img_resize_val']))
 
-    for batch in tqdm(batchifier):
+        # TODO : Add data augmentation ?
 
-        feed_dict = network_wrapper.get_feed_dict(is_training, batch['question'], batch['answer'], batch['image'], batch['seq_length'])
+        transforms_list += to_tensor_transform
 
-        results = sess.run(outputs_var, feed_dict=feed_dict)
+        if args['normalize_with_imagenet_stats'] or args['normalize_with_clear_stats']:
+            if args['normalize_with_imagenet_stats']:
+                stats = preprocessing_config['imagenet_stats']
+            else:
+                stats = preprocessing_config['clear_stats']
 
-        if beholder is not None:
-            print("Beholder Update")
-            beholder.update(session=sess)
+            transforms_list.append(NormalizeSample(mean=stats['mean'], std=stats['std'], inplace=True))
 
-        for var, result in zip(outputs_var, results):
-            if is_tensor_scalar(var):
-                aggregated_outputs[var].append(result)
+    else:
+        transforms_list += to_tensor_transform
 
-            elif is_tensor_prediction(var):
-                aggregated_outputs[var] = True
-                processed_predictions.append(process_predictions(network_wrapper.get_dataset(), result, batch['raw']))
-
-            elif is_tensor_gamma_list(var):
-                gamma_beta['gamma'].append(result)
-            elif is_tensor_beta_list(var):
-                gamma_beta['beta'].append(result)
-
-            elif is_tensor_summary(var) and writer is not None:
-                writer.add_summary(result, summary_index)
-                summary_index += 1
-
-        if writer is not None and summary_index > epoch_index * batchifier.batch_size:
-            writer.flush()
-
-    for var in aggregated_outputs.keys():
-        if is_tensor_scalar(var):
-            aggregated_outputs[var] = np.mean(aggregated_outputs[var]).item()
-        elif is_tensor_prediction(var):
-            aggregated_outputs[var] = [pred for epoch in processed_predictions for pred in epoch]
-
-    for batch_index, gamma_vectors_per_batch, beta_vectors_per_batch in zip(range(len(gamma_beta['gamma'])), gamma_beta['gamma'], gamma_beta['beta']):
-        processed_gamma_beta += process_gamma_beta(processed_predictions[batch_index], gamma_vectors_per_batch, beta_vectors_per_batch)
-
-    to_return = list(aggregated_outputs.values())
-    if len(processed_gamma_beta) > 0:
-        # FIXME : Not keeping the order here. Not dependent on the operation order anymore
-        to_return.append(processed_gamma_beta)
-
-    return to_return
+    return transforms.Compose(transforms_list)
 
 
-def do_film_training(sess, dataset, network_wrapper, optimizer_config, resnet_ckpt_path, nb_epoch, output_folder,
-                     train_writer=None, val_writer=None, beholder=None, nb_epoch_to_keep=None):
-    stats_file_path = "%s/stats.json" % output_folder
+# Data loading & preparation
+def create_datasets(args, preprocessing_config, load_question_program=False):
+    print("Creating Datasets")
+    transforms_to_apply = get_transforms_from_args(args, preprocessing_config)
 
-    # Setup optimizer (For training)
-    optimize_step, [loss, accuracy] = network_wrapper.create_optimizer(optimizer_config, var_list=None)  # TODO : Var_List should contain only film variables
+    datasets = {
+        'train': CLEAR_dataset(args['data_root_path'], args['version_name'], args['input_image_type'], 'train',
+                               dict_file_path=args['dict_file_path'], transforms=transforms_to_apply,
+                               tokenize_text=not args['create_dict'], load_question_program=load_question_program,
+                               preprocessed_folder_name=args['preprocessed_folder_name']),
 
-    prediction = network_wrapper.get_network_prediction()
+        'val': CLEAR_dataset(args['data_root_path'], args['version_name'], args['input_image_type'], 'val',
+                             dict_file_path=args['dict_file_path'], transforms=transforms_to_apply,
+                             tokenize_text=not args['create_dict'], load_question_program=load_question_program,
+                             preprocessed_folder_name=args['preprocessed_folder_name']),
 
-    # FIXME : This should be wrapped inside the wrapper (Maybe a initializer function ?)
-    # We update the film variables because the adam variables weren't there when we first defined them
-    network_wrapper.film_variables = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope="clear")
-    optimizer_variables = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope="beta")
+        'test': CLEAR_dataset(args['data_root_path'], args['version_name'], args['input_image_type'], 'test',
+                              dict_file_path=args['dict_file_path'], transforms=transforms_to_apply,
+                              tokenize_text=not args['create_dict'], load_question_program=load_question_program,
+                              preprocessed_folder_name=args['preprocessed_folder_name'])
+    }
 
-    sess.run(tf.variables_initializer(network_wrapper.film_variables))
-    sess.run(tf.variables_initializer(optimizer_variables))
-    #sess.run(tf.global_variables_initializer())
+    if args['pad_to_largest_image'] or args['pad_to_square_images']:
+        # We need the dataset object to retrieve images dims so we have to manually add transforms
+        max_train_img_dims = datasets['train'].get_max_width_image_dims()
+        max_val_img_dims = datasets['val'].get_max_width_image_dims()
+        max_test_img_dims = datasets['test'].get_max_width_image_dims()
 
-    if dataset.is_raw_img():
-        sess.run(tf.variables_initializer(network_wrapper.feature_extractor_variables))
-        network_wrapper.restore_feature_extractor_weights(sess, resnet_ckpt_path)
+        if args['pad_to_largest_image']:
+            datasets['train'].add_transform(PadTensor(max_train_img_dims))
+            datasets['val'].add_transform(PadTensor(max_val_img_dims))
+            datasets['test'].add_transform(PadTensor(max_test_img_dims))
 
-    removed_epoch = []
+        if args['pad_to_square_images'] or args['resize_to_square_images']:
+            train_biggest_dim = max(max_train_img_dims)
+            val_biggest_dim = max(max_val_img_dims)
+            test_biggest_dim = max(max_test_img_dims)
 
-    gamma_vector_tensors, beta_vector_tensors = network_wrapper.get_gamma_beta()
+            if args['resize_to_square_images']:
+                to_square_transform = ResizeTensor
+            else:
+                to_square_transform = PadTensor
 
-    op_to_run = [tf.summary.merge_all(), loss, accuracy, prediction, gamma_vector_tensors, beta_vector_tensors]
+            datasets['train'].add_transform(to_square_transform((train_biggest_dim, train_biggest_dim)))
+            datasets['val'].add_transform(to_square_transform((val_biggest_dim, val_biggest_dim)))
+            datasets['test'].add_transform(to_square_transform((test_biggest_dim, test_biggest_dim)))
 
-    # Training Loop
-    for epoch in range(nb_epoch):
-        epoch_output_folder_path = "%s/Epoch_%.2d" % (output_folder, epoch)
-        create_folder_if_necessary(epoch_output_folder_path)
-
-        print("Epoch %d" % epoch)
-        time_before_epoch = datetime.now()
-        train_loss, train_accuracy, train_predictions, train_gamma_beta_vectors = do_one_epoch(sess,
-                                                                                        dataset.get_batches('train'),
-                                                                                        network_wrapper,
-                                                                                        op_to_run + [optimize_step],
-                                                                                        epoch,
-                                                                                        writer=train_writer,
-                                                                                        beholder=beholder)
-
-        epoch_train_time = datetime.now() - time_before_epoch
-
-        print("Training :")
-        print("    Loss : %f  - Accuracy : %f" % (train_loss, train_accuracy))
-
-        # FIXME : Inference of validation set doesn't yield same result.
-        # FIXME : Should val batches be shuffled ?
-        # FIXME : Validation accuracy is skewed by the batch padding. We could recalculate accuracy from the prediction (After removing padded ones)
-        val_loss, val_accuracy, val_predictions, val_gamma_beta_vectors = do_one_epoch(sess,
-                                                                            dataset.get_batches('val', shuffled=False),
-                                                                            network_wrapper, op_to_run,
-                                                                            epoch, writer=None)#val_writer)
-
-        print("Validation :")
-        print("    Loss : %f  - Accuracy : %f" % (val_loss, val_accuracy))
-
-        stats = save_training_stats(stats_file_path, epoch, train_accuracy, train_loss,
-                            val_accuracy, val_loss, epoch_train_time)
-
-        save_json(train_predictions, epoch_output_folder_path, filename="train_inferences.json")
-        save_json(val_predictions, epoch_output_folder_path, filename="val_inferences.json")
-        save_json(train_gamma_beta_vectors, epoch_output_folder_path, filename='train_gamma_beta.json')
-        save_json(val_gamma_beta_vectors, epoch_output_folder_path, filename='val_gamma_beta.json')
-
-        network_wrapper.save_film_checkpoint(sess, "%s/checkpoint.ckpt" % epoch_output_folder_path)
-
-        if nb_epoch_to_keep is not None:
-            # FIXME : Definitely not the most efficient way to do this
-            sorted_stats = sorted(stats, key=lambda s: s['val_accuracy'], reverse=True)
-
-            epoch_to_remove = sorted_stats[nb_epoch_to_keep:]
-
-            for epoch_stat in epoch_to_remove:
-                if epoch_stat['epoch'] not in removed_epoch:
-                    removed_epoch.append(epoch_stat['epoch'])
-
-                    shutil.rmtree("%s/%s" % (output_folder, epoch_stat['epoch']))
-
-    # Create a symlink to best epoch output folder
-    best_epoch = sorted(stats, key=lambda s: s['val_accuracy'], reverse=True)[0]['epoch']
-    subprocess.run("cd %s && ln -s %s best" % (output_folder, best_epoch), shell=True)
+    return datasets
 
 
-# >>> Inference
-def do_batch_inference(sess, dataset, network_wrapper, output_folder, film_ckpt_path, resnet_ckpt_path, set_name="test"):
-    test_batches = dataset.get_batches(set_name, shuffled=False)
+def create_dataloaders(datasets, batch_size, nb_process=8):
+    print("Creating Dataloaders")
+    collate_fct = CLEAR_collate_fct(padding_token=datasets['train'].get_padding_token())
 
-    sess.run(tf.variables_initializer(network_wrapper.film_variables))
-    #sess.run(tf.global_variables_initializer())
+    # FIXME : Should take into account --nb_process, or at least the nb of core on the machine
+    return {
+        'train': DataLoader(datasets['train'], batch_size=batch_size, shuffle=True,
+                            num_workers=4, collate_fn=collate_fct),
 
-    if dataset.is_raw_img():
-        sess.run(tf.variables_initializer(network_wrapper.feature_extractor_variables))
-        network_wrapper.restore_feature_extractor_weights(sess, resnet_ckpt_path)
+        'val': DataLoader(datasets['val'], batch_size=batch_size, shuffle=True,
+                          num_workers=4, collate_fn=collate_fct),
 
-    network_wrapper.restore_film_network_weights(sess, film_ckpt_path)
+        'test': DataLoader(datasets['test'], batch_size=batch_size, shuffle=False,
+                           num_workers=4, collate_fn=collate_fct)
+    }
 
-    network_predictions = network_wrapper.get_network_prediction()
-    gamma_vector_tensors, beta_vector_tensors = network_wrapper.get_gamma_beta()
 
-    processed_predictions = []
+def execute_task(task, args, output_dated_folder, dataloaders, model, model_config, device, optimizer=None,
+                 loss_criterion=None, scheduler=None, tensorboard=None):
+    if task == "training":
+        train_model(device=device, model=model, dataloaders=dataloaders,
+                    output_folder=output_dated_folder, criterion=loss_criterion, optimizer=optimizer,
+                    scheduler=scheduler, nb_epoch=args['nb_epoch'],
+                    nb_epoch_to_keep=args['nb_epoch_stats_to_keep'], start_epoch=args['start_epoch'],
+                    tensorboard=tensorboard)
 
-    processed_gamma_beta = []
+    elif task == "inference":
+        set_inference(device=device, model=model, dataloader=dataloaders['test'], criterion=nn.CrossEntropyLoss(),
+                      output_folder=output_dated_folder)
 
-    for batch in tqdm(test_batches):
-        feed_dict = network_wrapper.get_feed_dict(False, batch['question'], batch['answer'],
-                                                  batch['image'], batch['seq_length'])
+    elif task == "create_dict":
+        create_dict_from_questions(dataloaders['train'].dataset, force_all_answers=args['force_dict_all_answer'],
+                                   output_folder_name=args['dict_folder'],
+                                   start_end_tokens=not args['no_start_end_tokens'])
 
-        predictions, gamma_vectors, beta_vectors = sess.run([network_predictions,
-                                                            gamma_vector_tensors,
-                                                            beta_vector_tensors],
-                                                            feed_dict=feed_dict)
+    elif task == "prepare_images":
+        # TODO : Merge write_clear_mean_to_config here
+        images_to_h5(dataloaders=dataloaders,
+                     square_image=args['pad_to_square_images'] or args['resize_to_square_images'],
+                     output_folder_name=args['preprocessed_folder_name'])
 
-        batch_processed_predictions = process_predictions(dataset, predictions, batch['raw'])
-        processed_predictions += batch_processed_predictions
+    elif task == "feature_extract":
+        extract_features(device=device, feature_extractor=model.feature_extractor, dataloaders=dataloaders,
+                         output_folder_name=args['preprocessed_folder_name'])
 
-        processed_gamma_beta += process_gamma_beta(batch_processed_predictions, gamma_vectors, beta_vectors)
+    elif task == "visualize_gamma_beta":
+        visualize_gamma_beta(args['gamma_beta_path'], dataloaders=dataloaders, output_folder=output_dated_folder)
 
-    # Batches are required to have always the same size.
-    # We don't want the batch padding to interfere with the test accuracy.
-    # We removed the padded (duplicated) examples
-    if test_batches.nb_padded_in_last_batch > 0:
-        processed_predictions = processed_predictions[:-test_batches.nb_padded_in_last_batch]
-        processed_gamma_beta = processed_gamma_beta[:-test_batches.nb_padded_in_last_batch]
+    elif task == "visualize_grad_cam":
+        grad_cam_visualization(device=device, model=model, dataloader=dataloaders['train'],
+                               output_folder=output_dated_folder)
 
-    nb_correct = sum(1 for r in processed_predictions if r['correct'])
-    nb_results = len(processed_predictions)
-    accuracy = nb_correct/nb_results
+    elif task == "lr_finder":
+        get_lr_finder_curves(model, device, dataloaders['train'], output_dated_folder, args['nb_epoch'], optimizer,
+                             val_dataloader=dataloaders['val'], loss_criterion=loss_criterion)
 
-    save_json(processed_predictions, output_folder, filename='results.json')
-    save_json(processed_gamma_beta, output_folder, filename='gamma_beta.json')
+    elif task == "write_clear_mean_to_config":
+        write_clear_mean_to_config(dataloaders['train'], device, model_config, args['config_path'],
+                                   args['overwrite_clear_mean'])
 
-    print("Test set accuracy : %f" % accuracy)
+    elif task == 'random_answer_baseline':
+        random_answer_baseline(dataloaders['train'], output_dated_folder)
+        random_answer_baseline(dataloaders['val'], output_dated_folder)
+
+    elif task == 'random_weight_baseline':
+        random_weight_baseline(model, device, dataloaders['train'], output_dated_folder)
+        random_weight_baseline(model, device, dataloaders['val'], output_dated_folder)
+
+    assert not task.startswith('notebook'), "Task not meant to be run from main.py. " \
+                                            "Used to prepare dataloaders & model for analysis in notebook"
+
+
+def prepare_for_task(args):
+    ####################################
+    #   Argument & Config parsing
+    ####################################
+    args, task, flags, paths = get_args_task_flags_paths(args)
+    device = f'cuda:{args["gpu_index"]}' if torch.cuda.is_available() and not args['use_cpu'] else 'cpu'
+
+    if args['random_seed'] is not None:
+        set_random_seed(args['random_seed'])
+
+    print("\nTask '%s' for version '%s'\n" % (task.replace('_', ' ').title(), paths["output_name"]))
+    print("Using device '%s'" % device)
+
+    film_model_config = read_json(args['config_path'])
+    # FIXME : Should be in args ?
+    early_stopping = not args['no_early_stopping'] and film_model_config['early_stopping']['enable']
+    film_model_config['early_stopping']['enable'] = early_stopping
+
+    # Create required folders if necessary
+    if flags['create_output_folder']:
+        create_folders_save_args(args, paths)
+
+        if flags['instantiate_model']:
+            save_model_config(args, paths, film_model_config)
+
+    # Make sure all variables exists
+    film_model, optimizer, loss_criterion, tensorboard, scheduler = None, None, None, None, None
+
+    ####################################
+    #   Dataloading
+    ####################################
+    datasets = create_datasets(args, film_model_config['preprocessing'], flags['load_question_program'])
+    dataloaders = create_dataloaders(datasets, args['batch_size'], nb_process=8)
+
+    ####################################
+    #   Model Definition
+    ####################################
+    if flags['instantiate_model']:
+        input_image_torch_shape = datasets['train'].get_input_shape(
+            channel_first=True)  # Torch size have Channel as first dimension
+        feature_extractor_config = get_feature_extractor_config_from_args(args)
+
+        film_model, optimizer, loss_criterion, scheduler = prepare_model(args, flags, paths, dataloaders, device,
+                                                                         film_model_config, input_image_torch_shape,
+                                                                         feature_extractor_config)
+
+        if not args['no_model_summary']:
+            print_model_summary(film_model, input_image_torch_shape, device)
+
+        if flags['use_tensorboard']:
+            tensorboard = create_tensorboard_writers(args, paths)
+            if args['tensorboard_save_graph']:
+                save_graph_to_tensorboard(film_model, tensorboard, input_image_torch_shape)
+
+    return (
+        (task, args, flags, paths, device),
+        dataloaders,
+        (film_model_config, film_model, optimizer, loss_criterion, scheduler, tensorboard)
+    )
 
 
 def main(args):
+    args = vars(args)  # Convert args object to dict
+    task_and_more, dataloaders, model_and_more = prepare_for_task(args)
+    task, args, flags, paths, device = task_and_more
+    film_model_config, film_model, optimizer, loss_criterion, scheduler, tensorboard = model_and_more
 
-    mutually_exclusive_params = [args.training, args.preprocessing, args.inference,
-                                 args.feature_extract, args.create_dict, args.visualize]
+    ####################################
+    #   Task Execution
+    ####################################
+    if flags['create_output_folder']:
+        # We create the symlink here so that bug in initialisation won't create a new 'latest' folder
+        create_symlink_to_latest_folder(paths["output_experiment_folder"], paths["current_datetime_str"])
 
-    if 0 < sum(mutually_exclusive_params) > 1:
-        print("[ERROR] Can only do one task at a time (--training, --inference, --visualize," +
-              " --preprocessing, --create_dict, --feature_extract)")
-        exit(1)
+    execute_task(task, args, paths["output_dated_folder"], dataloaders, film_model, film_model_config, device,
+                 optimizer, loss_criterion, scheduler, tensorboard)
 
-    is_preprocessing = False
-
-    if args.training:
-        task = "train_film"
-    elif args.inference:
-        task = "inference"
-    elif args.visualize:
-        task = "visualize_grad_cam"
-    elif args.preprocessing:
-        task = "full_preprocessing"
-        is_preprocessing = True
-    elif args.feature_extract:
-        task = "feature_extract"
-        is_preprocessing = True
-    elif args.create_dict:
-        task = "create_dict"
-        is_preprocessing = True
-
-    if args.random_seed is not None:
-        set_random_seed(args.random_seed)
-
-    # Paths
-    data_path = "%s/%s" % (args.data_root_path, args.version_name)
-
-    output_task_folder = "%s/%s" % (args.output_root_path, task)
-    output_experiment_folder = "%s/%s" %(output_task_folder, args.version_name)
-    current_datetime = datetime.now()
-    current_datetime_str = current_datetime.strftime("%Y-%m-%d_%Hh%M")
-    output_dated_folder = "%s/%s" % (output_experiment_folder, current_datetime_str)
-
-    tensorboard_folder = "%s/tensorboard" % args.output_root_path
-
-    train_writer_folder = '%s/train/%s' % (tensorboard_folder, current_datetime_str)
-    val_writer_folder = '%s/val/%s' % (tensorboard_folder, current_datetime_str)
-    test_writer_folder = '%s/test/%s' % (tensorboard_folder, current_datetime_str)
-    beholder_folder = '%s/beholder' % tensorboard_folder
-
-    if args.resnet_ckpt_path is None:
-        args.resnet_ckpt_path = "%s/resnet/resnet_v1_101.ckpt" % args.data_root_path
-
-    if args.film_ckpt_path is None:
-        #experiment_date = "2019-06-23_16h37"
-        experiment_date = "latest"
-        args.film_ckpt_path = "%s/train_film/%s/%s/best/checkpoint.ckpt" % (args.output_root_path, args.version_name, experiment_date)
-
-    if args.dict_file_path is None:
-        args.dict_file_path = "%s/preprocessed/dict.json" % data_path
-
-    film_model_config = get_config(args.config_path)
-
-    create_output_folder = not is_preprocessing
-
-    if create_output_folder:
-        # TODO : See if this is optimal file structure
-        create_folder_if_necessary(args.output_root_path)
-        create_folder_if_necessary(output_task_folder)
-        create_folder_if_necessary(output_experiment_folder)
-        create_folder_if_necessary(output_dated_folder)
-        create_symlink_to_latest_folder(output_experiment_folder, current_datetime_str)
-
-        # Save arguments & config to output folder
-        save_json(args, output_dated_folder, filename="arguments.json")
-        save_json(film_model_config, output_dated_folder, filename='config_%s.json' % film_model_config['input']['type'])
-
-        # Copy dictionary file used
-        shutil.copyfile(args.dict_file_path, "%s/dict.json" % output_dated_folder)
-
-    ########################################################
-    ################### Data Loading #######################
-    ########################################################
-    dataset = CLEARDataset(data_path, film_model_config['input'], batch_size=args.batch_size,
-                           tokenize_text=not is_preprocessing, dict_file_path=args.dict_file_path)
-
-    ########################################################
-    ################## Network Setup #######################
-    ########################################################
-    network_wrapper = FiLM_Network_Wrapper(film_model_config, dataset, preprocessing=is_preprocessing)
-
-    with tf.Session(config=tf.ConfigProto(gpu_options=tf.GPUOptions(allow_growth=True), allow_soft_placement=True)) as sess:
-        # Debugging Tools
-        #sess = tf_debug.TensorBoardDebugWrapperSession(sess, "T480s:8076")
-        train_writer = tf.summary.FileWriter(train_writer_folder, sess.graph)  # FIXME : Make the path parametrable ?
-        val_writer = tf.summary.FileWriter(val_writer_folder, sess.graph)  # FIXME : Make the path parametrable ?
-
-        #beholder = Beholder(beholder_folder)
-        beholder = None
-
-        if task == "train_film":
-            do_film_training(sess, dataset, network_wrapper, film_model_config['optimizer'],
-                             args.resnet_ckpt_path, args.nb_epoch, output_dated_folder,
-                             train_writer=train_writer, val_writer=val_writer, beholder=beholder,
-                             nb_epoch_to_keep=args.nb_epoch_stats_to_keep)
-
-        elif task == "inference":
-            do_batch_inference(sess, dataset, network_wrapper, output_dated_folder,
-                              args.film_ckpt_path, args.resnet_ckpt_path, set_name=args.inference_set)
-
-        elif task == "visualize_grad_cam":
-            grad_cam_visualization(sess, network_wrapper, args.film_ckpt_path, args.resnet_ckpt_path)
-
-        elif task == "feature_extract":
-            preextract_features(sess, dataset, network_wrapper, args.resnet_ckpt_path)
-
-        elif task == "create_dict":
-            create_dict_from_questions(dataset, force_all_answers=args.force_dict_all_answer)
-
-        elif task == "full_preprocessing":
-            create_dict_from_questions(dataset, force_all_answers=args.force_dict_all_answer)
-            preextract_features(sess, dataset, network_wrapper, args.resnet_ckpt_path)
-
-        time_elapsed = str(datetime.now() - current_datetime)
-
-        print("Execution took %s" % time_elapsed)
-
-        # TODO : Export Gamma & Beta
-        # TODO : Export visualizations
-
-    if create_output_folder:
-        save_json({'time_elapsed': time_elapsed}, output_dated_folder, filename='timing.json')
-
-        print("All Done")
+    ####################################
+    #   Exit
+    ####################################
+    on_exit_action(args, flags, paths, tensorboard)
 
 
+def on_exit_action(args, flags, paths, tensorboard):
+    if flags['use_tensorboard']:
+        close_tensorboard_writers(tensorboard['writers'])
+
+    if args['continue_training']:
+        fix_best_epoch_symlink_if_necessary(paths['output_dated_folder'], args['film_model_weight_path'])
+
+    time_elapsed = str(datetime.now() - paths["current_datetime"])
+
+    print("Execution took %s\n" % time_elapsed)
+
+    if flags['create_output_folder']:
+        save_json({'time_elapsed': time_elapsed}, paths["output_dated_folder"], filename='timing.json')
+
+
+def parse_args_string(string):
+    return vars(parser.parse_args(string.strip().split(' ')))
+
+
+# FIXME : Args is a namespace so it is available everywhere. Not a great idea to shadow it (But we get a dict key error if we try to access it so it is easiy catchable
 if __name__ == "__main__":
     args = parser.parse_args()
     main(args)
-
-        # TODO : Extract Beta And Gamma Parameters + T-SNE
-        # TODO : Feed RAW image directly to the FiLM network
-        # TODO : Quantify time cost of using raw images vs preprocessed conv features
-        # TODO : Resize images ? Do we absolutely need 224x224 for the resnet preprocessing ?
-        #        Since we extract a layer in resnet, we can feed any size, its fully convolutional up to that point
-        #        When feeding directly to FiLM, we can use original size ?
-        # TODO : What is the optimal size for our spectrograms ?
-        # TODO : Train with different amount of residual blocks. Other modifications to the architecture ?
-
-
-
