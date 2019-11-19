@@ -56,14 +56,18 @@ def chain_load_experiment_stats(output_experiment_dated_folder, continue_trainin
     else:
         stats = []
 
-    if film_model_weight_path is None:
-        # Read path to model weight in arguments json file
-        arguments = read_json(output_experiment_dated_folder, arguments_filename)
-
-        continue_training = arguments['continue_training']
-        film_model_weight_path = arguments['film_model_weight_path']
-
     if continue_training:
+
+        if film_model_weight_path is None:
+            # Read path to model weight in arguments json file
+            arguments = read_json(output_experiment_dated_folder, arguments_filename)
+
+            film_model_weight_path = arguments['film_model_weight_path']
+            continue_training = arguments['continue_training']
+
+            if not continue_training:
+                # The current experiment isn't continuing training no more previous stats to retrieve
+                return stats
 
         if film_model_weight_path == "latest":
             # Path for fallback with old behaviour
