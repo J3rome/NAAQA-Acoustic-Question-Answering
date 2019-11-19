@@ -65,10 +65,20 @@ class CLEAR_dataset(Dataset):
         self.scenes = {}
         self.answer_counter = collections.Counter()
         self.answers = []
+        self.longest_question_length = 0
 
         for i, sample in enumerate(self.questions):
             question_id = int(sample["question_index"])
             question = self.tokenizer.encode_question(sample["question"]) if tokenize_text else sample['question']
+
+            if tokenize_text:
+                # Remove the <start> and <end> tokens from the count
+                nb_word_in_question = len(question) - 2 if self.tokenizer.start_token else len(question)
+            else:
+                nb_word_in_question = len(question.split(' '))
+
+            if nb_word_in_question > self.longest_question_length:
+                self.longest_question_length = nb_word_in_question
 
             answer = sample.get("answer", None)  # None for test set
             if answer is not None:
