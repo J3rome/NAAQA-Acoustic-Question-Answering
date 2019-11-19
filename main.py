@@ -322,8 +322,7 @@ def prepare_for_task(args):
     #   Model Definition
     ####################################
     if flags['instantiate_model']:
-        input_image_torch_shape = datasets['train'].get_input_shape(
-            channel_first=True)  # Torch size have Channel as first dimension
+        input_image_torch_shape = datasets['train'].get_input_shape(channel_first=True)  # Torch size have Channel as first dimension
         feature_extractor_config = get_feature_extractor_config_from_args(args)
 
         film_model, optimizer, loss_criterion, scheduler = prepare_model(args, flags, paths, dataloaders, device,
