@@ -25,7 +25,7 @@ class CLEAR_dataset(Dataset):
 
     def __init__(self, folder, version_name, input_image_type, set_type, questions=None, transforms=None,
                  dict_file_path=None, load_question_program=False, preprocessed_folder_name="preprocessed",
-                 tokenize_text=True):
+                 tokenize_text=True, use_cache=True, synchronized_cache=False, max_cache_size=5000):
 
         self.root_folder_path = "%s/%s" % (folder, version_name)
         self.version_name = version_name
@@ -128,10 +128,10 @@ class CLEAR_dataset(Dataset):
 
         # Initialise image cache
         # We need shared memory and a Lock because this will be updated by each dataloader workers
-        self.use_cache = True
-        self.synchronised_cache = False
+        self.use_cache = use_cache
+        self.synchronized_cache = synchronized_cache
 
-        if self.synchronised_cache:
+        if self.synchronized_cache:
             self.multiprocessing_manager = mp.Manager()     # FIXME : Using mp.Array is probably more efficient
             self.cache_lock = mp.Lock()
             # FIXME: This is broken, won't focus on it since it doesn't help right now
@@ -144,7 +144,7 @@ class CLEAR_dataset(Dataset):
                 'indexes': set(),
                 'images': {},
                 'size': 0,
-                'max_size': 5000        # TODO : Set max cache size according to RAM
+                'max_size': max_cache_size        # TODO : Set max cache size according to RAM
             }
             
     @classmethod
@@ -235,7 +235,7 @@ class CLEAR_dataset(Dataset):
         return len(self.games)
 
     def load_image_from_cache(self, scene_id, image_filename):
-        if self.synchronised_cache:
+        if self.synchronized_cache:
             # We need to lock the cache to prevent writing race condition from multiple dataloader processes
             self.cache_lock.acquire()
 
@@ -256,7 +256,7 @@ class CLEAR_dataset(Dataset):
             self.image_cache['images'][scene_id] = image
             self.image_cache['size'] += 1
 
-        if self.synchronised_cache:
+        if self.synchronized_cache:
             # FIXME : Do we loose the advantages of multiprocessing if we lock on reading ? It basically work as if we only had 1 worker ?
             self.cache_lock.release()
 
