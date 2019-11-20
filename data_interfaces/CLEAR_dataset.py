@@ -145,7 +145,7 @@ class CLEAR_dataset(Dataset):
             }
             
     @classmethod
-    def from_dataset_object(cls, dataset_obj, questions):
+    def from_dataset_object(cls, dataset_obj, questions=None):
         folder_path = dataset_obj.root_folder_path.replace('/%s' % dataset_obj.version_name, '')
         return cls(folder_path, version_name=dataset_obj.version_name,
                    input_image_type=dataset_obj.input_image_type, set_type=dataset_obj.set,
