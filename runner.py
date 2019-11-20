@@ -249,30 +249,6 @@ def process_dataloader(is_training, device, model, dataloader, criterion=None, o
     return epoch_loss, epoch_acc, processed_predictions, zip(batch_lrs, batch_losses, batch_accs)
 
 
-def preload_images_to_ram(dataloader, batch_size=16):
-
-    dataset_copy = CLEAR_dataset.from_dataset_object(dataloader.dataset)
-
-    dataloader_copy = DataLoader(dataset_copy, shuffle=True, num_workers=0, collate_fn=dataloader.collate_fn,
-                                 batch_size=batch_size)
-
-    dataloader_copy.dataset.keep_1_game_per_scene()
-
-    images_loaded = 0
-    max_cache_size = dataloader_copy.dataset.image_cache['max_size']
-    print(f"Preloading images to cache. Cache size : {max_cache_size}")
-    for batch in tqdm(dataloader_copy):
-        images_loaded += batch_size
-
-        if images_loaded >= max_cache_size:
-            break
-
-    # Copy cache to original dataset
-    dataloader.dataset.image_cache = deepcopy(dataloader_copy.dataset.image_cache)
-
-    print("Done preloading images.")
-
-
 def train_model(device, model, dataloaders, output_folder, criterion, optimizer, scheduler=None,
                 nb_epoch=25, nb_epoch_to_keep=None, start_epoch=0, tensorboard=None):
 
@@ -424,3 +400,26 @@ def set_inference(device, model, dataloader, criterion, output_folder, save_gamm
 
     print("%s Accuracy : %.5f" % (set_type, acc))
 
+
+def preload_images_to_ram(dataloader, batch_size=16):
+
+    dataset_copy = CLEAR_dataset.from_dataset_object(dataloader.dataset)
+
+    dataloader_copy = DataLoader(dataset_copy, shuffle=True, num_workers=0, collate_fn=dataloader.collate_fn,
+                                 batch_size=batch_size)
+
+    dataloader_copy.dataset.keep_1_game_per_scene()
+
+    images_loaded = 0
+    max_cache_size = dataloader_copy.dataset.image_cache['max_size']
+    print(f"Preloading images to cache. Cache size : {max_cache_size}")
+    for batch in tqdm(dataloader_copy):
+        images_loaded += batch_size
+
+        if images_loaded >= max_cache_size:
+            break
+
+    # Copy cache to original dataset
+    dataloader.dataset.image_cache = deepcopy(dataloader_copy.dataset.image_cache)
+
+    print("Done preloading images.")
