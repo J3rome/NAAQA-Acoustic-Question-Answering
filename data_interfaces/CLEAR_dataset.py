@@ -129,12 +129,20 @@ class CLEAR_dataset(Dataset):
         # Initialise image cache
         # We need shared memory and a Lock because this will be updated by each dataloader workers
         self.use_cache = True
-        self.multiprocessing_manager = mp.Manager()     # FIXME : Using mp.Array is probably more efficient
-        self.cache_lock = mp.Lock()
-        self.image_cache = {
-            'indexes': self.multiprocessing_manager.list(),
-            'images': self.multiprocessing_manager.dict()
-        }
+        self.synchronised_cache = True
+
+        if self.synchronised_cache:
+            self.multiprocessing_manager = mp.Manager()     # FIXME : Using mp.Array is probably more efficient
+            self.cache_lock = mp.Lock()
+            self.image_cache = {
+                'indexes': self.multiprocessing_manager.list(),
+                'images': self.multiprocessing_manager.dict()
+            }
+        else:
+            self.image_cache = {
+                'indexes': [],
+                'images': {}
+            }
             
     @classmethod
     def from_dataset_object(cls, dataset_obj, questions):
@@ -228,8 +236,9 @@ class CLEAR_dataset(Dataset):
         # TODO : Set max cache size according to RAM
         max_cache_size = 2000
 
-        # We need to lock the cache to prevent writing race condition from multiple dataloader processes
-        self.cache_lock.acquire()
+        if self.synchronised_cache:
+            # We need to lock the cache to prevent writing race condition from multiple dataloader processes
+            self.cache_lock.acquire()
 
         if scene_id not in self.image_cache['indexes']:
             # Cache bust
@@ -246,8 +255,9 @@ class CLEAR_dataset(Dataset):
                                self.set).get_image()
             self.image_cache['images'][scene_id] = image
 
-        # FIXME : Do we loose the advantages of multiprocessing if we lock on reading ? It basically work as if we only had 1 worker ?
-        self.cache_lock.release()
+        if self.synchronised_cache:
+            # FIXME : Do we loose the advantages of multiprocessing if we lock on reading ? It basically work as if we only had 1 worker ?
+            self.cache_lock.release()
 
         return self.image_cache['images'][scene_id]
 
