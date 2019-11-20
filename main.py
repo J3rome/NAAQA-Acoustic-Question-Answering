@@ -212,20 +212,20 @@ def create_datasets(args, preprocessing_config, load_question_program=False):
     return datasets
 
 
-def create_dataloaders(datasets, batch_size, nb_process=8):
+def create_dataloaders(datasets, batch_size, nb_process=8, pin_memory=False):
     print("Creating Dataloaders")
     collate_fct = CLEAR_collate_fct(padding_token=datasets['train'].get_padding_token())
 
     # FIXME : Should take into account --nb_process, or at least the nb of core on the machine
     return {
         'train': DataLoader(datasets['train'], batch_size=batch_size, shuffle=True,
-                            num_workers=4, collate_fn=collate_fct),
+                            num_workers=4, collate_fn=collate_fct, pin_memory=pin_memory),
 
         'val': DataLoader(datasets['val'], batch_size=batch_size, shuffle=True,
-                          num_workers=4, collate_fn=collate_fct),
+                          num_workers=4, collate_fn=collate_fct, pin_memory=pin_memory),
 
         'test': DataLoader(datasets['test'], batch_size=batch_size, shuffle=False,
-                           num_workers=4, collate_fn=collate_fct)
+                           num_workers=4, collate_fn=collate_fct, pin_memory=pin_memory)
     }
 
 
