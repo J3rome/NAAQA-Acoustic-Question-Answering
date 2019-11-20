@@ -1,14 +1,17 @@
 import os
 import shutil
 from datetime import datetime
+from copy import deepcopy
 
 import subprocess
 from tqdm import tqdm
 import torch
 import torch.nn as nn
 from torch.optim.lr_scheduler import CyclicLR
+from torch.utils.data import DataLoader
 
 from models.CLEAR_film_model import CLEAR_FiLM_model
+from data_interfaces.CLEAR_dataset import CLEAR_dataset
 from models.metrics import calc_f1_score
 from utils.generic import save_batch_metrics, sort_stats, save_training_stats, chain_load_experiment_stats
 from utils.generic import optimizer_load_state_dict
@@ -244,6 +247,30 @@ def process_dataloader(is_training, device, model, dataloader, criterion=None, o
         batch_lrs = [0] * len(batch_losses)
 
     return epoch_loss, epoch_acc, processed_predictions, zip(batch_lrs, batch_losses, batch_accs)
+
+
+def preload_images_to_ram(dataloader, batch_size=16):
+
+    dataset_copy = CLEAR_dataset.from_dataset_object(dataloader.dataset)
+
+    dataloader_copy = DataLoader(dataset_copy, shuffle=True, num_workers=0, collate_fn=dataloader.collate_fn,
+                                 batch_size=batch_size)
+
+    dataloader_copy.dataset.keep_1_game_per_scene()
+
+    images_loaded = 0
+    max_cache_size = dataloader_copy.dataset.image_cache['max_size']
+    print(f"Preloading images to cache. Cache size : {max_cache_size}")
+    for batch in tqdm(dataloader_copy):
+        images_loaded += batch_size
+
+        if images_loaded >= max_cache_size:
+            break
+
+    # Copy cache to original dataset
+    dataloader.dataset.image_cache = deepcopy(dataloader_copy.dataset.image_cache)
+
+    print("Done preloading images.")
 
 
 def train_model(device, model, dataloaders, output_folder, criterion, optimizer, scheduler=None,
