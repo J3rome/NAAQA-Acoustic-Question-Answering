@@ -1,5 +1,6 @@
 import os
 import collections
+import multiprocessing as mp
 
 import ujson
 import numpy as np
@@ -65,10 +66,20 @@ class CLEAR_dataset(Dataset):
         self.scenes = {}
         self.answer_counter = collections.Counter()
         self.answers = []
+        self.longest_question_length = 0
 
         for i, sample in enumerate(self.questions):
             question_id = int(sample["question_index"])
             question = self.tokenizer.encode_question(sample["question"]) if tokenize_text else sample['question']
+
+            if tokenize_text:
+                # Remove the <start> and <end> tokens from the count
+                nb_word_in_question = len(question) - 2 if self.tokenizer.start_token else len(question)
+            else:
+                nb_word_in_question = len(question.split(' '))
+
+            if nb_word_in_question > self.longest_question_length:
+                self.longest_question_length = nb_word_in_question
 
             answer = sample.get("answer", None)  # None for test set
             if answer is not None:
@@ -114,6 +125,24 @@ class CLEAR_dataset(Dataset):
             self.answers.append(answer)
 
             self.answer_counter[answer] += 1
+
+        # Initialise image cache
+        # We need shared memory and a Lock because this will be updated by each dataloader workers
+        self.use_cache = True
+        self.synchronised_cache = True
+
+        if self.synchronised_cache:
+            self.multiprocessing_manager = mp.Manager()     # FIXME : Using mp.Array is probably more efficient
+            self.cache_lock = mp.Lock()
+            self.image_cache = {
+                'indexes': self.multiprocessing_manager.list(),
+                'images': self.multiprocessing_manager.dict()
+            }
+        else:
+            self.image_cache = {
+                'indexes': [],
+                'images': {}
+            }
             
     @classmethod
     def from_dataset_object(cls, dataset_obj, questions):
@@ -202,23 +231,56 @@ class CLEAR_dataset(Dataset):
     def __len__(self):
         return len(self.games)
 
+    def load_image_from_cache(self, scene_id, image_filename):
+
+        # TODO : Set max cache size according to RAM
+        max_cache_size = 2000
+
+        if self.synchronised_cache:
+            # We need to lock the cache to prevent writing race condition from multiple dataloader processes
+            self.cache_lock.acquire()
+
+        if scene_id not in self.image_cache['indexes']:
+            # Cache bust
+            if len(self.image_cache['indexes']) >= max_cache_size:
+                # Deleting oldest entry
+                del self.image_cache['images'][self.image_cache['indexes'][0]]
+                del self.image_cache['indexes'][0]
+
+            # Load image & Add to cache
+            self.image_cache['indexes'].append(scene_id)
+            image = CLEARImage(scene_id,
+                               image_filename,
+                               self.image_builder,
+                               self.set).get_image()
+            self.image_cache['images'][scene_id] = image
+
+        if self.synchronised_cache:
+            # FIXME : Do we loose the advantages of multiprocessing if we lock on reading ? It basically work as if we only had 1 worker ?
+            self.cache_lock.release()
+
+        return self.image_cache['images'][scene_id]
+
     def __getitem__(self, idx):
         requested_game = self.get_game(idx)
 
-        # Reference to H5py file must be shared between workers (when dataloader.num_workers > 0)
-        # We create the image here since it will create the img_builder which contain the h5 file ref
-        # See See https://discuss.pytorch.org/t/dataloader-when-num-worker-0-there-is-bug/25643/33
-        image = CLEARImage(requested_game['image']['id'],
-                           requested_game['image']['filename'],
-                           self.image_builder,
-                           requested_game['image']['set'])
+        if self.use_cache:
+            image = self.load_image_from_cache(requested_game['image']['id'], requested_game['image']['filename'])
+        else:
+            # Reference to H5py file must be shared between workers (when dataloader.num_workers > 0)
+            # We create the image here since it will create the img_builder which contain the h5 file ref
+            # See See https://discuss.pytorch.org/t/dataloader-when-num-worker-0-there-is-bug/25643/33
+            image = CLEARImage(requested_game['image']['id'],
+                               requested_game['image']['filename'],
+                               self.image_builder,
+                               requested_game['image']['set']).get_image()
 
         game_with_image = {
             'id': requested_game['id'],
-            'image': image.get_image(),
+            'image': image,
             'question': np.array(requested_game['question']),
             'answer': np.array(requested_game['answer']),
-            'scene_id': image.id
+            'scene_id': requested_game['image']['id']
         }
 
         if 'program' in requested_game:
