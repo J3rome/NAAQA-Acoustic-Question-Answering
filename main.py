@@ -212,7 +212,7 @@ def create_datasets(args, preprocessing_config, load_question_program=False):
     return datasets
 
 
-def create_dataloaders(datasets, batch_size, nb_process=8, pin_memory=False):
+def create_dataloaders(datasets, batch_size, nb_process=8, pin_memory=True):
     print("Creating Dataloaders")
     collate_fct = CLEAR_collate_fct(padding_token=datasets['train'].get_padding_token())
 
