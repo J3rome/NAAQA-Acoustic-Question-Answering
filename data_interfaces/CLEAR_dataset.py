@@ -64,6 +64,7 @@ class CLEAR_dataset(Dataset):
         nb_games = len(self.questions)
         self.games = multiprocessing.Array(ctypes.c_wchar_p, [""]*nb_games)
         self.scenes = {}
+        self.nb_scene = 0
         self.answer_counter = collections.Counter()
         self.answers = []
         self.longest_question_length = 0
@@ -115,6 +116,8 @@ class CLEAR_dataset(Dataset):
                     'filename': image_filename,
                     'question_idx': [i]
                 }
+
+                self.nb_scene += 1
 
                 if self.scenes_def:
                     self.scenes[image_id]['definition'] = self.scenes_def[image_id]
