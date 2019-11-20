@@ -264,6 +264,12 @@ def train_model(device, model, dataloaders, output_folder, criterion, optimizer,
     stats_file_path = "%s/stats.json" % output_folder
     removed_epoch = []
 
+
+    # Preload images
+    for set_type, dataloader in dataloaders.items():
+        if dataloader.dataset.use_cache:
+            preload_images_to_ram(dataloader)
+
     since = datetime.now()
 
     # Early stopping (Only enable when we are running at least 20 epoch)
@@ -402,9 +408,13 @@ def set_inference(device, model, dataloader, criterion, output_folder, save_gamm
 
 
 def preload_images_to_ram(dataloader, batch_size=16):
+    # Each worker will have a whole copy of the cache so this might take some RAM.
+    # If the cache['max_size'] is smaller than the dataset, each worker will update its own cache.
+    # No synchronisation between the workers will be done except for this primary preloading step
 
     dataset_copy = CLEAR_dataset.from_dataset_object(dataloader.dataset)
 
+    # We need to retrieve the data in the main thread (worker=0) to be able to retrieve the cache
     dataloader_copy = DataLoader(dataset_copy, shuffle=True, num_workers=0, collate_fn=dataloader.collate_fn,
                                  batch_size=batch_size)
 
