@@ -147,7 +147,7 @@ class CLEAR_dataset(Dataset):
                 'indexes': set(),
                 'images': {},
                 'size': 0,
-                'max_size': max_cache_size        # TODO : Set max cache size according to RAM
+                'max_size': min(max_cache_size, self.nb_scene)        # TODO : Set max cache size according to RAM
             }
             
     @classmethod
