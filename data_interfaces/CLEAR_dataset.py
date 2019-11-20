@@ -129,19 +129,22 @@ class CLEAR_dataset(Dataset):
         # Initialise image cache
         # We need shared memory and a Lock because this will be updated by each dataloader workers
         self.use_cache = True
-        self.synchronised_cache = True
+        self.synchronised_cache = False
 
         if self.synchronised_cache:
             self.multiprocessing_manager = mp.Manager()     # FIXME : Using mp.Array is probably more efficient
             self.cache_lock = mp.Lock()
+            # FIXME: This is broken, won't focus on it since it doesn't help right now
             self.image_cache = {
                 'indexes': self.multiprocessing_manager.list(),
                 'images': self.multiprocessing_manager.dict()
             }
         else:
             self.image_cache = {
-                'indexes': [],
-                'images': {}
+                'indexes': set(),
+                'images': {},
+                'size': 0,
+                'max_size': 5000        # TODO : Set max cache size according to RAM
             }
             
     @classmethod
@@ -232,28 +235,26 @@ class CLEAR_dataset(Dataset):
         return len(self.games)
 
     def load_image_from_cache(self, scene_id, image_filename):
-
-        # TODO : Set max cache size according to RAM
-        max_cache_size = 2000
-
         if self.synchronised_cache:
             # We need to lock the cache to prevent writing race condition from multiple dataloader processes
             self.cache_lock.acquire()
 
         if scene_id not in self.image_cache['indexes']:
             # Cache bust
-            if len(self.image_cache['indexes']) >= max_cache_size:
-                # Deleting oldest entry
-                del self.image_cache['images'][self.image_cache['indexes'][0]]
-                del self.image_cache['indexes'][0]
+            if self.image_cache['size'] >= self.image_cache['max_size']:
+                # Deleting oldest entry (Not guaranteed, pop() set doesn't guarantee order)
+                cache_idx = self.image_cache['indexes'].pop()
+                del self.image_cache['images'][cache_idx]
+                self.image_cache['size'] -= 1
 
             # Load image & Add to cache
-            self.image_cache['indexes'].append(scene_id)
+            self.image_cache['indexes'].add(scene_id)
             image = CLEARImage(scene_id,
                                image_filename,
                                self.image_builder,
                                self.set).get_image()
             self.image_cache['images'][scene_id] = image
+            self.image_cache['size'] += 1
 
         if self.synchronised_cache:
             # FIXME : Do we loose the advantages of multiprocessing if we lock on reading ? It basically work as if we only had 1 worker ?
