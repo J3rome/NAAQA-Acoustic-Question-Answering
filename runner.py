@@ -249,17 +249,29 @@ def process_dataloader(is_training, device, model, dataloader, criterion=None, o
     return epoch_loss, epoch_acc, processed_predictions, zip(batch_lrs, batch_losses, batch_accs)
 
 
-def one_game_inference(device, model, dataloader, question, scene_id, nb_top_pred=10):
+def one_game_inference_by_id(device, model, dataloader, game_id, nb_top_pred=10):
+    game = dataloader.dataset[game_id]
+    return one_game_inference(device, model, game, dataloader.collate_fn, dataloader.dataset.tokenizer,
+                              nb_top_pred=nb_top_pred)
+
+
+def custom_question_inference(device, model, dataloader, question, scene_id, nb_top_pred=10):
     dataset = dataloader.dataset
 
-    # Tokenize Input question       # TODO : Allow for run with game id
+    # Tokenize Input question
     tokenized_question = dataset.tokenizer.encode_question(question)
 
     # Retrieve game with requested scene_id. Copy it & Replace the question
     game_idx = dataset.scenes[scene_id]['question_idx'][0]
     game = deepcopy(dataset[game_idx])
     game['question'] = torch.tensor(tokenized_question)
-    one_game_batch = dataloader.collate_fn([game])
+
+    return one_game_inference(device, model, game, dataloader.collate_fn, dataloader.dataset.tokenizer,
+                              nb_top_pred=nb_top_pred)
+
+
+def one_game_inference(device, model, game, collate_fn, tokenizer, nb_top_pred=10):
+    one_game_batch = collate_fn([game])
 
     # Set up model in eval mode
     model.eval()
@@ -275,7 +287,7 @@ def one_game_inference(device, model, dataloader, question, scene_id, nb_top_pre
         top_probs, top_preds = torch.topk(softmax_output.squeeze(0), nb_top_pred)
 
     # [('answer1', 0.9), ('answer2', 0.7), ... ('answerX', 0.02)]
-    return [(dataset.tokenizer.decode_answer(pred), prob) for pred, prob in zip(top_preds.tolist(), top_probs.tolist())]
+    return [(tokenizer.decode_answer(pred), prob) for pred, prob in zip(top_preds.tolist(), top_probs.tolist())]
 
 
 def inference(set_type, device, model, dataloader, output_folder, criterion):
