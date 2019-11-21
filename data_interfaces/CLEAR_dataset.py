@@ -7,7 +7,7 @@ import numpy as np
 import torch
 from torch.utils.data import Dataset
 import torch.nn.functional as F
-from torchvision import transforms
+from torchvision import transforms as viz_transforms
 
 from data_interfaces.CLEAR_image_loader import get_img_builder, CLEARImage
 from utils.file import read_json, get_size_from_image_header
@@ -232,7 +232,7 @@ class CLEAR_dataset(Dataset):
 
     def add_transform(self, transform):
         # Create a new Compose object because initially, the object is shared between all dataset instances
-        self.transforms = transforms.Compose(self.transforms.transforms + [transform])
+        self.transforms = viz_transforms.Compose(self.transforms.transforms + [transform])
 
     def __len__(self):
         return len(self.games)
