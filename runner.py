@@ -249,6 +249,35 @@ def process_dataloader(is_training, device, model, dataloader, criterion=None, o
     return epoch_loss, epoch_acc, processed_predictions, zip(batch_lrs, batch_losses, batch_accs)
 
 
+def one_game_inference(device, model, dataloader, question, scene_id, nb_top_pred=10):
+    dataset = dataloader.dataset
+
+    # Tokenize Input question       # TODO : Allow for run with game id
+    tokenized_question = dataset.tokenizer.encode_question(question)
+
+    # Retrieve game with requested scene_id. Copy it & Replace the question
+    game_idx = dataset.scenes[scene_id]['question_idx'][0]
+    game = deepcopy(dataset[game_idx])
+    game['question'] = torch.tensor(tokenized_question)
+    one_game_batch = dataloader.collate_fn([game])
+
+    # Set up model in eval mode
+    model.eval()
+
+    # Copy data to GPU
+    image = one_game_batch['image'].to(device)
+    question = one_game_batch['question'].to(device)
+    seq_length = one_game_batch['seq_length'].to(device)
+
+    with torch.set_grad_enabled(False):
+        _, softmax_output = model(question, seq_length, image, pack_sequence=True)
+
+        top_probs, top_preds = torch.topk(softmax_output.squeeze(0), nb_top_pred)
+
+    # [('answer1', 0.9), ('answer2', 0.7), ... ('answerX', 0.02)]
+    return [(dataset.tokenizer.decode_answer(pred), prob) for pred, prob in zip(top_preds.tolist(), top_probs.tolist())]
+
+
 def inference(set_type, device, model, dataloader, output_folder, criterion):
     print(f"Running model on {set_type} set")
     loss, acc, predictions, metrics = process_dataloader(False, device, model, dataloader, criterion,
