@@ -119,8 +119,8 @@ def update_arguments(args, paths, flags):
                                                            'do inference or to continue training.'
 
         # If path specified is a date, we construct the path to the best model weights for the specified run
-        base_path = "%s/training/%s/%s" % (args['output_root_path'], paths["output_name"], args['film_model_weight_path'])
-        # Note : We might redo some epoch when continuing training because the 'best' epoch is not necessarely the last
+        base_path = f"{args['output_root_path']}/training/{paths['output_name']}/{args['film_model_weight_path']}"
+        # Note : We might redo some epoch when continuing training because the 'best' epoch is not necessarily the last
         suffix = "best/model.pt.tar"
 
         if is_date_string(args['film_model_weight_path']):
