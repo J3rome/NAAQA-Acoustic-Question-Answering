@@ -249,6 +249,18 @@ def process_dataloader(is_training, device, model, dataloader, criterion=None, o
     return epoch_loss, epoch_acc, processed_predictions, zip(batch_lrs, batch_losses, batch_accs)
 
 
+def inference(set_type, device, model, dataloader, output_folder, criterion):
+    print(f"Running model on {set_type} set")
+    loss, acc, predictions, metrics = process_dataloader(False, device, model, dataloader, criterion,
+                                                         gamma_beta_path=f"{output_folder}/{set_type}_gamma_beta.h5")
+
+    save_json(predictions, output_folder, filename=f"{set_type}_predictions.json")
+    save_json({'accuracy': acc, 'loss': loss}, output_folder, filename=f"{set_type}_stats.json")
+
+    print(f"Accuracy : {acc} --- Loss : {loss}")
+    print(f"All stats saved to '{output_folder}'")
+
+
 def train_model(device, model, dataloaders, output_folder, criterion, optimizer, scheduler=None,
                 nb_epoch=25, nb_epoch_to_keep=None, start_epoch=0, tensorboard=None):
 
@@ -389,22 +401,6 @@ def train_model(device, model, dataloaders, output_folder, criterion, optimizer,
     # TODO : load best model weights ?
     #model.load_state_dict(best_model_state)
     return model
-
-# TODO : Interactive mode, One game at a time
-
-def set_inference(device, model, dataloader, criterion, output_folder, save_gamma_beta=True):
-    set_type = dataloader.dataset.set
-
-    if save_gamma_beta:
-        gamma_beta_path = '%s/%s_gamma_beta.h5' % (output_folder, set_type)
-    else:
-        gamma_beta_path = None
-
-    _, acc, predictions = process_dataloader(False, device, model, dataloader, criterion=criterion, gamma_beta_path=None)#gamma_beta_path)
-
-    save_json(predictions, output_folder, filename='%s_predictions.json' % set_type)
-
-    print("%s Accuracy : %.5f" % (set_type, acc))
 
 
 def preload_images_to_ram(dataloader, batch_size=16):

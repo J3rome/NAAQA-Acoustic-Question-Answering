@@ -42,7 +42,7 @@ def create_flags_from_args(task, args):
 
     flags['restore_model_weights'] = task in ['inference', 'visualize_grad_cam'] or args['continue_training']
     flags['use_tensorboard'] = 'train' in task
-    flags['create_loss_criterion'] = task in ['training', 'lr_finder']
+    flags['create_loss_criterion'] = task in ['training', 'lr_finder', 'inference']
     flags['create_optimizer'] = task in ['training', 'lr_finder']
     flags['force_sgd_optimizer'] = task == 'lr_finder' or args['cyclical_lr']
     flags['load_question_program'] = task.startswith('notebook')

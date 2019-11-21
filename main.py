@@ -6,7 +6,7 @@ from torch.utils.data import DataLoader
 import torch.nn as nn
 from torchvision import transforms
 
-from runner import train_model, set_inference, prepare_model
+from runner import train_model, prepare_model, inference
 from baselines import random_answer_baseline, random_weight_baseline
 from preprocessing import create_dict_from_questions, extract_features, images_to_h5, get_lr_finder_curves
 from preprocessing import write_clear_mean_to_config
@@ -245,8 +245,11 @@ def execute_task(task, args, output_dated_folder, dataloaders, model, model_conf
                     tensorboard=tensorboard)
 
     elif task == "inference":
-        set_inference(device=device, model=model, dataloader=dataloaders['test'], criterion=nn.CrossEntropyLoss(),
-                      output_folder=output_dated_folder)
+        assert args['inference_set'] in dataloaders, "Invalid set name. A dataloader must exist for this set"
+
+        inference(device=device, model=model, set_type=args['inference_set'],
+                  dataloader=dataloaders[args['inference_set']], criterion=loss_criterion,
+                  output_folder=output_dated_folder)
 
     elif task == "create_dict":
         create_dict_from_questions(dataloaders['train'].dataset, force_all_answers=args['force_dict_all_answer'],
