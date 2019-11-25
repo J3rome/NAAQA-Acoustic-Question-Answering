@@ -90,8 +90,8 @@ h5_feature_key="features"
 h5_idx_key="idx2img"
 
 class h5FeatureBuilder(AbstractImgBuilder):
-    def __init__(self, img_dir, bufferize):
-        AbstractImgBuilder.__init__(self, img_dir, is_raw=False)
+    def __init__(self, img_dir, bufferize, is_raw=False):
+        AbstractImgBuilder.__init__(self, img_dir, is_raw=is_raw)
         self.bufferize = bufferize
         self.h5files = dict()
         self.img2idx = dict()
@@ -105,7 +105,7 @@ class h5FeatureBuilder(AbstractImgBuilder):
             h5filename = h5_basename
 
         # Build full path
-        h5filepath = os.path.join(self.img_dir,h5filename)
+        h5filepath = os.path.join(self.img_dir, h5filename)
 
         # Retrieve
         if h5filename not in self.h5files:
@@ -196,7 +196,8 @@ def get_img_builder(input_image_type, data_dir, preprocessed_folder_name='prepro
                 assert False, "Preprocessed folder '%s' doesn't exist" % preprocessed_folder_path
 
         bufferize = bufferize if bufferize is not None else False
-        loader = h5FeatureBuilder(os.path.join(data_dir, preprocessed_folder_name), bufferize=bufferize)
+        loader = h5FeatureBuilder(os.path.join(data_dir, preprocessed_folder_name, is_raw='raw' in input_type),
+                                  bufferize=bufferize)
     elif input_type == "raw":
         # TODO : Make the 'images' path parametrable
         loader = RawImageBuilder(os.path.join(data_dir, 'images'))
