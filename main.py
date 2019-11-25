@@ -38,8 +38,12 @@ parser.add_argument("--random_weight_baseline", help="Use randomly initialised N
 parser.add_argument("--lr_finder", help="Create LR Finder plot", action='store_true')
 parser.add_argument("--notebook_data_analysis", help="Will prepare dataloaders for analysis in notebook "
                                                      "(Should not be run via main.py)", action='store_true')
+parser.add_argument("--notebook_model_inference", help="Will prepare dataloaders & model for inference in notebook"
+                                                     "(Should not be run via main.py)", action='store_true')
 parser.add_argument("--write_clear_mean_to_config", help="Will calculate the mean and std of the dataset and write it "
                                                          "to the config file", action='store_true')
+
+
 
 # Input parameters
 parser.add_argument("--data_root_path", type=str, default='data', help="Directory with data")

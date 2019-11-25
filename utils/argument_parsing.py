@@ -18,13 +18,14 @@ def validate_arguments(args):
     mutually_exclusive_params = [args['training'], args['inference'], args['feature_extract'], args['create_dict'],
                                  args['visualize_gamma_beta'], args['visualize_grad_cam'], args['lr_finder'],
                                  args['write_clear_mean_to_config'], args['random_answer_baseline'],
-                                 args['random_weight_baseline'], args['prepare_images'], args['notebook_data_analysis']]
+                                 args['random_weight_baseline'], args['prepare_images'], args['notebook_data_analysis'],
+                                 args['notebook_model_inference']]
 
     assert sum(mutually_exclusive_params) == 1, \
         "[ERROR] Can only do one task at a time " \
         "(--training, --inference, --visualize_gamma_beta, --create_dict, --feature_extract --visualize_grad_cam " \
         "--prepare_images, --lr_finder, --write_clear_mean_to_config, --random_answer_baseline, " \
-        "--random_weight_baseline, --notebook_data_analysis)"
+        "--random_weight_baseline, --notebook_data_analysis, --notebook_model_inference)"
 
     mutually_exclusive_params = [args['raw_img_resize_based_on_height'], args['raw_img_resize_based_on_width']]
     assert sum(mutually_exclusive_params) < 2, "[ERROR] Image resize can be either --raw_img_resize_based_on_height " \
@@ -40,7 +41,7 @@ def validate_arguments(args):
 def create_flags_from_args(task, args):
     flags = {}
 
-    flags['restore_model_weights'] = task in ['inference', 'visualize_grad_cam'] or args['continue_training']
+    flags['restore_model_weights'] = task in ['inference', 'visualize_grad_cam', 'notebook_model_inference'] or args['continue_training']
     flags['use_tensorboard'] = 'train' in task
     flags['create_loss_criterion'] = task in ['training', 'lr_finder', 'inference']
     flags['create_optimizer'] = task in ['training', 'lr_finder']
@@ -53,7 +54,8 @@ def create_flags_from_args(task, args):
                                           'visualize_grad_cam',
                                           'feature_extract',
                                           'lr_finder',
-                                          'random_weight_baseline']
+                                          'random_weight_baseline',
+                                          'notebook_model_inference']
 
     return flags
 
@@ -75,7 +77,7 @@ def get_paths_from_args(task, args):
 def get_task_from_args(args):
     tasks = ['training', 'inference', 'visualize_gamma_beta', 'visualize_grad_cam', 'feature_extract', 'prepare_images',
              'create_dict', 'lr_finder', 'write_clear_mean_to_config', 'random_weight_baseline',
-             'random_answer_baseline', 'notebook_data_analysis']
+             'random_answer_baseline', 'notebook_data_analysis', 'notebook_model_inference']
 
     for task in tasks:
         if task in args and args[task]:
