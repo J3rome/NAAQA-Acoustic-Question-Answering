@@ -271,6 +271,7 @@ def custom_question_inference(device, model, dataloader, question, scene_id, nb_
 
 
 def one_game_inference(device, model, game, collate_fn, tokenizer, nb_top_pred=10):
+    # TODO : Add parameter 'up_to_prob'
     one_game_batch = collate_fn([game])
 
     # Set up model in eval mode
