@@ -259,7 +259,7 @@ def custom_question_inference(device, model, dataloader, question, scene_id, nb_
     dataset = dataloader.dataset
 
     # Tokenize Input question
-    tokenized_question = dataset.tokenizer.encode_question(question)
+    tokenized_question = dataset.tokenizer.encode_question(question.lower())
 
     # Retrieve game with requested scene_id. Copy it & Replace the question
     game_idx = dataset.scenes[scene_id]['question_idx'][0]
