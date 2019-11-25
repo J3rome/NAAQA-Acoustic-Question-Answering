@@ -3,7 +3,8 @@ import numpy as np
 from collections import defaultdict
 
 from utils.file import read_gamma_beta_h5
-from utils.random import get_random_state, set_random_state
+
+from utils.visualization import visualize_cam
 from utils.processing import process_predictions
 
 import plotly.graph_objects as go
@@ -12,12 +13,8 @@ from plotly.io import write_html
 from sklearn.manifold import TSNE as sk_TSNE
 from tsnecuda import TSNE as cuda_TSNE
 
-import matplotlib.pyplot as plt
-import matplotlib.patches as patches
-import matplotlib.font_manager as font_manager
-
 from models.gradcam import GradCAM
-from models.torchsummary import summary     # Custom version of torchsummary to fix bugs with input
+
 from torchvision.utils import make_grid
 
 from data_interfaces.CLEAR_dataset import CLEAR_dataset
@@ -55,26 +52,6 @@ def get_question_type(question_nodes):
         last_node_type = special_ending_nodes_correspondence[last_node_type]
 
     return last_node_type.title().replace('_', ' ')
-
-
-def save_graph_to_tensorboard(model, tensorboard, input_image_torch_shape):
-    # FIXME : For now we are ignoring TracerWarnings. Not sure the saved graph is 100% accurate...
-    import warnings
-    warnings.filterwarnings('ignore', category=torch.jit.TracerWarning)
-
-    # FIXME : Test on GPU
-    dummy_input = [torch.ones(2, 22, dtype=torch.long),
-                   torch.ones(2, 1, dtype=torch.long),
-                   torch.ones(2, *input_image_torch_shape, dtype=torch.float)]
-    tensorboard['writers']['train'].add_graph(model, dummy_input)
-
-
-def print_model_summary(model, input_image_torch_shape, device="cpu"):
-    # Printing summary affects the random state (Raw Vs Pre-Extracted Features).
-    # We restore it to ensure reproducibility between input type
-    random_state = get_random_state()
-    summary(model, [(22,), (1,), input_image_torch_shape], device=device)
-    set_random_state(random_state)
 
 
 def gamma_beta_2d_vis_per_feature_map(gamma_per_resblock, beta_per_resblock, resblock_keys, nb_dim_resblock, questions_type):
@@ -144,6 +121,7 @@ def visualize_gamma_beta(gamma_beta_path, dataloaders, output_folder):
         idx_to_questions[question['question_index']] = question
 
     questions = [idx_to_questions[idx] for idx in question_indexes]
+    # FIXME : Question type now included in dataset object
     question_types = [get_question_type(q['program']) for q in questions]
 
     question_type_to_color_map = {q_type: i for i, q_type in enumerate(set(question_types))}
@@ -204,57 +182,6 @@ def plot_tsne_per_resblock(vals, question_types, title="T-SNE"):
             )
 
     return figs
-
-
-def get_tagged_scene(dataset, game_id, remove_padding=False):
-    assert dataset.is_raw_img(), 'Only support tagging when config is set to RAW img'
-
-    # FIXME : Take padding into account
-    # FIXME : Pass gradcam img
-
-    toPILimg_transform = transforms.ToPILImage()
-
-    # Retrieving scenes definition
-    scenes = {int(s['scene_index']): s for s in dataset.scenes_def}
-
-    game = dataset[game_id]
-    pil_img = toPILimg_transform(game['image'])
-    scene = scenes[game['scene_id']]
-    scene_duration = sum([o['duration'] + o['silence_after'] for o in scene['objects']]) + scene['silence_before']
-    image_padding = game['image_padding'].tolist()
-
-    time_resolution = int(scene_duration/(pil_img.width - image_padding[1]) + 0.5)   # Ms/pixel
-
-    if remove_padding:
-        pil_img = pil_img.crop((0,0,pil_img.width-image_padding[1], pil_img.height-image_padding[0]))
-
-    fig, ax = plt.subplots(1, figsize=((pil_img.width + 50)/100, (pil_img.height + 150)/100), dpi=100)
-    ax.imshow(pil_img)
-
-    annotation_colors = [np.random.rand(3) for i in range(len(scene['objects']))]
-    annotations = {}
-
-    current_position = int(scene['silence_before'] / time_resolution)
-    for i, sound in enumerate(scene['objects']):
-        sound_duration_in_px = int(sound['duration']/time_resolution + 0.5)
-        sound_silence_in_px = int(sound['silence_after']/time_resolution + 0.5)
-        annotation_rect = patches.Rectangle((current_position, 2), width=sound_duration_in_px,
-                                            height=pil_img.height - 4, fill=False, color=annotation_colors[i],
-                                            linewidth=1.4)
-        key = f"{sound['instrument'].capitalize()}/{sound['brightness']}/{sound['loudness']}/{sound['note']}/{sound['id']}"
-        annotations[key] = annotation_rect
-        ax.add_patch(annotation_rect)
-
-        current_position += sound_duration_in_px + sound_silence_in_px
-
-    # TODO : Add correct scale to axis (Freq & time)
-    ax.legend(annotations.values(), annotations.keys(), bbox_to_anchor=(0.5, -0.45), loc='lower center', ncol=2,
-              prop=font_manager.FontProperties(family='sans-serif', size='small'))
-    fig.tight_layout()
-    plt.show()
-
-
-    # TODO : Define vertical lines position
 
 
 def grad_cam_visualization(device, model, dataloader, output_folder, nb_game_per_img=10, limit_dataset=45):
@@ -339,26 +266,3 @@ def grad_cam_visualization(device, model, dataloader, output_folder, nb_game_per
 
     print("GradCAM Visualization Done. See %s for results" % output_folder)
 
-
-def visualize_cam(mask, img):
-    """ Taken from https://github.com/vickyliin/gradcam_plus_plus-pytorch
-    Make heatmap from mask and synthesize GradCAM result image using heatmap and img.
-    Args:
-        mask (torch.tensor): mask shape of (1, 1, H, W) and each element has value in range [0, 1]
-        img (torch.tensor): img shape of (1, 3, H, W) and each pixel value is in range [0, 1]
-
-    Return:
-        heatmap (torch.tensor): heatmap img shape of (3, H, W)
-        result (torch.tensor): synthesized GradCAM result of same shape with heatmap.
-    """
-    import cv2       # Not an official dependency
-    heatmap = (255 * mask.squeeze()).type(torch.uint8).cpu().numpy()
-    heatmap = cv2.applyColorMap(heatmap, cv2.COLORMAP_JET)
-    heatmap = torch.from_numpy(heatmap).permute(2, 0, 1).float().div(255)
-    b, g, r = heatmap.split(1)
-    heatmap = torch.cat([r, g, b])
-
-    result = heatmap+img.cpu()
-    result = result.div(result.max()).squeeze()
-
-    return heatmap, result

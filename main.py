@@ -10,7 +10,7 @@ from runner import train_model, prepare_model, inference
 from baselines import random_answer_baseline, random_weight_baseline
 from preprocessing import create_dict_from_questions, extract_features, images_to_h5, get_lr_finder_curves
 from preprocessing import write_clear_mean_to_config
-from visualization import visualize_gamma_beta, grad_cam_visualization, print_model_summary, save_graph_to_tensorboard
+from visualization import visualize_gamma_beta, grad_cam_visualization
 from data_interfaces.CLEAR_dataset import CLEAR_dataset, CLEAR_collate_fct
 from data_interfaces.transforms import ToTensor, ImgBetweenZeroOne, ResizeImgBasedOnHeight, ResizeImgBasedOnWidth
 from data_interfaces.transforms import PadTensor, NormalizeSample, ResizeTensor
@@ -18,6 +18,7 @@ from data_interfaces.transforms import PadTensor, NormalizeSample, ResizeTensor
 from utils.file import save_model_config, save_json, read_json, create_symlink_to_latest_folder
 from utils.file import create_folders_save_args, fix_best_epoch_symlink_if_necessary
 from utils.random import set_random_seed
+from utils.visualization import print_model_summary, save_graph_to_tensorboard
 from utils.argument_parsing import get_args_task_flags_paths, get_feature_extractor_config_from_args
 from utils.logging import create_tensorboard_writers, close_tensorboard_writers
 
