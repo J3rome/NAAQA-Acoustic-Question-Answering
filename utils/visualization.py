@@ -4,6 +4,7 @@ import matplotlib.font_manager as font_manager
 from torchvision.transforms import ToPILImage
 import numpy as np
 import torch
+import pandas as pd
 
 from utils.random import get_random_state, set_random_state
 from models.torchsummary import summary     # Custom version of torchsummary to fix bugs with input
@@ -18,7 +19,7 @@ def print_model_summary(model, input_image_torch_shape, device="cpu"):
 
 
 def get_tagged_scene(dataset, game_or_game_id, scene_image=None, remove_padding=False, show_legend=True, show_fig=False,
-                     fig_ax=None):
+                     fig_title=None, fig_ax=None):
     assert dataset.is_raw_img() or scene_image is not None, 'Image to tag must be provided if not in RAW mode'
 
     if type(game_or_game_id) == int:
@@ -44,8 +45,10 @@ def get_tagged_scene(dataset, game_or_game_id, scene_image=None, remove_padding=
     if fig_ax:
         fig, ax = fig_ax
     else:
-        fig, ax = plt.subplots(1, figsize=((image_width + 50)/100, (image_height + 150)/100), dpi=100)
+        fig, ax = plt.subplots()#1, figsize=((image_width + 50)/100, (image_height + 150)/100), dpi=100)
 
+    if fig_title is not None:
+        fig.suptitle(fig_title)
     ax.imshow(ToPILImage()(image))
 
     # Retrieve scene informations
@@ -87,6 +90,50 @@ def get_tagged_scene(dataset, game_or_game_id, scene_image=None, remove_padding=
     return (fig, ax), rgb_colors
 
 
+def df_col_styler(col_colors=None):
+    # Pandas dataframe styler. Each columns will have a color defined by 'col_colors'
+    default_style = "text-transform: capitalize;"
+
+    def apply_style(x):
+        # copy df to new - original data are not changed
+        df = x.copy()
+
+        for i in range(len(df.columns)):
+            if col_colors:
+                color = f"rgba({col_colors[i][0]},{col_colors[i][1]},{col_colors[i][2]}, 0.6)"
+                style = f"{default_style} background-color: {color};"
+            else:
+                style = default_style
+            df[i] = style
+
+        return df
+
+    return apply_style
+
+
+def get_tagged_scene_table_legend(dataloader, scene_id, col_colors=None):
+    sounds = dataloader.dataset.scenes[scene_id]['definition']['objects']
+
+    legend = pd.DataFrame(sounds, columns=['instrument', 'loudness', 'brightness', 'note', 'id']).T
+
+    legend.style.set_table_attributes("style='display:inline'").set_caption('Caption table')
+
+    legend = legend.style.apply(df_col_styler(col_colors), axis=None)
+    return legend
+
+
+def print_top_preds(top_preds, question, answer=None):
+    print(f"Question : {question}")
+    if answer is not None:
+        if answer == top_preds[0][0]:
+            print("Correct Answer")
+        else:
+            print(f"Wrong Answer. Correct answer is : {answer}")
+
+    for i, (ans, class_id, prob) in enumerate(top_preds):
+        print("{:>10} {:>25} ---- {}".format(f"Guess {i + 1}:", ans.capitalize(), str(prob)))
+
+
 def save_graph_to_tensorboard(model, tensorboard, input_image_torch_shape):
     # FIXME : For now we are ignoring TracerWarnings. Not sure the saved graph is 100% accurate...
     import warnings
@@ -97,6 +144,36 @@ def save_graph_to_tensorboard(model, tensorboard, input_image_torch_shape):
                    torch.ones(2, 1, dtype=torch.long),
                    torch.ones(2, *input_image_torch_shape, dtype=torch.float)]
     tensorboard['writers']['train'].add_graph(model, dummy_input)
+
+import cv2
+def get_gradcam_heatmap(mask):
+    # Remove unnecessary dimensions
+    while len(mask.shape) > 2:
+        mask = mask.squeeze(0)
+
+    mask = mask.detach().cpu().numpy()
+
+    heatmap = (mask * 255).astype(np.uint8)
+    heatmap = cv2.applyColorMap(heatmap, cv2.COLORMAP_JET)
+    heatmap = torch.from_numpy(heatmap).permute(2, 0, 1).float().div(255)
+    b, g, r = heatmap.split(1)
+    heatmap = torch.cat([r, g, b])
+
+    return heatmap
+
+
+def merge_gradcam_heatmap_with_image(heatmap, image):
+
+    while len(image.shape) > 3:
+        # Remove batch dimension
+        image = image.squeeze(0)
+
+    image = image.detach().cpu()
+
+    merged = heatmap + image
+
+    return merged.div(merged.max())
+
 
 def visualize_cam(mask, img):
     """ Taken from https://github.com/vickyliin/gradcam_plus_plus-pytorch
