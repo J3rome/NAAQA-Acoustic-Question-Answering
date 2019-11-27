@@ -109,7 +109,7 @@ def images_to_h5(dataloaders, square_image, output_folder_name='preprocessed'):
 
         # Retrieve min & max dims of images
         max_width_id, height, max_width = dataloader.dataset.get_max_width_image_dims(return_scene_id=True)
-        #game_id = dataloader.dataset.get_game_id_for_scene(max_width_id)
+        #game_id = dataloader.dataset.get_random_id_for_scene(max_width_id)
         #max_width_img = dataloader.dataset[game_id]['image'].unsqueeze(0)
 
         if square_image:
@@ -189,7 +189,7 @@ def extract_features(device, feature_extractor, dataloaders, output_folder_name=
 
         # Retrieve min & max dims of images
         max_width_id, height, max_width = dataloader.dataset.get_max_width_image_dims(return_scene_id=True)
-        game_id = dataloader.dataset.get_game_id_for_scene(max_width_id)
+        game_id = dataloader.dataset.get_random_id_for_scene(max_width_id)
         max_width_img = dataloader.dataset[game_id]['image'].unsqueeze(0).to(device)
         feature_extractor_output_shape = feature_extractor.get_output_shape(max_width_img, channel_first=False)
 
