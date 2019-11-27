@@ -1,4 +1,5 @@
 from collections import defaultdict
+import random
 
 from IPython.core.display import display, HTML
 
@@ -28,47 +29,42 @@ def code_cell_toggle_button():
     display(HTML(html_str))
 
 
-def notebook_input_prompt(variable_name, default_text="", button_label="OK [MUST PRESS]"):
+def notebook_input_prompt(variable_name, default_text="", button_label="CHOOSE", selected=False):
     html_str = """
-    <input id="inptval" style="width:60%;" type="text" value="DEFAULT_TEXT">
-    <button onclick="set_value()" style="width:20%;">BUTTON_LABEL</button>
+    <input id="INPUT_ID" style="INPUT_STYLE" type="text" value="DEFAULT_TEXT">
+    <button onclick="INPUT_ID()" style="width:20%;">BUTTON_LABEL</button>
 
     <script type="text/Javascript">
-        function set_value(){
-            var input_value = document.getElementById('inptval').value;
-            var command = "VARIABLE_NAME = '" + input_value + "'";
+        function INPUT_ID(){
+            var input_box = document.getElementById('INPUT_ID');
+            var command = "VARIABLE_NAME = '" + input_box.value + "'";
             var kernel = IPython.notebook.kernel;
             kernel.execute(command);
+            
+            // Clear the colors & Assign color to chosen
+            var all_inputs = document.querySelectorAll('*[id^="inptval"]');
+            
+            all_inputs.forEach(function(node){
+                node.style.backgroundColor = '';
+            })
+            
+            input_box.style.backgroundColor = 'orange';
+            
         }
     </script>
     """
 
+    input_style = "width:60%;"
+    if selected:
+        input_style += "background-color:orange;"
+
+    html_str = html_str.replace("INPUT_STYLE", input_style)
     html_str = html_str.replace("VARIABLE_NAME", variable_name)
     html_str = html_str.replace("DEFAULT_TEXT", default_text)
     html_str = html_str.replace("BUTTON_LABEL", button_label)
+    html_str = html_str.replace("INPUT_ID", f"inptval_{random.randint(0,10000)}")
 
     display(HTML(html_str))
-
-
-def df_col_styler(col_colors=None):
-    # Pandas dataframe styler. Each columns will have a color defined by 'col_colors'
-    default_style = "text-transform: capitalize;"
-
-    def apply_style(x):
-        # copy df to new - original data are not changed
-        df = x.copy()
-
-        for i in range(len(df.columns)):
-            if col_colors:
-                color = f"rgba({col_colors[i][0]},{col_colors[i][1]},{col_colors[i][2]}, 0.6)"
-                style = f"{default_style} background-color: {color};"
-            else:
-                style = default_style
-            df[i] = style
-
-        return df
-
-    return apply_style
 
 
 def separate_preds_ground_truth(processed_predictions, attribute=None):
