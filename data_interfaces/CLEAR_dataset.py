@@ -1,6 +1,7 @@
 import os
 import collections
 import multiprocessing as mp
+import random
 
 import ujson
 import numpy as np
@@ -180,10 +181,66 @@ class CLEAR_dataset(Dataset):
 
         return self.all_image_sizes
 
-    def get_game_id_for_scene(self, scene_id):
-        assert scene_id in self.scenes
+    def get_random_game_per_family(self, return_game=False):
+        assert len(self.games_per_family.keys()) > 0, 'Dataset.games_per_family empty. Need Dataset.extra_stats == True'
+        to_return = {}
 
-        return self.scenes[scene_id]['question_idx'][0]
+        for family, games_id in self.games_per_family.items():
+            game_id = random.choice(games_id)
+
+            if return_game:
+                to_return[family] = self[game_id]
+            else:
+                to_return[family] = game_id
+
+        return to_return
+
+
+    def get_random_game(self, return_game=False):
+        game_id = np.random.randint(0, len(self.games) - 1)
+
+        if return_game:
+            return self[game_id]
+
+        return game_id
+
+    def get_random_game_per_family_for_scene(self, scene_id, return_game=False):
+        assert scene_id in self.scenes, f'Scene id {scene_id} is not loaded'
+
+        games_for_scene = self.scenes[scene_id]['question_idx']
+        game_per_family = {}
+
+        for game_id in games_for_scene:
+            game = self.get_game(game_id, decode_tokens=True)
+            family = self.answer_to_family[game['answer']]
+
+            if family in game_per_family:
+                # We already have an example of this family
+                continue
+
+            if return_game:
+                game_per_family[family] = self[game_id]
+            else:
+                game_per_family[family] = game_id
+
+        for fam in set(self.answer_families) - set(game_per_family.keys()):
+            if fam == 'unknown':
+                continue
+            game_per_family[fam] = None
+
+        return game_per_family
+
+    def get_random_game_for_scene(self, scene_id, return_game=False):
+        assert scene_id in self.scenes, f'Scene id {scene_id} is not loaded'
+
+        games_for_scene = self.scenes[scene_id]['question_idx']
+
+        game_id = games_for_scene[np.random.randint(0, len(games_for_scene) - 1)]
+
+        if return_game:
+            return self[game_id]
+
+        return game_id
 
     def get_resize_config(self):
         value = None
