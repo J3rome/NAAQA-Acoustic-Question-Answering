@@ -249,7 +249,8 @@ def create_dict_from_questions(dataset, word_min_occurence=1, dict_filename='dic
     word2occ = defaultdict(int)
 
     tokenizer = CLEARTokenizer.get_tokenizer_inst()
-    forbidden_tokens = [",", "?"]
+    #forbidden_tokens = [",", "?"]
+    forbidden_tokens = []
 
     # Tokenize questions
     for i in range(len(games)):
