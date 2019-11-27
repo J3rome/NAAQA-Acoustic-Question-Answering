@@ -255,7 +255,7 @@ def one_game_inference_by_id(device, model, dataloader, game_id, nb_top_pred=10)
                               nb_top_pred=nb_top_pred)
 
 
-def custom_question_inference(device, model, dataloader, question, scene_id, nb_top_pred=10):
+def create_game_for_custom_question(dataloader, question, scene_id):
     dataset = dataloader.dataset
 
     # Tokenize Input question
@@ -266,6 +266,17 @@ def custom_question_inference(device, model, dataloader, question, scene_id, nb_
     game = deepcopy(dataset[game_idx])
     game['question'] = torch.tensor(tokenized_question)
 
+    return game
+
+
+def custom_question_inference(device, model, dataloader, question, scene_id, nb_top_pred=10):
+    game = create_game_for_custom_question(dataloader, question, scene_id)
+
+    return one_game_inference(device, model, game, dataloader.collate_fn, dataloader.dataset.tokenizer,
+                              nb_top_pred=nb_top_pred)
+
+
+def custom_game_inference(device, model, game, dataloader, nb_top_pred=10):
     return one_game_inference(device, model, game, dataloader.collate_fn, dataloader.dataset.tokenizer,
                               nb_top_pred=nb_top_pred)
 
