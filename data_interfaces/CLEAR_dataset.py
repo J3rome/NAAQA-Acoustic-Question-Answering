@@ -172,6 +172,7 @@ class CLEAR_dataset(Dataset):
         return ujson.dumps(game)
 
     def get_all_image_sizes(self):
+        # FIXME : This is broken now that is_raw_img() return True for H5 file.
         assert self.is_raw_img(), 'Config must be set to RAW img in order to retrieve images sizes'
 
         if self.all_image_sizes is None:
