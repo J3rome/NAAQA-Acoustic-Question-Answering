@@ -24,8 +24,8 @@ import re
 class CLEAR_dataset(Dataset):
 
     def __init__(self, folder, version_name, input_image_type, set_type, questions=None, transforms=None,
-                 dict_file_path=None, load_question_program=False, preprocessed_folder_name="preprocessed",
-                 tokenize_text=True, use_cache=True, synchronized_cache=False, max_cache_size=5000):
+                 dict_file_path=None, preprocessed_folder_name="preprocessed", tokenize_text=True, extra_stats=False,
+                 use_cache=True, synchronized_cache=False, max_cache_size=5000):
 
         self.root_folder_path = "%s/%s" % (folder, version_name)
         self.version_name = version_name
@@ -63,6 +63,7 @@ class CLEAR_dataset(Dataset):
 
         nb_games = len(self.questions)
         self.games = multiprocessing.Array(ctypes.c_wchar_p, [""]*nb_games)
+        self.games_per_family = collections.defaultdict(list)
         self.scenes = {}
         self.nb_scene = 0
         self.answer_counter = collections.Counter()
@@ -99,22 +100,10 @@ class CLEAR_dataset(Dataset):
                 # Backward compatibility with older CLEVR format
                 image_filename = sample["image_filename"].replace('AQA_', 'CLEAR_')
 
-            game = {
-                'id': question_id,
-                'image': {'id': image_id, 'filename': image_filename, 'set': self.set},
-                'question': question,
-                'answer': answer
-            }
-
-            if load_question_program:
-                game['program'] = sample['program'] if 'program' in sample else []
-
-            self.games[i] = self.prepare_game(game)
-
             if image_id not in self.scenes:
                 self.scenes[image_id] = {
                     'filename': image_filename,
-                    'question_idx': [i]
+                    'question_idx': []
                 }
 
                 self.nb_scene += 1
@@ -122,11 +111,21 @@ class CLEAR_dataset(Dataset):
                 if self.scenes_def:
                     self.scenes[image_id]['definition'] = self.scenes_def[image_id]
 
-            else:
+            game = {
+                'id': question_id,
+                'image': {'id': image_id, 'filename': image_filename, 'set': self.set},
+                'question': question,
+                'answer': answer
+            }
+
+            if extra_stats:
                 self.scenes[image_id]['question_idx'].append(i)
+                self.games_per_family[self.answer_to_family[str(sample['answer']).lower()]].append(i)
+                game['program'] = sample['program'] if 'program' in sample else []
+
+            self.games[i] = self.prepare_game(game)
 
             self.answers.append(answer)
-
             self.answer_counter[answer] += 1
 
         # Initialise image cache

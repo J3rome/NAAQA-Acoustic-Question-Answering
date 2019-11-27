@@ -171,26 +171,26 @@ def get_transforms_from_args(args, preprocessing_config):
 
 
 # Data loading & preparation
-def create_datasets(args, preprocessing_config, load_question_program=False):
+def create_datasets(args, preprocessing_config, load_dataset_extra_stats=False):
     print("Creating Datasets")
     transforms_to_apply = get_transforms_from_args(args, preprocessing_config)
 
     datasets = {
         'train': CLEAR_dataset(args['data_root_path'], args['version_name'], args['input_image_type'], 'train',
                                dict_file_path=args['dict_file_path'], transforms=transforms_to_apply,
-                               tokenize_text=not args['create_dict'], load_question_program=load_question_program,
+                               tokenize_text=not args['create_dict'], extra_stats=load_dataset_extra_stats,
                                preprocessed_folder_name=args['preprocessed_folder_name'],
                                use_cache=not args['disable_image_cache'], max_cache_size=args['max_image_cache_size']),
 
         'val': CLEAR_dataset(args['data_root_path'], args['version_name'], args['input_image_type'], 'val',
                              dict_file_path=args['dict_file_path'], transforms=transforms_to_apply,
-                             tokenize_text=not args['create_dict'], load_question_program=load_question_program,
+                             tokenize_text=not args['create_dict'], extra_stats=load_dataset_extra_stats,
                              preprocessed_folder_name=args['preprocessed_folder_name'],
                              use_cache=not args['disable_image_cache'], max_cache_size=args['max_image_cache_size']),
 
         'test': CLEAR_dataset(args['data_root_path'], args['version_name'], args['input_image_type'], 'test',
                               dict_file_path=args['dict_file_path'], transforms=transforms_to_apply,
-                              tokenize_text=not args['create_dict'], load_question_program=load_question_program,
+                              tokenize_text=not args['create_dict'], extra_stats=load_dataset_extra_stats,
                               preprocessed_folder_name=args['preprocessed_folder_name'],
                               use_cache=not args['disable_image_cache'], max_cache_size=args['max_image_cache_size'])
     }
@@ -329,7 +329,7 @@ def prepare_for_task(args):
     ####################################
     #   Dataloading
     ####################################
-    datasets = create_datasets(args, film_model_config['preprocessing'], flags['load_question_program'])
+    datasets = create_datasets(args, film_model_config['preprocessing'], flags['load_dataset_extra_stats'])
     dataloaders = create_dataloaders(datasets, args['batch_size'], nb_process=8)
 
     ####################################

@@ -46,7 +46,7 @@ def create_flags_from_args(task, args):
     flags['create_loss_criterion'] = task in ['training', 'lr_finder', 'inference']
     flags['create_optimizer'] = task in ['training', 'lr_finder']
     flags['force_sgd_optimizer'] = task == 'lr_finder' or args['cyclical_lr']
-    flags['load_question_program'] = task.startswith('notebook')
+    flags['load_dataset_extra_stats'] = task.startswith('notebook') or task == 'inference'
     flags['create_output_folder'] = task not in ['create_dict', 'feature_extract',
                                                  'write_clear_mean_to_config'] and not task.startswith('notebook')
     flags['instantiate_model'] = task in ['training',
