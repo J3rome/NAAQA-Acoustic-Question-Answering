@@ -139,3 +139,19 @@ class NormalizeSample(object):
         sample['image'] = vis_F.normalize(sample['image'], self.mean, self.std, self.inplace)
 
         return sample
+
+
+class NormalizeInverse(NormalizeSample):
+    """
+    Undoes the normalization and returns the reconstructed images in the input domain.
+    """
+
+    def __init__(self, mean, std):
+        mean = torch.as_tensor(mean)
+        std = torch.as_tensor(std)
+        std_inv = 1 / (std + 1e-7)
+        mean_inv = -mean * std_inv
+        super().__init__(mean=mean_inv, std=std_inv)
+
+    def __call__(self, sample):
+        return super().__call__(sample)#.clone())
