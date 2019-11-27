@@ -299,7 +299,7 @@ def one_game_inference(device, model, game, collate_fn, tokenizer, nb_top_pred=1
         top_probs, top_preds = torch.topk(softmax_output.squeeze(0), nb_top_pred)
 
     # [('answer1', 0.9), ('answer2', 0.7), ... ('answerX', 0.02)]
-    return [(tokenizer.decode_answer(pred), prob) for pred, prob in zip(top_preds.tolist(), top_probs.tolist())]
+    return [(tokenizer.decode_answer(pred), pred, prob) for pred, prob in zip(top_preds.tolist(), top_probs.tolist())]
 
 
 def inference(set_type, device, model, dataloader, output_folder, criterion):
