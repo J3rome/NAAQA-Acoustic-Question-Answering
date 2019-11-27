@@ -28,20 +28,23 @@ class GradCAM(object):
         heatmap, cam_result = visualize_cam(mask, img)
     """
 
-    def __init__(self, model: torch.nn.Module, target_layer: torch.nn.Module, apply_relu=False):
+    def __init__(self, model: torch.nn.Module, target_layers, apply_relu=False):
         self.model = model
 
         self.apply_relu = apply_relu
+        self.target_layers = target_layers
+        self.reverse_layer_map = {m: k for k, m in target_layers.items()}
 
         self.gradients = dict()
         self.activations = dict()
         def backward_hook(module, grad_input, grad_output):
-            self.gradients['value'] = grad_output[0]
+            self.gradients[self.reverse_layer_map[module]] = grad_output[0]
         def forward_hook(module, input, output):
-            self.activations['value'] = output
+            self.activations[self.reverse_layer_map[module]] = output
 
-        target_layer.register_forward_hook(forward_hook)
-        target_layer.register_backward_hook(backward_hook)
+        for target_layer in target_layers.values():
+            target_layer.register_forward_hook(forward_hook)
+            target_layer.register_backward_hook(backward_hook)
 
     # TODO : is useful ?
     def saliency_map_size(self, *input_size):
@@ -61,34 +64,36 @@ class GradCAM(object):
         """
         batch_size, nb_channels, img_height, img_width = input_image.size()
 
-        # FIXME : Should we use logit or logit_softmaxed ?
         logit, logit_softmaxed = self.model(question, question_lengths, input_image, pack_sequence=pack_sequence)
 
         if class_idx is None:
             class_idx = logit_softmaxed.max(1)[-1]
 
-        scores = logit_softmaxed.gather(1, class_idx.unsqueeze(1))
+        scores = logit.gather(1, class_idx.unsqueeze(1))
 
         self.model.zero_grad()
         scores.backward(torch.ones_like(scores), retain_graph=retain_graph)
 
-        gradients = self.gradients['value']
-        activations = self.activations['value']
-        batch_size, grad_nb_channels, grad_height, grad_width = gradients.size()
+        saliency_maps = {}
+        for layer_name, layer in self.target_layers.items():
+            gradients = self.gradients[layer_name]
+            activations = self.activations[layer_name]
+            batch_size, grad_nb_channels, grad_height, grad_width = gradients.size()
 
-        alpha = gradients.view(batch_size, grad_nb_channels, -1)
-        if self.apply_relu:
-            alpha = F.relu(alpha)
-        alpha = alpha.mean(2)
+            alpha = gradients.view(batch_size, grad_nb_channels, -1)
+            if self.apply_relu:
+                alpha = F.relu(alpha)
+            alpha = alpha.mean(2)
 
-        weights = alpha.view(batch_size, grad_nb_channels, 1, 1)
+            weights = alpha.view(batch_size, grad_nb_channels, 1, 1)
 
-        saliency_maps = (weights*activations).sum(1, keepdim=True)
-        saliency_maps = F.relu(saliency_maps)
-        # TODO : F.upsample is deprecated
-        saliency_maps = F.upsample(saliency_maps, size=(img_height, img_width), mode='bilinear', align_corners=False)
-        saliency_map_min, saliency_map_max = saliency_maps.min(), saliency_maps.max()
-        saliency_maps = (saliency_maps - saliency_map_min).div(saliency_map_max - saliency_map_min).data
+            saliency_map = (weights*activations).sum(1, keepdim=True)
+            saliency_map = F.relu(saliency_map)
+            # TODO : F.upsample is deprecated
+            saliency_map = F.upsample(saliency_map, size=(img_height, img_width), mode='bilinear', align_corners=False)
+            saliency_map_min, saliency_map_max = saliency_map.min(), saliency_map.max()
+            saliency_map = (saliency_map - saliency_map_min).div(saliency_map_max - saliency_map_min).data
+            saliency_maps[layer_name] = saliency_map
 
         return saliency_maps, scores, logit_softmaxed
 
