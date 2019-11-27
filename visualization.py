@@ -183,6 +183,52 @@ def plot_tsne_per_resblock(vals, question_types, title="T-SNE"):
 
     return figs
 
+from utils.visualization import get_gradcam_heatmap, merge_gradcam_heatmap_with_image
+def one_game_gradcam(device, model, game, collate_fn, class_idx=None, return_heatmap=True):
+    one_game_batch = collate_fn([game])
+
+    # Set up model in eval mode
+    model.eval()
+
+    # Copy data to GPU
+    image = one_game_batch['image'].to(device)
+    question = one_game_batch['question'].to(device)
+    seq_length = one_game_batch['seq_length'].to(device)
+
+    # FIXME : Should we target directly the conv layer instead of relu ?
+    target_layers = {
+        "stem_conv": model.stem_conv[0],
+        'resblocks[0].conv1': model.resblocks[0].conv1[0],
+        'resblocks[0].conv2': model.resblocks[0].conv2[0],
+        'resblocks[0].film_layer': model.resblocks[0].film_layer[0],
+        'resblocks[0].out': model.resblocks[0],
+        'classif_conv': model.classif_conv[0]
+    }
+
+    cam_model = GradCAM(model, target_layers, apply_relu=False)
+
+    if class_idx is None:
+        class_idx = one_game_batch['answer'].to(device)
+    elif type(class_idx) == int:
+        class_idx = torch.tensor(class_idx).unsqueeze(0)
+    elif isinstance(class_idx, torch.Tensor):
+        while len(class_idx.shape) < 1:
+            class_idx = class_idx.unsqueeze(0)
+
+    saliency_maps, confidence, logit = cam_model(question, seq_length, image, class_idx=class_idx)
+
+    images_to_return = {}
+
+    for layer_name, saliency_map in saliency_maps.items():
+        if return_heatmap:
+            heatmap = get_gradcam_heatmap(saliency_map)
+            images_to_return[layer_name] = heatmap
+        else:
+            images_to_return[layer_name] = saliency_map.squeeze(0)
+
+    # Since our batch contain only 1 game, we squeeze() the first dimension
+    return images_to_return, confidence.squeeze(0)
+
 
 def grad_cam_visualization(device, model, dataloader, output_folder, nb_game_per_img=10, limit_dataset=45):
     orig_dataloader = dataloader
