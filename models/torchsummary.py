@@ -5,7 +5,7 @@ from collections import OrderedDict
 import numpy as np
 
 
-def summary(model, input_infos, batch_size=-1, device="cuda:0"):
+def summary(model, input_infos, batch_size=-1, device="cpu"):
 
     def register_hook(module):
 
@@ -54,29 +54,15 @@ def summary(model, input_infos, batch_size=-1, device="cuda:0"):
     assert 'cpu' in device or (torch.cuda.is_available() and 'cuda' in device), \
         "Input device is not valid, please specify 'cuda' or 'cpu'"
 
-    if device.startswith("cuda"):
-        dtype_prefix = torch.cuda
-    else:
-        dtype_prefix = torch
-
-    # multiple inputs to the network
-    #if isinstance(input_size, tuple):
-    #    input_size = [input_size]
-
-    #model.to(device)
+    model.to(device)
 
     # batch_size of 2 for batchnorm
     x = []
     for input_size, input_type in input_infos:
-        # FIXME : Test on GPU
         x.append(torch.ones(2, *input_size).type(input_type).to(device))
 
     if len(x) == 1:
         x = x[0]
-
-    #x.append(torch.ones(2, *input_size[0]).type(dtype_prefix.LongTensor).to(device))
-    #x.append(torch.ones(2).type(dtype_prefix.LongTensor).to(device) + 1)
-    #x.append(torch.ones(2, *input_size[2]).type(dtype_prefix.FloatTensor).to(device))
 
     # create properties
     summary = OrderedDict()
