@@ -196,7 +196,7 @@ def get_img_builder(input_image_type, data_dir, preprocessed_folder_name='prepro
                 assert False, "Preprocessed folder '%s' doesn't exist" % preprocessed_folder_path
 
         bufferize = bufferize if bufferize is not None else False
-        loader = h5FeatureBuilder(os.path.join(data_dir, preprocessed_folder_name, is_raw='raw' in input_type),
+        loader = h5FeatureBuilder(os.path.join(data_dir, preprocessed_folder_name), is_raw='raw' in input_type,
                                   bufferize=bufferize)
     elif input_type == "raw":
         # TODO : Make the 'images' path parametrable
