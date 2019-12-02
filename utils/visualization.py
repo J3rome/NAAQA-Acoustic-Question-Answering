@@ -14,7 +14,10 @@ def print_model_summary(model, input_image_torch_shape, device="cpu"):
     # Printing summary affects the random state (Raw Vs Pre-Extracted Features).
     # We restore it to ensure reproducibility between input type
     random_state = get_random_state()
-    summary(model, [(22,), (1,), input_image_torch_shape], device=device)
+    summary(model, [
+        ((22,), torch.LongTensor),
+        ((1,), torch.LongTensor),
+        (input_image_torch_shape, torch.FloatTensor)], device=device)
     set_random_state(random_state)
 
 
