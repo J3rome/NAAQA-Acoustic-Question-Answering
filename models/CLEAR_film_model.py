@@ -328,7 +328,7 @@ class CLEAR_FiLM_model(nn.Module):
             self.feature_extractor.eval()
 
     def to(self, device=None, dtype=None, non_blocking=False):
-        # FIXME : This might be bad for multi GPU usage, make sure that device is different than "cuda" when using multi gpu
+        # Copy model to device only once
         if self.current_device != device:
             self.current_device = device
             super(CLEAR_FiLM_model, self).to(device, dtype, non_blocking)
