@@ -160,6 +160,7 @@ class CLEAR_FiLM_model(nn.Module):
                  sequence_padding_idx=0, save_features=True):
         super(CLEAR_FiLM_model, self).__init__()
 
+        self.current_device = 'cpu'
         self.config = config
         self.early_stopping = config.get('early_stopping', None)
         self.early_stopping = self.early_stopping if self.early_stopping and self.early_stopping['enable'] else None
@@ -326,6 +327,11 @@ class CLEAR_FiLM_model(nn.Module):
         if self.feature_extractor and self.feature_extractor.training:
             self.feature_extractor.eval()
 
+    def to(self, device=None, dtype=None, non_blocking=False):
+        # FIXME : This might be bad for multi GPU usage, make sure that device is different than "cuda" when using multi gpu
+        if self.current_device != device:
+            self.current_device = device
+            super(CLEAR_FiLM_model, self).to(device, dtype, non_blocking)
 
 class Resnet_feature_extractor(nn.Module):
     def __init__(self, resnet_version=101, layer_index=6, no_grads=True):      # TODO : Add Parameter to unfreeze some layers
