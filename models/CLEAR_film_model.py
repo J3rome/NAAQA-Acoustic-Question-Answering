@@ -213,6 +213,47 @@ class CLEAR_FiLM_model(nn.Module):
             ('relu', nn.ReLU(inplace=True))
         ]))
 
+        self.stem_conv2 = nn.Sequential(OrderedDict([
+            ('conv', Conv2d_tf(in_channels=config['stem']['conv_out'] + spatial_location_extra_channels['stem'],
+                               out_channels=config['stem']['conv_out'], kernel_size=config['stem']['conv_kernel'],
+                               stride=1, padding='SAME', dilation=1)),
+            ('batchnorm', nn.BatchNorm2d(config['stem']['conv_out'])),
+            ('relu', nn.ReLU(inplace=True))
+        ]))
+
+        self.stem_conv3 = nn.Sequential(OrderedDict([
+            ('conv', Conv2d_tf(in_channels=config['stem']['conv_out'] + spatial_location_extra_channels['stem'],
+                               out_channels=config['stem']['conv_out'], kernel_size=config['stem']['conv_kernel'],
+                               stride=1, padding='SAME', dilation=1)),
+            ('batchnorm', nn.BatchNorm2d(config['stem']['conv_out'])),
+            ('relu', nn.ReLU(inplace=True))
+        ]))
+
+        self.stem_conv4 = nn.Sequential(OrderedDict([
+            ('conv', Conv2d_tf(in_channels=config['stem']['conv_out'] + spatial_location_extra_channels['stem'],
+                               out_channels=config['stem']['conv_out'], kernel_size=config['stem']['conv_kernel'],
+                               stride=1, padding='SAME', dilation=1)),
+            ('batchnorm', nn.BatchNorm2d(config['stem']['conv_out'])),
+            ('relu', nn.ReLU(inplace=True))
+        ]))
+
+        self.stem_conv5 = nn.Sequential(OrderedDict([
+            ('conv', Conv2d_tf(in_channels=config['stem']['conv_out'] + spatial_location_extra_channels['stem'],
+                               out_channels=config['stem']['conv_out'], kernel_size=config['stem']['conv_kernel'],
+                               stride=1, padding='SAME', dilation=1)),
+            ('batchnorm', nn.BatchNorm2d(config['stem']['conv_out'])),
+            ('relu', nn.ReLU(inplace=True))
+        ]))
+
+        # Pooling
+        # TODO : Combine with avg pooling ?
+        self.max_pool_in_freq = nn.MaxPool2d((3, 1))
+        self.max_pool_in_time = nn.MaxPool2d((1, 3))
+        self.max_pool_square = nn.MaxPool2d((2, 2))
+        #self.max_pool_square = nn.MaxPool2d((3, 3))
+
+
+
         ## Resblocks
         resblock_out_channels = config['stem']['conv_out']
         resblock_in_channels = resblock_out_channels + spatial_location_extra_channels['resblock']
@@ -276,7 +317,36 @@ class CLEAR_FiLM_model(nn.Module):
         if self.config['stem']['spatial_location']:
             conv_out = append_spatial_location(conv_out)
 
+        # FIXME : Move the stem logic inside our own feature extractor
+        # FIXME : Probably need to be resnet style, otherwise we'll get vanishing gradients
+        # FIXME : We should keep a stem layer after our feature extractor (I guess ?)
+
         conv_out = self.stem_conv(conv_out)
+        conv_out = self.max_pool_in_freq(conv_out)
+
+        if self.config['stem']['spatial_location']:
+            conv_out = append_spatial_location(conv_out)
+
+        conv_out = self.stem_conv2(conv_out)
+        conv_out = self.max_pool_in_time(conv_out)
+
+        # if self.config['stem']['spatial_location']:
+        #     conv_out = append_spatial_location(conv_out)
+        #
+        # conv_out = self.stem_conv3(conv_out)
+        # conv_out = self.max_pool_in_freq(conv_out)
+        #
+        # if self.config['stem']['spatial_location']:
+        #     conv_out = append_spatial_location(conv_out)
+        #
+        # conv_out = self.stem_conv4(conv_out)
+        # conv_out = self.max_pool_in_time(conv_out)
+        #
+        # if self.config['stem']['spatial_location']:
+        #     conv_out = append_spatial_location(conv_out)
+        #
+        # conv_out = self.stem_conv5(conv_out)
+        # conv_out = self.max_pool_square(conv_out)
 
         for i, resblock in enumerate(self.resblocks):
             conv_out = resblock(conv_out, rnn_hidden_state, spatial_location=self.config['resblock']['spatial_location'])
