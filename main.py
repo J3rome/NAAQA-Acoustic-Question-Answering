@@ -267,9 +267,16 @@ def execute_task(task, args, output_dated_folder, dataloaders, model, model_conf
                      square_image=args['pad_to_square_images'] or args['resize_to_square_images'],
                      output_folder_name=args['preprocessed_folder_name'])
 
+        # Save generation args with h5 file
+        save_json(args, f"{dataloaders['train'].dataset.root_folder_path}/{args['preprocessed_folder_name']}",
+                  filename="arguments.json")
+
     elif task == "feature_extract":
         extract_features(device=device, feature_extractor=model.feature_extractor, dataloaders=dataloaders,
                          output_folder_name=args['preprocessed_folder_name'])
+        # Save generation args with h5 file
+        save_json(args, f"{dataloaders['train'].dataset.root_folder_path}/{args['preprocessed_folder_name']}",
+                  filename="arguments.json")
 
     elif task == "visualize_gamma_beta":
         visualize_gamma_beta(args['gamma_beta_path'], dataloaders=dataloaders, output_folder=output_dated_folder)
