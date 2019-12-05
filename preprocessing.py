@@ -17,7 +17,7 @@ import matplotlib.pyplot as plt
 
 
 def get_lr_finder_curves(model, device, train_dataloader, output_dated_folder, num_iter, optimizer, val_dataloader=None,
-                         loss_criterion=nn.CrossEntropyLoss(), weight_decay_list=None, min_lr=1e-10):
+                         loss_criterion=nn.CrossEntropyLoss(), weight_decay_list=None, min_lr=1e-10, show_fig=False):
     if type(weight_decay_list) != list:
         weight_decay_list = [0., 3e-1, 3e-2, 3e-3, 3e-4, 3e-5, 3e-6, 3e-7]
 
@@ -43,11 +43,17 @@ def get_lr_finder_curves(model, device, train_dataloader, output_dated_folder, n
 
         fig, ax = lr_finder.plot(fig_ax=(fig, ax), legend_label=f"Weight Decay : {weight_decay:.5}", show_fig=False)
 
+
+    if show_fig:
+        plt.show()
+
     filepath = "%s/%s" % (output_dated_folder, 'lr_finder_plot.png')
     fig.savefig(filepath)
 
     # Reset optimiser config
     optimizer.load_state_dict(initial_optimizer_state_dict)
+
+    return fig, ax
 
 
 def write_clear_mean_to_config(dataloader, device, current_config, config_file_path, overwrite_mean=False):
