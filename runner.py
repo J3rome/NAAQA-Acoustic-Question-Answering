@@ -75,8 +75,6 @@ def prepare_model(args, flags, paths, dataloaders, device, model_config, input_i
             # Cycle length is a ratio of the total nb steps
             cycle_step = int(total_nb_steps * cycle_length)
 
-        cycle_step = max(cycle_step, 2)
-
         print(f"Using cyclical LR : ({base_lr:.5},{max_lr:.5})  Momentum ({base_momentum:.5}, {max_momentum:.5})")
         print(f"Total nb steps : {total_nb_steps} ({args['nb_epoch']} epoch)  -- Nb steps per cycle : {cycle_step} "
               f"({cycle_step / len(dataloaders['train'])} epoch)")
@@ -444,7 +442,7 @@ def train_model(device, model, dataloaders, output_folder, criterion, optimizer,
                 print("Early Stopping count : %d/%d" % (early_stop_counter, stop_threshold))
 
                 if early_stop_counter >= stop_threshold:
-                    print("Early Stopping at epoch %d on %d" % (epoch, nb_epoch))
+                    print("Early Stopping at epoch %d on %d" % (epoch, start_epoch + nb_epoch))
                     break
 
         print()
