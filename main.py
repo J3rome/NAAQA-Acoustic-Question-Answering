@@ -378,8 +378,12 @@ def main(args):
         # We create the symlink here so that bug in initialisation won't create a new 'latest' folder
         create_symlink_to_latest_folder(paths["output_experiment_folder"], paths["current_datetime_str"])
 
-    execute_task(task, args, paths["output_dated_folder"], dataloaders, film_model, film_model_config, device,
-                 optimizer, loss_criterion, scheduler, tensorboard)
+
+    try:
+        execute_task(task, args, paths["output_dated_folder"], dataloaders, film_model, film_model_config, device,
+                     optimizer, loss_criterion, scheduler, tensorboard)
+    except KeyboardInterrupt:
+        print("\n\n>>> Received keyboard interrupt, Gracefully exiting\n")
 
     ####################################
     #   Exit
