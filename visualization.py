@@ -196,6 +196,7 @@ def one_game_gradcam(device, model, game, collate_fn, class_idx=None, return_hea
     seq_length = one_game_batch['seq_length'].to(device)
 
     # FIXME : Should we target directly the conv layer instead of relu ?
+    # FIXME : This is not scalable, if the network architecture change the target layers need to be changed
     target_layers = {
         "stem_conv": model.stem_conv[0],
         'resblocks[0].conv1': model.resblocks[0].conv1[0],

@@ -29,15 +29,28 @@ def code_cell_toggle_button():
     display(HTML(html_str))
 
 
-def notebook_input_prompt(variable_name, default_text="", button_label="CHOOSE", selected=False):
+def notebook_input_prompt(variable_name, default_text="", button_label="CHOOSE", default_answer=None, selected=False):
     html_str = """
     <input id="INPUT_ID" style="INPUT_STYLE" type="text" value="DEFAULT_TEXT">
     <button onclick="INPUT_ID()" style="width:20%;">BUTTON_LABEL</button>
 
     <script type="text/Javascript">
+        document.getElementById('INPUT_ID').addEventListener("keyup", function(event) {
+            if (event.keyCode == 13){
+                event.preventDefault();
+                event.target.nextElementSibling.click()
+            }
+        })
+    
         function INPUT_ID(){
             var input_box = document.getElementById('INPUT_ID');
-            var command = "VARIABLE_NAME = '" + input_box.value + "'";
+            var default_text = "DEFAULT_TEXT";
+            if(input_box.value == default_text){
+                var command = "VARIABLE_NAME = ('" + input_box.value + "', DEFAULT_ANSWER)"
+            }else{
+                var command = "VARIABLE_NAME = ('" + input_box.value + "', None)"
+            }
+            
             var kernel = IPython.notebook.kernel;
             kernel.execute(command);
             
@@ -49,7 +62,6 @@ def notebook_input_prompt(variable_name, default_text="", button_label="CHOOSE",
             })
             
             input_box.style.backgroundColor = 'orange';
-            
         }
     </script>
     """
@@ -61,6 +73,11 @@ def notebook_input_prompt(variable_name, default_text="", button_label="CHOOSE",
     html_str = html_str.replace("INPUT_STYLE", input_style)
     html_str = html_str.replace("VARIABLE_NAME", variable_name)
     html_str = html_str.replace("DEFAULT_TEXT", default_text)
+    if default_answer is None:
+        default_answer = 'None'
+    else:
+        default_answer = f"'{default_answer}'"
+    html_str = html_str.replace("DEFAULT_ANSWER", default_answer)
     html_str = html_str.replace("BUTTON_LABEL", button_label)
     html_str = html_str.replace("INPUT_ID", f"inptval_{random.randint(0,10000)}")
 
