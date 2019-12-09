@@ -134,7 +134,7 @@ def print_top_preds(top_preds, question, answer=None):
             print(f"Wrong Answer. Correct answer is : {answer}")
 
     for i, (ans, class_id, prob) in enumerate(top_preds):
-        print("{:>10} {:>25} ---- {}".format(f"Guess {i + 1}:", ans.capitalize(), str(prob)))
+        print("{:>10} {:>25} ---- {}".format(f"Guess {i}:", ans.capitalize(), str(prob)))
 
 
 def save_graph_to_tensorboard(model, tensorboard, input_image_torch_shape):
