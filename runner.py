@@ -458,26 +458,29 @@ def train_model(device, model, dataloaders, output_folder, criterion, optimizer,
     return model
 
 
-def preload_images_to_ram(dataloader, batch_size=16):
+def preload_images_to_ram(dataloader, batch_size=1):
     # Each worker will have a whole copy of the cache so this might take some RAM.
     # If the cache['max_size'] is smaller than the dataset, each worker will update its own cache.
     # No synchronisation between the workers will be done except for this primary preloading step
 
     dataset_copy = CLEAR_dataset.from_dataset_object(dataloader.dataset)
+    dataset_copy.keep_1_game_per_scene()
 
     # We need to retrieve the data in the main thread (worker=0) to be able to retrieve the cache
     dataloader_copy = DataLoader(dataset_copy, shuffle=True, num_workers=0, collate_fn=dataloader.collate_fn,
                                  batch_size=batch_size)
 
-    dataloader_copy.dataset.keep_1_game_per_scene()
-
     images_loaded = 0
     max_cache_size = dataloader_copy.dataset.image_cache['max_size']
     print(f"Preloading images to cache. Cache size : {max_cache_size}")
-    for batch in tqdm(dataloader_copy):
+    tqdm_iterator = tqdm(dataloader_copy, miniters=1)
+    for batch in tqdm_iterator:
         images_loaded += batch_size
 
         if images_loaded >= max_cache_size:
+            # Prevent incomplete tqdm progress bar when breaking
+            tqdm_iterator.refresh()
+            tqdm_iterator.close()
             break
 
     # Copy cache to original dataset
