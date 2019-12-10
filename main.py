@@ -129,7 +129,7 @@ parser.add_argument("--overwrite_clear_mean", help="Will overwrite the Mean and 
 parser.add_argument("--f1_score", help="Use f1 score in loss calculation", action='store_true')
 parser.add_argument("--cyclical_lr", help="Will use cyclical learning rate (Bounds in config.json)",
                     action='store_true')
-parser.add_argument("--disable_image_cache", help="Will disable image loading cache", action='store_true')
+parser.add_argument("--enable_image_cache", help="Will enable image loading cache (In RAM)", action='store_true')
 parser.add_argument("--max_image_cache_size", type=int, default=5000,
                     help="Max number of images that can be stored in cache")
 
@@ -180,19 +180,19 @@ def create_datasets(args, preprocessing_config, load_dataset_extra_stats=False):
                                dict_file_path=args['dict_file_path'], transforms=transforms_to_apply,
                                tokenize_text=not args['create_dict'], extra_stats=load_dataset_extra_stats,
                                preprocessed_folder_name=args['preprocessed_folder_name'],
-                               use_cache=not args['disable_image_cache'], max_cache_size=args['max_image_cache_size']),
+                               use_cache=args['enable_image_cache'], max_cache_size=args['max_image_cache_size']),
 
         'val': CLEAR_dataset(args['data_root_path'], args['version_name'], args['input_image_type'], 'val',
                              dict_file_path=args['dict_file_path'], transforms=transforms_to_apply,
                              tokenize_text=not args['create_dict'], extra_stats=load_dataset_extra_stats,
                              preprocessed_folder_name=args['preprocessed_folder_name'],
-                             use_cache=not args['disable_image_cache'], max_cache_size=args['max_image_cache_size']),
+                             use_cache=args['enable_image_cache'], max_cache_size=args['max_image_cache_size']),
 
         'test': CLEAR_dataset(args['data_root_path'], args['version_name'], args['input_image_type'], 'test',
                               dict_file_path=args['dict_file_path'], transforms=transforms_to_apply,
                               tokenize_text=not args['create_dict'], extra_stats=load_dataset_extra_stats,
                               preprocessed_folder_name=args['preprocessed_folder_name'],
-                              use_cache=not args['disable_image_cache'], max_cache_size=args['max_image_cache_size'])
+                              use_cache=args['enable_image_cache'], max_cache_size=args['max_image_cache_size'])
     }
 
     if args['pad_to_largest_image'] or args['pad_to_square_images']:
