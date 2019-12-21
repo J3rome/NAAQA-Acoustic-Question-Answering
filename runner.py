@@ -95,7 +95,10 @@ def prepare_model(args, flags, paths, dataloaders, device, model_config, input_i
         if 'epoch' in checkpoint:
             args['start_epoch'] = checkpoint['epoch'] + 1
 
-        if 'rng_state' in checkpoint:
+        if 'rng_state' in checkpoint and args['continue_training']:
+            # FIXME : Might not be able to restore the rng state if the network was trained on different computer
+            #  For now, we only restore rng_state if we are continuing training (Which is most likely usecase)
+            #  (Prob just if trained on diff gpu. Not sure about the cpu rng state)
             if device != 'cpu':
                 if 'torch' in checkpoint['rng_state']:
                     checkpoint['rng_state']['torch'] = checkpoint['rng_state']['torch'].cpu()
