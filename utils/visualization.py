@@ -161,13 +161,20 @@ def get_tagged_scene_table_legend(dataloader, scene_id, col_colors=None):
     return legend
 
 
-def print_top_preds(top_preds, question, answer=None):
-    print(f"Question : {question}")
+def print_top_preds(top_preds, question, answer=None, pred_gap_tolerance=0.2):
+    print(f"Question : {question.capitalize()}")
     if answer is not None:
         if answer == top_preds[0][0]:
             print("Correct Answer")
         else:
             print(f"Wrong Answer. Correct answer is : {answer}")
+
+    if len(top_preds) > 1:
+        pred_gap = top_preds[0][2] - top_preds[1][2]
+        if pred_gap < pred_gap_tolerance:
+            print(f"AMBIGUOUS GUESS -- Gap between Guess #0 and #1 : {pred_gap}")
+
+    print()
 
     for i, (ans, class_id, prob) in enumerate(top_preds):
         print("{:>10} {:>25} ---- {}".format(f"Guess {i}:", ans.capitalize(), str(prob)))
