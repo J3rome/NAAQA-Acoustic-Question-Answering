@@ -112,7 +112,19 @@ def prepare_model(args, flags, paths, dataloaders, device, model_config, input_i
             optimizer_load_state_dict(optimizer, checkpoint['optimizer_state_dict'], device)
 
         if scheduler and 'scheduler_state_dict' in checkpoint:
-            scheduler.load_state_dict(checkpoint['scheduler_state_dict'])
+            current_scheduler_state_dict = scheduler.state_dict()
+            scheduler_param_changed = False
+            for key in ['max_lrs', 'base_lrs', 'base_momentum', 'max_momentum']:
+                if current_scheduler_state_dict[key] != checkpoint['scheduler_state_dict'][key]:
+                    scheduler_param_changed = True
+                    break
+
+            # We override the checkpoint scheduler parameters if the configuration changed
+            # We might want to change the learning rate when continuing training
+            if not scheduler_param_changed:
+                scheduler.load_state_dict(checkpoint['scheduler_state_dict'])
+            else:
+                print(">>>> Scheduler params changed, not loading from checkpoint. MAKE SURE THIS IS YOUR EXPECTED BEHAVIOUR.")
 
     if args['continue_training']:
         # Recover stats from previous run
@@ -432,6 +444,8 @@ def train_model(device, model, dataloaders, output_folder, criterion, optimizer,
                                                               best_epoch['val_loss'],
                                                               best_epoch['val_acc']))
         best_epoch_symlink_path = '%s/best' % output_folder
+
+        # TODO : Only create link if best_epoch is different than current link
         subprocess.run("ln -snf %s %s" % (best_epoch['epoch'], best_epoch_symlink_path), shell=True)
 
         # Early Stopping
