@@ -21,8 +21,29 @@ def print_model_summary(model, input_image_torch_shape, device="cpu"):
     set_random_state(random_state)
 
 
+def get_scene_image_axis_labels(image_width, image_height, scene_duration, max_freq, tick_ratio=0.2):
+    """
+    Return xlabels in seconds and ylabels in Hz
+    """
+    time_resolution = int(scene_duration / image_width + 0.5)   # Ms/pixel
+    freq_resolution = int(max_freq / image_height + 0.5)        # Hz/pixel
+
+    xticks = [p for p in range(image_width) if p % int(image_width * tick_ratio) == 0]
+    xticks[-1] = image_width
+    xtick_labels = [int(pixel * time_resolution / 1000) for pixel in xticks]
+
+    yticks = [p for p in range(image_height) if p % int(image_height * tick_ratio) == 0]
+    yticks[-1] = image_height
+    yticks_labels = [int(pixel * freq_resolution) for pixel in yticks]
+
+    # By default y axis '0' is at the top instead of bottom when working with imshow
+    yticks_labels.reverse()
+
+    return (xticks, xtick_labels), (yticks, yticks_labels)
+
+
 def get_tagged_scene(dataset, game_or_game_id, scene_image=None, remove_padding=False, show_legend=True, show_fig=False,
-                     fig_title=None, fig_ax=None):
+                     fig_title=None, fig_ax=None, sound_sample_rate=22050):
     assert dataset.is_raw_img() or scene_image is not None, 'Image to tag must be provided if not in RAW mode'
 
     if type(game_or_game_id) == int:
@@ -39,10 +60,17 @@ def get_tagged_scene(dataset, game_or_game_id, scene_image=None, remove_padding=
     image_padding = game['image_padding'].tolist()
     image_height, image_width = image.shape[1:]
 
-    if remove_padding:
-        # Crop image
-        image = image[:, :-image_padding[0], :-image_padding[1]]
-        image_height, image_width = image.shape[1:]
+    if sum(image_padding) > 0:
+        image_height -= image_padding[0]
+        image_width -= image_padding[1]
+
+        if remove_padding:
+            image = image[:, :image_height, :image_width]
+
+    # Retrieve scene informations
+    scene = dataset.scenes[game['scene_id']]['definition']
+    scene_duration = sum([o['duration'] + o['silence_after'] for o in scene['objects']]) + scene['silence_before']
+    time_resolution = int(scene_duration / image_width + 0.5)  # Ms/pixel
 
     # Create figure
     if fig_ax:
@@ -51,13 +79,21 @@ def get_tagged_scene(dataset, game_or_game_id, scene_image=None, remove_padding=
         fig, ax = plt.subplots()#1, figsize=((image_width + 50)/100, (image_height + 150)/100), dpi=100)
 
     if fig_title is not None:
-        fig.suptitle(fig_title)
+        #fig.suptitle(fig_title)
+        ax.set_title(fig_title)
+
     ax.imshow(ToPILImage()(image))
 
-    # Retrieve scene informations
-    scene = dataset.scenes[game['scene_id']]['definition']
-    scene_duration = sum([o['duration'] + o['silence_after'] for o in scene['objects']]) + scene['silence_before']
-    time_resolution = int(scene_duration/image_width + 0.5)   # Ms/pixel
+    # Set axis
+    (xticks, xtick_labels), (yticks, ytick_labels) = get_scene_image_axis_labels(image_width, image_height,
+                                                                                 scene_duration, sound_sample_rate // 2)
+    ax.set_xticks(xticks)
+    ax.set_xticklabels(xtick_labels)
+    ax.set_xlabel("Time (seconds)")
+
+    ax.set_yticks(yticks)
+    ax.set_yticklabels(ytick_labels)
+    ax.set_ylabel("Freq (Hz)")
 
     # Generate annotations
     annotations = {}
