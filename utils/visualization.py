@@ -153,7 +153,7 @@ def df_col_styler(col_colors=None):
 def get_tagged_scene_table_legend(dataloader, scene_id, col_colors=None):
     sounds = dataloader.dataset.scenes[scene_id]['definition']['objects']
 
-    legend = pd.DataFrame(sounds, columns=['instrument', 'loudness', 'brightness', 'note', 'id']).T
+    legend = pd.DataFrame(sounds, columns=['instrument', 'loudness', 'brightness', 'note', 'duration', 'id']).T
 
     legend.style.set_table_attributes("style='display:inline'").set_caption('Caption table')
 
