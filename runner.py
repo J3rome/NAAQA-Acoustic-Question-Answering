@@ -112,7 +112,17 @@ def prepare_model(args, flags, paths, dataloaders, device, model_config, input_i
             optimizer_load_state_dict(optimizer, checkpoint['optimizer_state_dict'], device)
 
         if scheduler and 'scheduler_state_dict' in checkpoint:
-            scheduler.load_state_dict(checkpoint['scheduler_state_dict'])
+            current_scheduler_state_dict = scheduler.state_dict()
+            scheduler_param_changed = False
+            for key in ['max_lrs', 'base_lrs', 'base_momentum', 'max_momentum']:
+                if current_scheduler_state_dict[key] != checkpoint['scheduler_state_dict'][key]:
+                    scheduler_param_changed = True
+                    break
+
+            if not scheduler_param_changed:
+                scheduler.load_state_dict(checkpoint['scheduler_state_dict'])
+            else:
+                print("Scheduler params changed, not loading from checkpoint")
 
     if args['continue_training']:
         # Recover stats from previous run
