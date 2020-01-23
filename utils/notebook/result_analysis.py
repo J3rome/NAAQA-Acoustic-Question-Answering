@@ -1,6 +1,7 @@
 import matplotlib.pyplot as plt
 from sklearn.metrics import confusion_matrix
 from sklearn.utils.multiclass import unique_labels
+import heapq
 
 from utils.file import read_json
 from utils.notebook.generic import format_epoch_folder
@@ -93,6 +94,72 @@ def plot_predictions_distribution_per_question_family(train_predictions, val_pre
         plt.show()
 
     return figs_axs
+
+
+def plot_predictions_confidence_gap(train_predictions, val_predictions, question_family=None, norm_hist=False,
+                    show_fig=False, fig_ax=None):
+    # TODO : Add X & Y Axis labels
+    if fig_ax:
+        fig, axs = fig_ax
+        assert len(axs) >= 3, 'Subplot provided doesn\'t have 3 ax available'
+    else:
+        fig, axs = plt.subplots(3, 1)
+
+    if question_family:
+        filter_fct = lambda p: p['ground_truth_answer_family'] == question_family
+        prefix = question_family.capitalize()
+    else:
+        filter_fct = None
+        prefix = "All Family"
+
+    #FIXME : Sooo ugly !
+    for pred in train_predictions['correct']:
+        top_pred = heapq.nlargest(2, pred['prediction_probs'])
+        pred['gap'] = top_pred[0] - top_pred[1]
+
+    for pred in val_predictions['correct']:
+        top_pred = heapq.nlargest(2, pred['prediction_probs'])
+        pred['gap'] = top_pred[0] - top_pred[1]
+
+    axs[0].set_title(f"[{prefix}]Confidence GAP (Guess 0 & Guess 1)\nCorrect Predictions")
+    plot_hist(train_predictions['correct'], key="gap", label="Train", filter_fct=filter_fct, norm_hist=norm_hist,
+              fig_ax=(fig, axs[0]))
+    plot_hist(val_predictions['correct'], key="gap", label="Val", filter_fct=filter_fct, norm_hist=norm_hist,
+              fig_ax=(fig, axs[0]))
+    axs[0].legend()
+
+    for pred in train_predictions['correct_family']:
+        top_pred = heapq.nlargest(2, pred['prediction_probs'])
+        pred['gap'] = top_pred[0] - top_pred[1]
+
+    for pred in val_predictions['correct_family']:
+        top_pred = heapq.nlargest(2, pred['prediction_probs'])
+        pred['gap'] = top_pred[0] - top_pred[1]
+
+    axs[1].set_title(f"[{prefix}]Confidence GAP (Guess 0 & Guess 1)\nIncorrect Predictions -- Correct Family")
+    plot_hist(train_predictions['correct_family'], key="gap", label="Train", filter_fct=filter_fct,
+              norm_hist=norm_hist, fig_ax=(fig, axs[1]))
+    plot_hist(val_predictions['correct_family'], key="gap", label="Val", filter_fct=filter_fct, norm_hist=norm_hist,
+              fig_ax=(fig, axs[1]))
+    axs[1].legend()
+
+    for pred in train_predictions['incorrect_family']:
+        top_pred = heapq.nlargest(2, pred['prediction_probs'])
+        pred['gap'] = top_pred[0] - top_pred[1]
+
+    for pred in val_predictions['incorrect_family']:
+        top_pred = heapq.nlargest(2, pred['prediction_probs'])
+        pred['gap'] = top_pred[0] - top_pred[1]
+
+    axs[2].set_title(f"[{prefix}]Confidence GAP (Guess 0 & Guess 1)\nIncorrect Predictions -- Incorrect Family")
+    plot_hist(train_predictions['incorrect_family'], key="gap", label="Train", filter_fct=filter_fct,
+              norm_hist=norm_hist, fig_ax=(fig, axs[2]))
+    plot_hist(val_predictions['incorrect_family'], key="gap", label="Val", filter_fct=filter_fct,
+              norm_hist=norm_hist, fig_ax=(fig, axs[2]))
+    axs[2].legend()
+
+    if show_fig:
+        plt.show()
 
 
 def plot_predictions_confidence(train_predictions, val_predictions, question_family=None, norm_hist=False,

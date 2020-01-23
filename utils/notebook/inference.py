@@ -24,7 +24,8 @@ def do_custom_question_inference(device, model, dataloader, custom_question, sce
     return custom_game, top_preds
 
 
-def show_gradcam(device, model, dataloader, custom_game, scene_id, guess_id=0, top_preds=None, clear_stats=None):
+def show_gradcam(device, model, dataloader, custom_game, scene_id, guess_id=0, top_preds=None, clear_stats=None,
+                 apply_relu=False):
 
     if top_preds:
         class_idx = top_preds[guess_id][1]
@@ -32,7 +33,7 @@ def show_gradcam(device, model, dataloader, custom_game, scene_id, guess_id=0, t
         class_idx = None
 
     heatmaps, confidence = one_game_gradcam(device, model, custom_game, dataloader.collate_fn,
-                                            class_idx=class_idx, return_heatmap=True)
+                                            class_idx=class_idx, return_heatmap=True, apply_relu=apply_relu)
 
     #display(get_tagged_scene_table_legend(dataloader, scene_id, colors))
 
@@ -66,7 +67,8 @@ def show_gradcam(device, model, dataloader, custom_game, scene_id, guess_id=0, t
 
     return heatmaps
 
-def show_game_notebook_input(dataloader, game, clear_stats=None):
+
+def show_game_notebook_input(dataloader, game, clear_stats=None, remove_image_padding=False):
     if clear_stats:
         inverse_norm = NormalizeInverse(clear_stats['mean'],
                                         clear_stats['std'])
@@ -74,8 +76,10 @@ def show_game_notebook_input(dataloader, game, clear_stats=None):
         game = inverse_norm(deepcopy(game))
 
     (fig, ax), colors = get_tagged_scene(dataloader.dataset, game, fig_title=f"Scene #{game['scene_id']}",
-                                         show_legend=False)
-    display(get_tagged_scene_table_legend(dataloader, game['scene_id'], colors))
+                                         show_legend=False, remove_padding=remove_image_padding)
+
+    legend = get_tagged_scene_table_legend(dataloader, game['scene_id'], colors)
+    display(legend)
     # TODO : Use CSS To move table beside figure
     # legend = get_tagged_scene_table_legend(dataloaders[set_type], scene_id, colors)
     # display(HTML(legend.render()))
@@ -100,4 +104,4 @@ def show_game_notebook_input(dataloader, game, clear_stats=None):
 
     default_question = custom_questions[0]
 
-    return default_question, custom_questions
+    return default_question, custom_questions, legend

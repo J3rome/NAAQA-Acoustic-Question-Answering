@@ -184,7 +184,7 @@ def plot_tsne_per_resblock(vals, question_types, title="T-SNE"):
     return figs
 
 from utils.visualization import get_gradcam_heatmap, merge_gradcam_heatmap_with_image
-def one_game_gradcam(device, model, game, collate_fn, class_idx=None, return_heatmap=True):
+def one_game_gradcam(device, model, game, collate_fn, class_idx=None, return_heatmap=True, apply_relu=False):
     one_game_batch = collate_fn([game])
 
     # Set up model in eval mode
@@ -206,15 +206,17 @@ def one_game_gradcam(device, model, game, collate_fn, class_idx=None, return_hea
         'classif_conv': model.classif_conv[0]
     }
 
-    cam_model = GradCAM(model, target_layers, apply_relu=False)
+    cam_model = GradCAM(model, target_layers, apply_relu=apply_relu)
 
     if class_idx is None:
-        class_idx = one_game_batch['answer'].to(device)
+        class_idx = one_game_batch['answer']
     elif type(class_idx) == int:
         class_idx = torch.tensor(class_idx).unsqueeze(0)
     elif isinstance(class_idx, torch.Tensor):
         while len(class_idx.shape) < 1:
             class_idx = class_idx.unsqueeze(0)
+
+    class_idx = class_idx.to(device)
 
     saliency_maps, confidence, logit = cam_model(question, seq_length, image, class_idx=class_idx)
 

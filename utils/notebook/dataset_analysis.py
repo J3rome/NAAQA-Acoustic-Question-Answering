@@ -90,7 +90,7 @@ def plot_scene_duration_hist(scenes, title=None, legend_label=None, fig_ax=None,
         if title is None:
             title = "Scene durations"
 
-    fig_ax = plot_discrete_hist(durations, title=title, fig_ax=fig_ax, legend_label=legend_label, norm_hist=norm_hist,
+    fig_ax = plot_hist(durations, title=title, fig_ax=fig_ax, label=legend_label, norm_hist=norm_hist,
                                 show_fig=show_fig)
 
     fig_ax[0].tight_layout()

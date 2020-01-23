@@ -95,7 +95,10 @@ def prepare_model(args, flags, paths, dataloaders, device, model_config, input_i
         if 'epoch' in checkpoint:
             args['start_epoch'] = checkpoint['epoch'] + 1
 
-        if 'rng_state' in checkpoint:
+        if 'rng_state' in checkpoint and args['continue_training']:
+            # FIXME : Might not be able to restore the rng state if the network was trained on different computer
+            #  For now, we only restore rng_state if we are continuing training (Which is most likely usecase)
+            #  (Prob just if trained on diff gpu. Not sure about the cpu rng state)
             if device != 'cpu':
                 if 'torch' in checkpoint['rng_state']:
                     checkpoint['rng_state']['torch'] = checkpoint['rng_state']['torch'].cpu()
@@ -119,10 +122,12 @@ def prepare_model(args, flags, paths, dataloaders, device, model_config, input_i
                     scheduler_param_changed = True
                     break
 
+            # We override the checkpoint scheduler parameters if the configuration changed
+            # We might want to change the learning rate when continuing training
             if not scheduler_param_changed:
                 scheduler.load_state_dict(checkpoint['scheduler_state_dict'])
             else:
-                print("Scheduler params changed, not loading from checkpoint")
+                print(">>>> Scheduler params changed, not loading from checkpoint. MAKE SURE THIS IS YOUR EXPECTED BEHAVIOUR.")
 
     if args['continue_training']:
         # Recover stats from previous run
@@ -442,6 +447,8 @@ def train_model(device, model, dataloaders, output_folder, criterion, optimizer,
                                                               best_epoch['val_loss'],
                                                               best_epoch['val_acc']))
         best_epoch_symlink_path = '%s/best' % output_folder
+
+        # TODO : Only create link if best_epoch is different than current link
         subprocess.run("ln -snf %s %s" % (best_epoch['epoch'], best_epoch_symlink_path), shell=True)
 
         # Early Stopping
@@ -468,26 +475,29 @@ def train_model(device, model, dataloaders, output_folder, criterion, optimizer,
     return model
 
 
-def preload_images_to_ram(dataloader, batch_size=16):
+def preload_images_to_ram(dataloader, batch_size=1):
     # Each worker will have a whole copy of the cache so this might take some RAM.
     # If the cache['max_size'] is smaller than the dataset, each worker will update its own cache.
     # No synchronisation between the workers will be done except for this primary preloading step
 
     dataset_copy = CLEAR_dataset.from_dataset_object(dataloader.dataset)
+    dataset_copy.keep_1_game_per_scene()
 
     # We need to retrieve the data in the main thread (worker=0) to be able to retrieve the cache
     dataloader_copy = DataLoader(dataset_copy, shuffle=True, num_workers=0, collate_fn=dataloader.collate_fn,
                                  batch_size=batch_size)
 
-    dataloader_copy.dataset.keep_1_game_per_scene()
-
     images_loaded = 0
     max_cache_size = dataloader_copy.dataset.image_cache['max_size']
     print(f"Preloading images to cache. Cache size : {max_cache_size}")
-    for batch in tqdm(dataloader_copy):
+    tqdm_iterator = tqdm(dataloader_copy, miniters=1)
+    for batch in tqdm_iterator:
         images_loaded += batch_size
 
         if images_loaded >= max_cache_size:
+            # Prevent incomplete tqdm progress bar when breaking
+            tqdm_iterator.refresh()
+            tqdm_iterator.close()
             break
 
     # Copy cache to original dataset
