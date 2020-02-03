@@ -2,7 +2,6 @@ from collections import OrderedDict
 
 import torch
 import torch.nn as nn
-import torchvision
 
 from models.feature_extractor import Resnet_feature_extractor
 from utils.random import set_random_state, get_random_state
@@ -102,20 +101,208 @@ class CLEAR_FiLM_model(nn.Module):
 
         self.current_device = 'cpu'
         self.config = config
+
         self.early_stopping = config.get('early_stopping', None)
         self.early_stopping = self.early_stopping if self.early_stopping and self.early_stopping['enable'] else None
 
         dropout_drop_prob = float(config['optimizer'].get('dropout_drop_prob', 0.0))
-        film_layer_transformation = config['resblock'].get('film_projection_type', None)
 
-        # FIXME : Is it really ok to reuse the same dropout layer multiple time ?
+        film_layer_transformation = config['resblock'].get('film_projection_type', None)
+        #self.dropout = nn.Dropout(p=dropout_drop_prob)
+
+        # Question Pipeline
+        self.question_pipeline = Question_pipeline(config, nb_words, dropout_drop_prob, sequence_padding_idx)
+
+        # Image Pipeline
+        self.image_pipeline = Image_pipeline(config, input_image_channels, feature_extraction_config)
+
+        # Question and Image Fusion
+        resblock_out_channels = config['stem']['conv_out']
+        resblock_in_channels = resblock_out_channels + ( 2 if config['resblock']['spatial_location'] else 0 )
+        self.resblocks = nn.ModuleList()
+        self.nb_resblock = config['resblock']['no_resblock']
+        for i in range(self.nb_resblock):
+            self.resblocks.append(FiLMed_resblock(in_channels=resblock_in_channels,
+                                                  out_channels=resblock_out_channels,
+                                                  context_size=config["question"]["rnn_state_size"],
+                                                  kernel1=config['resblock']['kernel1'],
+                                                  kernel2=config['resblock']['kernel2'],
+                                                  dropout_drop_prob=dropout_drop_prob,
+                                                  film_layer_transformation=film_layer_transformation))
+
+        if config['classifier'].get('type', '').lower() == 'conv':
+            # Classification (Via 1x1 conv & GlobalPooling)
+            classifier_class = Conv_classifier
+        else:
+            # Fully connected classifier
+            classifier_class = Fcn_classifier
+
+        self.classifier = classifier_class(in_channels=resblock_out_channels,
+                                           projection_size=config["classifier"]['projection_size'],
+                                           output_size=nb_answers,
+                                           spatial_location_layer=config['classifier']['spatial_location'],
+                                           dropout_drop_prob=dropout_drop_prob)
+
+    def forward(self, question, question_lengths=None, input_image=None, pack_sequence=False):
+        if question is not None and question_lengths is None and input_image is None:
+            # Parse first parameter as a list of parameter
+            assert type(question) == list and len(question) == 3, "Invalid parameters"
+            # Allow passing a list of arguments
+            question_lengths = question[1]
+            input_image = question[2]
+            question = question[0]
+
+        # Question Pipeline
+        rnn_hidden_state = self.question_pipeline(question, question_lengths, pack_sequence)
+
+        # Image Pipeline
+        conv_out = self.image_pipeline(input_image)
+
+        # Question and Image fusion
+        for i, resblock in enumerate(self.resblocks):
+            conv_out = resblock(conv_out, rnn_hidden_state,
+                                spatial_location=self.config['resblock']['spatial_location'])
+
+        # Classification
+        logits, logits_softmaxed = self.classifier(conv_out)
+
+        return logits, logits_softmaxed
+
+    def get_gammas_betas(self):
+        gammas = []
+        betas = []
+        for resblock in self.resblocks:
+            betas.append(resblock.film_layer.film.betas)
+            gammas.append(resblock.film_layer.film.gammas)
+
+        return gammas, betas
+
+    def get_cleaned_state_dict(self):
+        state_dict = self.state_dict()
+
+        if self.image_pipeline.feature_extractor is not None:
+            state_dict = {k : p for k,p in state_dict.items() if 'feature_extractor' not in k}
+
+        return state_dict
+
+    def train(self, mode=True):
+        # Only call train if model is in eval mode
+        if self.training != mode:
+            super(CLEAR_FiLM_model, self).train(mode)
+
+        # Keep the feature extractor in eval mode
+        if self.image_pipeline.feature_extractor and self.image_pipeline.feature_extractor.training:
+            self.feature_extractor.eval()
+
+    def to(self, device=None, dtype=None, non_blocking=False):
+        # Copy model to device only once
+        if self.current_device != device:
+            self.current_device = device
+            super(CLEAR_FiLM_model, self).to(device, dtype, non_blocking)
+
+
+class Conv_classifier(nn.Module):
+    def __init__(self, in_channels, projection_size, output_size, spatial_location_layer, dropout_drop_prob):
+        super(Conv_classifier, self).__init__()
+
+        self.spatial_location_layer = spatial_location_layer
+
+        # Classification (Via 1x1 conv & GlobalPooling)
+        self.classif_prof_conv = nn.Sequential(OrderedDict([
+            ('conv', Conv2d_tf(in_channels=in_channels + (2 if spatial_location_layer else 0),
+                               out_channels=projection_size,
+                               kernel_size=[1, 1], stride=1, padding="VALID", dilation=1)),
+            ('batchnorm', nn.BatchNorm2d(projection_size)),
+            ('relu', nn.ReLU(inplace=True))
+        ]))
+
+        self.logits = nn.Sequential(OrderedDict([
+            ('conv', Conv2d_tf(in_channels=projection_size,
+                               out_channels=output_size,
+                               kernel_size=[1, 1], stride=1, padding="VALID", dilation=1)),
+            ('batchnorm', nn.BatchNorm2d(output_size)),
+            ('relu', nn.ReLU(inplace=True))
+        ]))
+
+        self.softmax = nn.Softmax(dim=1)
+
         self.dropout = nn.Dropout(p=dropout_drop_prob)
 
-        spatial_location_extra_channels = {
-            'stem': 2 if config['stem']['spatial_location'] else 0,
-            'resblock': 2 if config['resblock']['spatial_location'] else 0,
-            'classifier': 2 if config['classifier']['spatial_location'] else 0
-        }
+    def forward(self, input_features):
+        if self.spatial_location_layer:
+            input_features = append_spatial_location(input_features)
+
+        classif_proj_out = self.classif_prof_conv(input_features)
+
+        # FIXME : Should we really use dropout here ?
+        #classif_proj_out = self.dropout(classif_proj_out)
+        logits_maps = self.logits(classif_proj_out)
+
+        # Global Max Pooling
+        # FIXME : Max vs mean ? Concat/Avg both together ?
+        logits, _ = logits_maps.view(logits_maps.shape[0], logits_maps.shape[1], -1).max(dim=2)
+        #logits = logits_maps.mean(dim=[2, 3])
+
+        logits_softmaxed = self.softmax(logits)
+
+        return logits, logits_softmaxed
+
+
+class Fcn_classifier(nn.Module):
+    def __init__(self, in_channels, projection_size, output_size, spatial_location_layer, dropout_drop_prob):
+        super(Fcn_classifier, self).__init__()
+
+        self.spatial_location_layer = spatial_location_layer
+
+        first_conv_out = 32
+
+        self.classif_conv = nn.Sequential(OrderedDict([
+            ('conv', Conv2d_tf(in_channels=in_channels + (2 if spatial_location_layer else 0),
+                               out_channels=first_conv_out,
+                               kernel_size=[1, 1], stride=1, padding="VALID", dilation=1)),
+            ('batchnorm', nn.BatchNorm2d(first_conv_out)),
+            ('relu', nn.ReLU(inplace=True))
+        ]))
+
+        self.hidden_layer = nn.Sequential(OrderedDict([
+            ('linear', nn.Linear(first_conv_out, projection_size)),
+            ('batchnorm', nn.BatchNorm1d(projection_size)),
+            ('relu', nn.ReLU(inplace=True))
+        ]))
+
+        # FIXME : Why we don't have batchnorm & relu here ?
+        self.logits = nn.Linear(projection_size, output_size)
+
+        self.softmax = nn.Softmax(dim=1)
+
+        self.dropout = nn.Dropout(p=dropout_drop_prob)
+
+    def forward(self, input_features):
+        if self.spatial_location_layer:
+            input_features = append_spatial_location(input_features)
+
+        conv_out = self.classif_conv(input_features)
+
+        # FIXME : Max vs mean ?
+        # Global Max Pooling
+        logits, _ = conv_out.view(conv_out.shape[0], conv_out.shape[1], -1).max(dim=2)
+        #logits, _ = conv_out.max(dim=2)
+        #logits, _ = logits.max(dim=2)
+        #logits = conv_out.mean(dim=[2, 3])
+
+        hidden_out = self.hidden_layer(logits)
+        #hidden_out = self.dropout(hidden_out)
+
+        logits = self.logits(hidden_out)
+
+        logits_softmaxed = self.softmax(logits)
+
+        return logits, logits_softmaxed
+
+
+class Question_pipeline(nn.Module):
+    def __init__(self, config, nb_words, dropout_drop_prob=0, sequence_padding_idx=0):
+        super(Question_pipeline, self).__init__()
 
         # Question Pipeline
         self.word_emb = nn.Embedding(num_embeddings=nb_words,
@@ -132,7 +319,31 @@ class CLEAR_FiLM_model(nn.Module):
                                 batch_first=True,
                                 dropout=0)
 
-        #### Image Pipeline
+        self.dropout = nn.Dropout(p=dropout_drop_prob)
+
+    def forward(self, question, question_lengths, pack_sequence):
+        word_emb = self.word_emb(question)
+        word_emb = self.dropout(word_emb)
+
+        if pack_sequence:
+            word_emb = torch.nn.utils.rnn.pack_padded_sequence(word_emb, question_lengths, batch_first=True,
+                                                               enforce_sorted=False)
+
+        rnn_out, rnn_hidden = self.rnn_state(word_emb)
+
+        rnn_hidden_state = self.dropout(rnn_hidden.squeeze(0))
+
+        return rnn_hidden_state
+
+
+class Image_pipeline(nn.Module):
+    def __init__(self, config, input_image_channels, feature_extraction_config, dropout_drop_prob=0):
+        super(Image_pipeline, self).__init__()
+
+        self.config = config
+
+        spatial_location_extra_channels = 2 if config['stem']['spatial_location'] else 0
+
         if feature_extraction_config is not None:
             # Instantiating the feature extractor affects the random state (Raw Vs Pre-Extracted Features).
             # We restore it to ensure reproducibility between input type
@@ -146,7 +357,7 @@ class CLEAR_FiLM_model(nn.Module):
 
         ## Stem
         self.stem_conv = nn.Sequential(OrderedDict([
-            ('conv', Conv2d_tf(in_channels=input_image_channels + spatial_location_extra_channels['stem'],
+            ('conv', Conv2d_tf(in_channels=input_image_channels + spatial_location_extra_channels,
                                out_channels=config['stem']['conv_out'], kernel_size=config['stem']['conv_kernel'],
                                stride=1, padding='SAME', dilation=1)),
             ('batchnorm', nn.BatchNorm2d(config['stem']['conv_out'])),
@@ -154,7 +365,7 @@ class CLEAR_FiLM_model(nn.Module):
         ]))
 
         self.stem_conv2 = nn.Sequential(OrderedDict([
-            ('conv', Conv2d_tf(in_channels=config['stem']['conv_out'] + spatial_location_extra_channels['stem'],
+            ('conv', Conv2d_tf(in_channels=config['stem']['conv_out'] + spatial_location_extra_channels,
                                out_channels=config['stem']['conv_out'], kernel_size=config['stem']['conv_kernel'],
                                stride=1, padding='SAME', dilation=1)),
             ('batchnorm', nn.BatchNorm2d(config['stem']['conv_out'])),
@@ -162,7 +373,7 @@ class CLEAR_FiLM_model(nn.Module):
         ]))
 
         self.stem_conv3 = nn.Sequential(OrderedDict([
-            ('conv', Conv2d_tf(in_channels=config['stem']['conv_out'] + spatial_location_extra_channels['stem'],
+            ('conv', Conv2d_tf(in_channels=config['stem']['conv_out'] + spatial_location_extra_channels,
                                out_channels=config['stem']['conv_out'], kernel_size=config['stem']['conv_kernel'],
                                stride=1, padding='SAME', dilation=1)),
             ('batchnorm', nn.BatchNorm2d(config['stem']['conv_out'])),
@@ -170,7 +381,7 @@ class CLEAR_FiLM_model(nn.Module):
         ]))
 
         self.stem_conv4 = nn.Sequential(OrderedDict([
-            ('conv', Conv2d_tf(in_channels=config['stem']['conv_out'] + spatial_location_extra_channels['stem'],
+            ('conv', Conv2d_tf(in_channels=config['stem']['conv_out'] + spatial_location_extra_channels,
                                out_channels=config['stem']['conv_out'], kernel_size=config['stem']['conv_kernel'],
                                stride=1, padding='SAME', dilation=1)),
             ('batchnorm', nn.BatchNorm2d(config['stem']['conv_out'])),
@@ -178,7 +389,7 @@ class CLEAR_FiLM_model(nn.Module):
         ]))
 
         self.stem_conv5 = nn.Sequential(OrderedDict([
-            ('conv', Conv2d_tf(in_channels=config['stem']['conv_out'] + spatial_location_extra_channels['stem'],
+            ('conv', Conv2d_tf(in_channels=config['stem']['conv_out'] + spatial_location_extra_channels,
                                out_channels=config['stem']['conv_out'], kernel_size=config['stem']['conv_kernel'],
                                stride=1, padding='SAME', dilation=1)),
             ('batchnorm', nn.BatchNorm2d(config['stem']['conv_out'])),
@@ -190,65 +401,11 @@ class CLEAR_FiLM_model(nn.Module):
         self.max_pool_in_freq = nn.MaxPool2d((3, 1))
         self.max_pool_in_time = nn.MaxPool2d((1, 3))
         self.max_pool_square = nn.MaxPool2d((2, 2))
-        #self.max_pool_square = nn.MaxPool2d((3, 3))
+        # self.max_pool_square = nn.MaxPool2d((3, 3))
 
+        self.dropout = nn.Dropout(p=dropout_drop_prob)
 
-
-        ## Resblocks
-        resblock_out_channels = config['stem']['conv_out']
-        resblock_in_channels = resblock_out_channels + spatial_location_extra_channels['resblock']
-        self.resblocks = nn.ModuleList()
-        self.nb_resblock = config['resblock']['no_resblock']
-        for i in range(self.nb_resblock):
-            self.resblocks.append(FiLMed_resblock(in_channels=resblock_in_channels,
-                                                  out_channels=resblock_out_channels,
-                                                  context_size=config["question"]["rnn_state_size"],
-                                                  kernel1=config['resblock']['kernel1'],
-                                                  kernel2=config['resblock']['kernel2'],
-                                                  dropout_drop_prob=dropout_drop_prob,
-                                                  film_layer_transformation=film_layer_transformation))
-
-        #### Classification
-        self.classif_conv = nn.Sequential(OrderedDict([
-            ('conv', Conv2d_tf(in_channels=resblock_out_channels + spatial_location_extra_channels['classifier'],
-                               out_channels=config['classifier']['conv_out'],
-                               kernel_size=config['classifier']['conv_kernel'], stride=1, padding="SAME", dilation=1)),
-            ('batchnorm', nn.BatchNorm2d(config['classifier']['conv_out'])),
-            ('relu', nn.ReLU(inplace=True))
-        ]))
-
-        self.classif_hidden = nn.Sequential(OrderedDict([
-            ('linear', nn.Linear(config['classifier']['conv_out'], config['classifier']['no_mlp_units'])),
-            ('batchnorm', nn.BatchNorm1d(config['classifier']['no_mlp_units'])),
-            ('relu', nn.ReLU(inplace=True))
-        ]))
-
-        self.logits = nn.Linear(config['classifier']['no_mlp_units'], nb_answers)
-
-        self.softmax = nn.Softmax(dim=1)
-
-    def forward(self, question, question_lengths=None, input_image=None, pack_sequence=False):
-        if question is not None and question_lengths is None and input_image is None:
-            assert type(question) == list and len(question) == 3, "Invalid parameters"
-            # Allow passing a list of arguments
-            question_lengths = question[1]
-            input_image = question[2]
-            question = question[0]
-
-        # Question Pipeline
-        word_emb = self.word_emb(question)
-
-        word_emb = self.dropout(word_emb)
-
-        if pack_sequence:
-            word_emb = torch.nn.utils.rnn.pack_padded_sequence(word_emb, question_lengths, batch_first=True,
-                                                               enforce_sorted=False)        # FIXME : Verify implication of enforce_sorted
-
-        rnn_out, rnn_hidden = self.rnn_state(word_emb)
-
-        rnn_hidden_state = self.dropout(rnn_hidden.squeeze(0))
-
-        # Image Pipeline
+    def forward(self, input_image):
         conv_out = input_image
         if self.feature_extractor:
             # Extract features using pretrained network
@@ -270,79 +427,8 @@ class CLEAR_FiLM_model(nn.Module):
         conv_out = self.stem_conv2(conv_out)
         conv_out = self.max_pool_in_time(conv_out)
 
-        # if self.config['stem']['spatial_location']:
-        #     conv_out = append_spatial_location(conv_out)
-        #
-        # conv_out = self.stem_conv3(conv_out)
-        # conv_out = self.max_pool_in_freq(conv_out)
-        #
-        # if self.config['stem']['spatial_location']:
-        #     conv_out = append_spatial_location(conv_out)
-        #
-        # conv_out = self.stem_conv4(conv_out)
-        # conv_out = self.max_pool_in_time(conv_out)
-        #
-        # if self.config['stem']['spatial_location']:
-        #     conv_out = append_spatial_location(conv_out)
-        #
-        # conv_out = self.stem_conv5(conv_out)
-        # conv_out = self.max_pool_square(conv_out)
-
-        for i, resblock in enumerate(self.resblocks):
-            conv_out = resblock(conv_out, rnn_hidden_state, spatial_location=self.config['resblock']['spatial_location'])
-
-        # Classification
-        if self.config["classifier"]["spatial_location"]:
-           conv_out = append_spatial_location(conv_out)
-
-        classif_out = self.classif_conv(conv_out)
-
-        # Global Max Pooling (Max pooling over whole dimensions 3,4)
-        classif_out, _ = classif_out.max(dim=2)
-        classif_out, _ = classif_out.max(dim=2)
-
-        # TODO : Concat globalAvgPool ?
-
-        classif_out = self.classif_hidden(classif_out)
-        classif_out = self.dropout(classif_out)
-        logits = self.logits(classif_out)
-
-        logits_softmaxed = self.softmax(logits)
-
-        return logits, logits_softmaxed
-
-    def get_gammas_betas(self):
-        gammas = []
-        betas = []
-        for resblock in self.resblocks:
-            betas.append(resblock.film_layer.film.betas)
-            gammas.append(resblock.film_layer.film.gammas)
-
-        return gammas, betas
-
-    def get_cleaned_state_dict(self):
-        state_dict = self.state_dict()
-
-        if self.feature_extractor is not None:
-            state_dict = {k : p for k,p in state_dict.items() if 'feature_extractor' not in k}
-
-        return state_dict
-
-    def train(self, mode=True):
-        # Only call train if model is in eval mode
-        if self.training != mode:
-            super(CLEAR_FiLM_model, self).train(mode)
-
-        # Keep the feature extractor in eval mode
-        if self.feature_extractor and self.feature_extractor.training:
-            self.feature_extractor.eval()
-
-    def to(self, device=None, dtype=None, non_blocking=False):
-        # Copy model to device only once
-        if self.current_device != device:
-            self.current_device = device
-            super(CLEAR_FiLM_model, self).to(device, dtype, non_blocking)
-
+        return conv_out
+    
 
 if __name__ == "__main__":
     print("Main")
