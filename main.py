@@ -43,8 +43,6 @@ parser.add_argument("--notebook_model_inference", help="Will prepare dataloaders
 parser.add_argument("--write_clear_mean_to_config", help="Will calculate the mean and std of the dataset and write it "
                                                          "to the config file", action='store_true')
 
-
-
 # Input parameters
 parser.add_argument("--data_root_path", type=str, default='data', help="Directory with data")
 parser.add_argument("--version_name", type=str, help="Name of the dataset version")
