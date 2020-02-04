@@ -57,6 +57,7 @@
   },
   "classifier":{
     "spatial_location":true,
+    "type": "fcn",
     "conv_out":32,
     "conv_kernel":[
       1,
