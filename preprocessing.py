@@ -120,9 +120,9 @@ def images_to_h5(dataloaders, square_image, output_folder_name='preprocessed'):
 
         if square_image:
             max_dim = max(height, max_width)
-            image_dim = [max_dim, max_dim, 3]
+            image_dim = [3, max_dim, max_dim]
         else:
-            image_dim = [height, max_width, 3]
+            image_dim = [3, height, max_width]
 
         # Keep only 1 game per scene (We want to process every image only once)
         dataloader.dataset.keep_1_game_per_scene()
@@ -131,16 +131,12 @@ def images_to_h5(dataloaders, square_image, output_folder_name='preprocessed'):
 
         with h5py.File(output_filepath, 'w') as f:
             # FIXME : Change dataset name ?
+            # FIXME : We loose padding informations when saving in h5 file
             h5_dataset = f.create_dataset('features', shape=[nb_games] + image_dim, dtype=np.float32)
             h5_idx2img = f.create_dataset('idx2img', shape=[nb_games], dtype=np.int32)
             h5_idx = 0
             for batch in tqdm(dataloader):
-                # swap axis
-                # numpy image: H x W x C
-                # torch image: C X H X W
-                # We want to save in numpy format
-                images = batch['image'].numpy().transpose((0, 2, 3, 1))
-                h5_dataset[h5_idx: h5_idx + batch_size] = images
+                h5_dataset[h5_idx: h5_idx + batch_size] = batch['image']
 
                 for i, scene_id in enumerate(batch['scene_id']):
                     h5_idx2img[h5_idx + i] = scene_id
