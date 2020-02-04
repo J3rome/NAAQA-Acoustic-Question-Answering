@@ -175,7 +175,7 @@ def process_dataloader(is_training, device, model, dataloader, criterion=None, o
 
     for batch_idx, batch in enumerate(tqdm(dataloader)):
         #mem_trace.report('Batch %d/%d - Epoch %d' % (i, dataloader.batch_size, epoch))
-        images = batch['image'].to(device)
+        images = batch['image'].to(device, non_blocking=True)
         questions = batch['question'].to(device)
         answers = batch['answer'].to(device)
         seq_lengths = batch['seq_length'].to(device)
