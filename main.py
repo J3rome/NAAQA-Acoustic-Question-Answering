@@ -215,10 +215,12 @@ def create_datasets(args, preprocessing_config, load_dataset_extra_stats=False):
             val_biggest_dim = max(max_val_img_dims)
             test_biggest_dim = max(max_test_img_dims)
 
-            if args['resize_to_square_images']:
-                to_square_transform = ResizeTensor
-            else:
+            # If the height is the largest dimension, we force the padding of the width since we don't want to
+            # resize the time axis
+            if args['pad_to_square_images'] or train_height_is_largest:
                 to_square_transform = PadTensor
+            else:
+                to_square_transform = ResizeTensor
 
             datasets['train'].add_transform(to_square_transform((train_biggest_dim, train_biggest_dim)))
             datasets['val'].add_transform(to_square_transform((val_biggest_dim, val_biggest_dim)))
