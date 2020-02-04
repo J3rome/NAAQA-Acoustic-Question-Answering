@@ -53,6 +53,71 @@ class ResizeTensor(object):
         return sample
 
 
+class ResizeTensorBasedOnHeight(object):
+    """ Resize PIL image to 'output_height' while keeping image ration """
+    def __init__(self, output_height):
+        self.output_height = output_height
+
+    def get_resized_dim(self, height, width):
+        new_height = self.get_output_height()
+        new_width = self.get_output_width(height, width)
+
+        return new_height, new_width
+
+    def get_output_height(self):
+        return self.output_height
+
+    def get_output_width(self, height, width):
+        return int(self.output_height * width / height + 0.5)
+
+    def __call__(self, sample):
+        # Images tensor are in format C x H x W
+        output_width = self.get_output_width(sample['image'].shape[1], sample['image'].shape[2])
+
+        if output_width + self.output_height != sample['image'].shape[2] + sample['image'].shape[1]:
+            sample['image'] = F.interpolate(sample['image'].unsqueeze(0), size=(self.output_height, output_width),
+                                            mode='bicubic').squeeze(0)
+
+        return sample
+
+
+class ResizeTensorBasedOnWidth(object):
+    """
+    Resize PIL image to 'output_width' while keeping image ration
+    If max_width is provided,
+    the resizing will be made according to the max_width ratio instead of the sample width ratio
+    """
+    def __init__(self, output_width, max_width=None):
+        self.output_width = output_width
+        self.max_width = max_width
+
+    def get_resized_dim(self, height, width):
+        if self.max_width:
+            reference_width = self.max_width
+        else:
+            reference_width = width
+
+        new_height = self.get_output_height(height, reference_width)
+        new_width = self.get_output_width(new_height, height, width)
+
+        return int(new_height + 0.5), int(new_width + 0.5)
+
+    def get_output_height(self, height, width):
+        return self.output_width * height / width
+
+    def get_output_width(self, target_height, height, width):
+        return target_height * width / height
+
+    def __call__(self, sample):
+        output_height, output_width = self.get_resized_dim(sample['image'].shape[1], sample['image'].shape[2])
+
+        if output_height + output_width != sample['image'].shape[1] + sample['image'].shape[2]:
+            sample['image'] = F.interpolate(sample['image'].unsqueeze(0), size=(output_height, output_width),
+                                            mode='bicubic').squeeze(0)
+
+        return sample
+
+
 class ResizeImg(object):
     """ Resize PIL image to 'output_shape' """
     def __init__(self, output_shape):
