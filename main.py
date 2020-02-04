@@ -12,8 +12,8 @@ from preprocessing import create_dict_from_questions, extract_features, images_t
 from preprocessing import write_clear_mean_to_config
 from visualization import visualize_gamma_beta, grad_cam_visualization
 from data_interfaces.CLEAR_dataset import CLEAR_dataset, CLEAR_collate_fct
-from data_interfaces.transforms import ToTensor, ImgBetweenZeroOne, ResizeImgBasedOnHeight, ResizeImgBasedOnWidth
-from data_interfaces.transforms import PadTensor, NormalizeSample, ResizeTensor
+from data_interfaces.transforms import ImgBetweenZeroOne, PadTensor, NormalizeSample, ResizeTensor
+from data_interfaces.transforms import ResizeTensorBasedOnHeight, ResizeTensorBasedOnWidth
 
 from utils.file import save_model_config, save_json, read_json, create_symlink_to_latest_folder
 from utils.file import create_folders_save_args, fix_best_epoch_symlink_if_necessary
@@ -135,24 +135,12 @@ parser.add_argument("--max_image_cache_size", type=int, default=5000,
 def get_transforms_from_args(args, preprocessing_config):
     transforms_list = []
 
-    # Bundle together ToTensor and ImgBetweenZeroOne, need to be one after the other for other transforms to work
-    to_tensor_transform = [ToTensor()]
     if args['normalize_zero_one']:
-        to_tensor_transform.append(ImgBetweenZeroOne())
+        transforms_list.append(ImgBetweenZeroOne())
 
     if args['input_image_type'].startswith('raw'):
 
-        if args['raw_img_resize_val']:
-            if args['raw_img_resize_based_on_width']:
-                resize_transform = ResizeImgBasedOnWidth
-            else:
-                # By default, we resize according to height
-                resize_transform = ResizeImgBasedOnHeight
-            transforms_list.append(resize_transform(args['raw_img_resize_val']))
-
         # TODO : Add data augmentation ?
-
-        transforms_list += to_tensor_transform
 
         if args['normalize_with_imagenet_stats'] or args['normalize_with_clear_stats']:
             if args['normalize_with_imagenet_stats']:
@@ -161,9 +149,6 @@ def get_transforms_from_args(args, preprocessing_config):
                 stats = preprocessing_config['clear_stats']
 
             transforms_list.append(NormalizeSample(mean=stats['mean'], std=stats['std'], inplace=True))
-
-    else:
-        transforms_list += to_tensor_transform
 
     return transforms.Compose(transforms_list)
 
@@ -193,11 +178,32 @@ def create_datasets(args, preprocessing_config, load_dataset_extra_stats=False):
                               use_cache=args['enable_image_cache'], max_cache_size=args['max_image_cache_size'])
     }
 
-    if args['pad_to_largest_image'] or args['pad_to_square_images']:
+    if args['raw_img_resize_val'] or args['pad_to_largest_image'] or args['pad_to_square_images']:
         # We need the dataset object to retrieve images dims so we have to manually add transforms
         max_train_img_dims = datasets['train'].get_max_width_image_dims()
         max_val_img_dims = datasets['val'].get_max_width_image_dims()
         max_test_img_dims = datasets['test'].get_max_width_image_dims()
+
+        train_height_is_largest = max_train_img_dims[0] > max_train_img_dims[1]
+
+        if args['raw_img_resize_val']:
+
+            if max_train_img_dims[0] > args['raw_img_resize_val'] or max_train_img_dims[1] > args['raw_img_resize_val']:
+
+                # Resize based on the biggest dimension
+                if train_height_is_largest:
+                    resize_transform = ResizeTensorBasedOnHeight(args['raw_img_resize_val'])
+                else:
+                    resize_transform = ResizeTensorBasedOnWidth(args['raw_img_resize_val'], max_train_img_dims[1])
+
+                datasets['train'].add_transform(resize_transform)
+                datasets['val'].add_transform(resize_transform)
+                datasets['test'].add_transform(resize_transform)
+
+                # Update max images dims after resize
+                max_train_img_dims = resize_transform.get_resized_dim(max_train_img_dims[0], max_train_img_dims[1])
+                max_val_img_dims = resize_transform.get_resized_dim(max_val_img_dims[0], max_val_img_dims[1])
+                max_test_img_dims = resize_transform.get_resized_dim(max_test_img_dims[0], max_test_img_dims[1])
 
         if args['pad_to_largest_image']:
             datasets['train'].add_transform(PadTensor(max_train_img_dims))

@@ -13,7 +13,7 @@ from torchvision import transforms as viz_transforms
 from data_interfaces.CLEAR_image_loader import get_img_builder, CLEARImage
 from utils.file import read_json, get_size_from_image_header
 from utils.generic import get_answer_to_family_map
-from data_interfaces.transforms import ResizeImgBasedOnHeight, ResizeImgBasedOnWidth
+from data_interfaces.transforms import ResizeTensorBasedOnWidth, ResizeTensorBasedOnHeight
 
 import multiprocessing
 import ctypes
@@ -243,20 +243,13 @@ class CLEAR_dataset(Dataset):
 
         return game_id
 
-    def get_resize_config(self):
-        value = None
-        resize_type = None
-
+    def get_resize_transform(self):
         if self.transforms:
             for transform in self.transforms.transforms:
-                if type(transform) is ResizeImgBasedOnHeight:
-                    value = transform.output_height
-                    resize_type = 'height'
-                elif type(transform) is ResizeImgBasedOnWidth:
-                    value = transform.output_width
-                    resize_type = 'width'
+                if type(transform) is ResizeTensorBasedOnHeight or type(transform) is ResizeTensorBasedOnWidth:
+                    return transform
 
-        return value, resize_type
+        return None
 
     def get_min_width_image_dims(self, return_scene_id=False):
         return self._get_minmax_width_image_dims(return_scene_id, minmax_fct=min)
@@ -275,15 +268,10 @@ class CLEAR_dataset(Dataset):
         else:
             to_return = tuple()
 
-        resized_val, resized_dim = self.get_resize_config()
+        resize_transform = self.get_resize_transform()
 
-        if resized_val:
-            if resized_dim == 'height':
-                max_width = int(resized_val * max_width / height)
-                height = resized_val
-            elif resized_dim == 'width':
-                height = int(resized_val * height / max_width)
-                max_width = resized_val
+        if resize_transform:
+            height, max_width = resize_transform.get_resized_dim(height, max_width)
 
         return to_return + (height, max_width)
 
@@ -339,18 +327,20 @@ class CLEAR_dataset(Dataset):
         game_with_image = {
             'id': requested_game['id'],
             'image': image,
-            'question': np.array(requested_game['question']),
-            'answer': np.array(requested_game['answer']),
+            'question': torch.tensor(requested_game['question'], dtype=torch.int32),
+            'answer': torch.tensor(requested_game['answer']),
             'scene_id': requested_game['image']['id']
         }
 
         if 'program' in requested_game:
             game_with_image['program'] = requested_game['program']
 
-        if self.transforms:
+        # FIXME : Transformed images should be saved in cache instead of the original one..Kinda defeat the purpose of the cache
+        if len(self.transforms.transforms) > 0:
             game_with_image = self.transforms(game_with_image)
 
         if 'image_padding' not in game_with_image:
+            # FIXME: We loose padding information when loading from h5
             game_with_image['image_padding'] = torch.tensor([0, 0], dtype=torch.int)
 
         return game_with_image
