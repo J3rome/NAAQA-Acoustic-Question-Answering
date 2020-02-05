@@ -18,7 +18,7 @@ from data_interfaces.transforms import ResizeTensorBasedOnHeight, ResizeTensorBa
 from utils.file import save_model_config, save_json, read_json, create_symlink_to_latest_folder
 from utils.file import create_folders_save_args, fix_best_epoch_symlink_if_necessary
 from utils.random import set_random_seed
-from utils.visualization import print_model_summary, save_graph_to_tensorboard
+from utils.visualization import save_model_summary, save_graph_to_tensorboard
 from utils.argument_parsing import get_args_task_flags_paths, get_feature_extractor_config_from_args
 from utils.logging import create_tensorboard_writers, close_tensorboard_writers
 
@@ -356,8 +356,8 @@ def prepare_for_task(args):
                                                                          film_model_config, input_image_torch_shape,
                                                                          feature_extractor_config)
 
-        if not args['no_model_summary']:
-            print_model_summary(film_model, input_image_torch_shape, device)
+        save_model_summary(paths['output_dated_folder'], film_model, input_image_torch_shape, device,
+                           print_output=not args['no_model_summary'])
 
         if flags['use_tensorboard']:
             tensorboard = create_tensorboard_writers(args, paths)

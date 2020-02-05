@@ -10,14 +10,20 @@ from utils.random import get_random_state, set_random_state
 from models.torchsummary import summary     # Custom version of torchsummary to fix bugs with input
 
 
-def print_model_summary(model, input_image_torch_shape, device="cpu"):
+def save_model_summary(output_folder, model, input_image_torch_shape, device="cpu", output_filename="model_summary.txt",
+                       print_output=True):
     # Printing summary affects the random state (Raw Vs Pre-Extracted Features).
     # We restore it to ensure reproducibility between input type
     random_state = get_random_state()
-    summary(model, [
-        ((22,), torch.LongTensor),
-        ((1,), torch.LongTensor),
-        (input_image_torch_shape, torch.FloatTensor)], device=device)
+    model_summary = summary(model,
+                            [((22,), torch.LongTensor),
+                             ((1,), torch.LongTensor),
+                             (input_image_torch_shape, torch.FloatTensor)],
+                            device=device, print_output=print_output)
+
+    with open(f"{output_folder}/{output_filename}", 'w') as f:
+        f.write(model_summary)
+
     set_random_state(random_state)
 
 
