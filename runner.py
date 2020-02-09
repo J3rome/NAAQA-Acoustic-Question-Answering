@@ -38,7 +38,7 @@ def prepare_model(args, flags, paths, dataloaders, device, model_config, input_i
     trainable_parameters = filter(lambda p: p.requires_grad, film_model.parameters())
 
     if flags['create_optimizer']:
-        if model_config['optimizer'].get('type', '') == 'sgd' or flags["force_sgd_optimizer"]:
+        if model_config['optimizer'].get('type', '') == 'sgd':
             optimizer = torch.optim.SGD(trainable_parameters, lr=model_config['optimizer']['learning_rate'],
                                         momentum=model_config['optimizer']['sgd_momentum'],
                                         weight_decay=model_config['optimizer']['weight_decay'])

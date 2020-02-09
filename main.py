@@ -329,6 +329,9 @@ def prepare_for_task(args):
     early_stopping = not args['no_early_stopping'] and film_model_config['early_stopping']['enable']
     film_model_config['early_stopping']['enable'] = early_stopping
 
+    if flags["force_sgd_optimizer"]:
+        film_model_config['optimizer']['type'] = 'sgd'
+
     # Create required folders if necessary
     if flags['create_output_folder']:
         create_folders_save_args(args, paths)
