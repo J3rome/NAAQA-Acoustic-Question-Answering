@@ -41,7 +41,8 @@ def validate_arguments(args):
 def create_flags_from_args(task, args):
     flags = {}
 
-    flags['restore_model_weights'] = task in ['inference', 'visualize_grad_cam', 'notebook_model_inference'] or args['continue_training']
+    flags['restore_model_weights'] = args['continue_training'] or args['film_model_weight_path'] is not None \
+                                     or task in ['inference', 'visualize_grad_cam', 'notebook_model_inference']
     flags['use_tensorboard'] = 'train' in task
     flags['create_loss_criterion'] = task in ['training', 'lr_finder', 'inference']
     flags['create_optimizer'] = task in ['training', 'lr_finder']
