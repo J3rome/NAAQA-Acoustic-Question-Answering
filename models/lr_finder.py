@@ -157,12 +157,14 @@ class LRFinder(object):
 
         print("Learning rate search finished.")
 
+        return list(zip(self.history['lr'], self.history['loss']))
+
     def _train_batch(self, batch):
         # Set model to training mode
         self.model.train()
 
         # Move data to the correct device
-        images = batch['image'].to(self.device)
+        images = batch['image'].to(self.device, non_blocking=True)
         questions = batch['question'].to(self.device)
         answers = batch['answer'].to(self.device)
         seq_lengths = batch['seq_length'].to(self.device)
