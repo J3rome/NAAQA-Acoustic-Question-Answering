@@ -112,7 +112,12 @@ def prepare_model(args, flags, paths, dataloaders, device, model_config, input_i
         film_model.load_state_dict(checkpoint['model_state_dict'], strict=False)
 
         if optimizer and "optimizer_state_dict" in checkpoint:
-            optimizer_load_state_dict(optimizer, checkpoint['optimizer_state_dict'], device)
+            current_optimizer_param_keys = optimizer.state_dict()['param_groups'][0].keys()
+            checkpoint_optimizer_param_keys = checkpoint['optimizer_state_dict']['param_groups'][0].keys()
+
+            if current_optimizer_param_keys == checkpoint_optimizer_param_keys:
+                # If param_keys are different, we have different optimizer therefore we don't want to restore
+                optimizer_load_state_dict(optimizer, checkpoint['optimizer_state_dict'], device)
 
         if scheduler and 'scheduler_state_dict' in checkpoint:
             current_scheduler_state_dict = scheduler.state_dict()
