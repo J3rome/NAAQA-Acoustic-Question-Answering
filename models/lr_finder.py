@@ -195,7 +195,7 @@ class LRFinder(object):
             for iteration in range(num_iter):
                 batch = next(iterator)
                 # Move data to the correct device
-                images = batch['image'].to(self.device)
+                images = batch['image'].to(self.device, non_blocking=True)
                 questions = batch['question'].to(self.device)
                 answers = batch['answer'].to(self.device)
                 seq_lengths = batch['seq_length'].to(self.device)
