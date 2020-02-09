@@ -17,14 +17,14 @@ def get_args_task_flags_paths(args):
 def validate_arguments(args):
     mutually_exclusive_params = [args['training'], args['inference'], args['feature_extract'], args['create_dict'],
                                  args['visualize_gamma_beta'], args['visualize_grad_cam'], args['lr_finder'],
-                                 args['write_clear_mean_to_config'], args['random_answer_baseline'],
+                                 args['calc_clear_mean'], args['random_answer_baseline'],
                                  args['random_weight_baseline'], args['prepare_images'], args['notebook_data_analysis'],
                                  args['notebook_model_inference']]
 
     assert sum(mutually_exclusive_params) == 1, \
         "[ERROR] Can only do one task at a time " \
         "(--training, --inference, --visualize_gamma_beta, --create_dict, --feature_extract --visualize_grad_cam " \
-        "--prepare_images, --lr_finder, --write_clear_mean_to_config, --random_answer_baseline, " \
+        "--prepare_images, --lr_finder, --calc_clear_mean, --random_answer_baseline, " \
         "--random_weight_baseline, --notebook_data_analysis, --notebook_model_inference)"
 
     mutually_exclusive_params = [args['raw_img_resize_based_on_height'], args['raw_img_resize_based_on_width']]
@@ -77,7 +77,7 @@ def get_paths_from_args(task, args):
 
 def get_task_from_args(args):
     tasks = ['training', 'inference', 'visualize_gamma_beta', 'visualize_grad_cam', 'feature_extract', 'prepare_images',
-             'create_dict', 'lr_finder', 'write_clear_mean_to_config', 'random_weight_baseline',
+             'create_dict', 'lr_finder', 'calc_clear_mean', 'random_weight_baseline',
              'random_answer_baseline', 'notebook_data_analysis', 'notebook_model_inference']
 
     for task in tasks:
@@ -105,7 +105,7 @@ def update_arguments(args, paths, flags):
     args['normalize_zero_one'] = args['normalize_zero_one'] and not args['keep_image_range']
 
     # Make sure we are not normalizing beforce calculating mean and std
-    if args['write_clear_mean_to_config']:
+    if args['calc_clear_mean']:
         args['normalize_with_imagenet_stats'] = False
         args['normalize_with_clear_stats'] = False
 

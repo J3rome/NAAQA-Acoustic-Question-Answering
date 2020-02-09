@@ -47,6 +47,15 @@ def get_size_from_image_header(folder, filename=None):
     return height, width
 
 
+def get_clear_stats(data_path, filename='clear_stats.json'):
+    stats_filepath = f"{data_path}/{filename}"
+
+    assert os.path.exists(stats_filepath), f"No stats file found at {stats_filepath}"
+
+    with open(stats_filepath, 'r') as f:
+        return ujson.load(f)
+
+
 def read_gamma_beta_h5(filepath):
     gammas_betas = []
 

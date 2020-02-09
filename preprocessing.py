@@ -7,10 +7,11 @@ from random import shuffle
 
 from data_interfaces.CLEAR_dataset import CLEARTokenizer
 from utils.file import create_folder_if_necessary, save_json, read_json
-from utils.processing import calc_mean_and_std, update_mean_in_config
+from utils.processing import calc_mean_and_std
 
 import torch
 import torch.nn as nn
+import ujson
 
 from models.lr_finder import LRFinder
 import matplotlib.pyplot as plt
@@ -56,20 +57,23 @@ def get_lr_finder_curves(model, device, train_dataloader, output_dated_folder, n
     return fig, ax
 
 
-def write_clear_mean_to_config(dataloader, device, current_config, config_file_path, overwrite_mean=False):
-    assert os.path.isfile(config_file_path), f"Config file '{config_file_path}' doesn't exist"
+def write_clear_stats_to_file(dataloader, device, overwrite_mean=False,
+                               filename='clear_stats.json'):
+    stats_file_path = f"{dataloader.dataset.root_folder_path}/{filename}"
 
-    key = "clear_stats"
-
-    if not overwrite_mean and 'preprocessing' in current_config and key in current_config['preprocessing'] \
-       and type(current_config['preprocessing'][key]) == list:
-        assert False, "CLEAR mean is already present in config."
+    assert overwrite_mean or not overwrite_mean and not os.path.exists(stats_file_path), \
+        f"CLEAR stats is already present at {stats_file_path}"
 
     dataloader.dataset.keep_1_game_per_scene()
 
     mean, std = calc_mean_and_std(dataloader, device=device)
 
-    update_mean_in_config(mean, std, config_file_path, current_config=current_config, key=key)
+    save_json({
+            'mean': mean,
+            'std': std
+        }, stats_file_path)
+
+    print(f"Clear stats written to '{stats_file_path}'")
 
 
 # >>> Feature Extraction

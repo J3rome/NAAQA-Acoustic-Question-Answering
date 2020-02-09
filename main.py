@@ -9,14 +9,14 @@ from torchvision import transforms
 from runner import train_model, prepare_model, inference
 from baselines import random_answer_baseline, random_weight_baseline
 from preprocessing import create_dict_from_questions, extract_features, images_to_h5, get_lr_finder_curves
-from preprocessing import write_clear_mean_to_config
+from preprocessing import write_clear_stats_to_file
 from visualization import visualize_gamma_beta, grad_cam_visualization
 from data_interfaces.CLEAR_dataset import CLEAR_dataset, CLEAR_collate_fct
 from data_interfaces.transforms import ImgBetweenZeroOne, PadTensor, NormalizeSample, ResizeTensor
 from data_interfaces.transforms import ResizeTensorBasedOnHeight, ResizeTensorBasedOnWidth
 
 from utils.file import save_model_config, save_json, read_json, create_symlink_to_latest_folder
-from utils.file import create_folders_save_args, fix_best_epoch_symlink_if_necessary
+from utils.file import create_folders_save_args, fix_best_epoch_symlink_if_necessary, get_clear_stats
 from utils.random import set_random_seed
 from utils.visualization import save_model_summary, save_graph_to_tensorboard
 from utils.argument_parsing import get_args_task_flags_paths, get_feature_extractor_config_from_args
@@ -40,8 +40,8 @@ parser.add_argument("--notebook_data_analysis", help="Will prepare dataloaders f
                                                      "(Should not be run via main.py)", action='store_true')
 parser.add_argument("--notebook_model_inference", help="Will prepare dataloaders & model for inference in notebook"
                                                      "(Should not be run via main.py)", action='store_true')
-parser.add_argument("--write_clear_mean_to_config", help="Will calculate the mean and std of the dataset and write it "
-                                                         "to the config file", action='store_true')
+parser.add_argument("--calc_clear_mean", help="Will calculate the mean and std of the dataset and write it in a json at"
+                                              "the root of the dataset", action='store_true')
 
 # Input parameters
 parser.add_argument("--data_root_path", type=str, default='data', help="Directory with data")
@@ -132,7 +132,7 @@ parser.add_argument("--max_image_cache_size", type=int, default=5000,
                     help="Max number of images that can be stored in cache")
 
 
-def get_transforms_from_args(args, preprocessing_config):
+def get_transforms_from_args(args, data_path, preprocessing_config):
     transforms_list = []
 
     if args['normalize_zero_one']:
@@ -146,7 +146,7 @@ def get_transforms_from_args(args, preprocessing_config):
             if args['normalize_with_imagenet_stats']:
                 stats = preprocessing_config['imagenet_stats']
             else:
-                stats = preprocessing_config['clear_stats']
+                stats = get_clear_stats(data_path)
 
             transforms_list.append(NormalizeSample(mean=stats['mean'], std=stats['std'], inplace=True))
 
@@ -154,9 +154,9 @@ def get_transforms_from_args(args, preprocessing_config):
 
 
 # Data loading & preparation
-def create_datasets(args, preprocessing_config, load_dataset_extra_stats=False):
+def create_datasets(args, data_path, preprocessing_config, load_dataset_extra_stats=False):
     print("Creating Datasets")
-    transforms_to_apply = get_transforms_from_args(args, preprocessing_config)
+    transforms_to_apply = get_transforms_from_args(args, data_path, preprocessing_config)
 
     datasets = {
         'train': CLEAR_dataset(args['data_root_path'], args['version_name'], args['input_image_type'], 'train',
@@ -268,7 +268,6 @@ def execute_task(task, args, output_dated_folder, dataloaders, model, model_conf
                                    start_end_tokens=not args['no_start_end_tokens'])
 
     elif task == "prepare_images":
-        # TODO : Merge write_clear_mean_to_config here
         images_to_h5(dataloaders=dataloaders,
                      square_image=args['pad_to_square_images'] or args['resize_to_square_images'],
                      output_folder_name=args['preprocessed_folder_name'])
@@ -295,9 +294,8 @@ def execute_task(task, args, output_dated_folder, dataloaders, model, model_conf
         get_lr_finder_curves(model, device, dataloaders['train'], output_dated_folder, args['nb_epoch'], optimizer,
                              val_dataloader=dataloaders['val'], loss_criterion=loss_criterion)
 
-    elif task == "write_clear_mean_to_config":
-        write_clear_mean_to_config(dataloaders['train'], device, model_config, args['config_path'],
-                                   args['overwrite_clear_mean'])
+    elif task == "calc_clear_mean":
+        write_clear_stats_to_file(dataloaders['train'], device, args['overwrite_clear_mean'])
 
     elif task == 'random_answer_baseline':
         random_answer_baseline(dataloaders['train'], output_dated_folder)
@@ -345,7 +343,7 @@ def prepare_for_task(args):
     ####################################
     #   Dataloading
     ####################################
-    datasets = create_datasets(args, film_model_config['preprocessing'], flags['load_dataset_extra_stats'])
+    datasets = create_datasets(args, paths['data_path'], film_model_config['preprocessing'], flags['load_dataset_extra_stats'])
     dataloaders = create_dataloaders(datasets, args['batch_size'], nb_process=8)
 
     ####################################
