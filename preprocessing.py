@@ -33,17 +33,21 @@ def get_lr_finder_curves(model, device, train_dataloader, output_dated_folder, n
     fig, ax = plt.subplots()
     lr_finder = LRFinder(model, optimizer, loss_criterion, device=device)
 
+    num_iter_val = int(num_iter * 0.20)
+
     for weight_decay in weight_decay_list:
         # Reset LR Finder and change weight decay
         lr_finder.reset(weight_decay=weight_decay)
 
         print(f"Learning Rate finder -- Running for {num_iter} batches with weight decay : {weight_decay:.5}")
         # FIXME : Should probably run with validation data?
-        lr_finder.range_test(train_dataloader, val_loader=None, end_lr=100, num_iter=num_iter,
-                             num_iter_val=100)
+        losses_per_lr = lr_finder.range_test(train_dataloader, val_loader=val_dataloader, end_lr=num_iter_val,
+                                             num_iter=num_iter, num_iter_val=num_iter_val)
 
         fig, ax = lr_finder.plot(fig_ax=(fig, ax), legend_label=f"Weight Decay : {weight_decay:.5}", show_fig=False)
 
+        with open(f'{output_dated_folder}/lr_finder_weight_decay_{weight_decay:.5}.json', 'w') as f:
+            ujson.dump(losses_per_lr, f, indent=2)
 
     if show_fig:
         plt.show()
