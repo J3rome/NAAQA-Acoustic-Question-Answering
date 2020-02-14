@@ -69,6 +69,10 @@ parser.add_argument("--raw_img_resize_based_on_width", action='store_true',
                     help="If set (with --raw_img_resize_val), the height of the image will be calculated according to "
                          "the width in order to keep the ratio")
 
+parser.add_argument("--force_square_resize", action='store_true',
+                    help="Will force resize to --raw_img_resize_val without keeping aspect ratio. "
+                         "If --pad_to_square_images, image will be padded with zero. Else it will be resized")
+
 
 parser.add_argument("--keep_image_range", help="Will NOT scale the image between 0-1 (Reverse --normalize_zero_one)",
                     action='store_true')
@@ -186,7 +190,7 @@ def create_datasets(args, data_path, preprocessing_config, load_dataset_extra_st
 
         train_height_is_largest = max_train_img_dims[0] > max_train_img_dims[1]
 
-        if args['raw_img_resize_val']:
+        if args['raw_img_resize_val'] and not args['force_square_resize']:
 
             if max_train_img_dims[0] > args['raw_img_resize_val'] or max_train_img_dims[1] > args['raw_img_resize_val']:
 
@@ -217,10 +221,15 @@ def create_datasets(args, data_path, preprocessing_config, load_dataset_extra_st
 
             # If the height is the largest dimension, we force the padding of the width since we don't want to
             # resize the time axis
-            if args['pad_to_square_images'] or train_height_is_largest:
+            if args['pad_to_square_images'] or train_height_is_largest and not args['force_square_resize']:
                 to_square_transform = PadTensor
             else:
                 to_square_transform = ResizeTensor
+
+            if args['force_square_resize']:
+                train_biggest_dim = args['raw_img_resize_val']
+                val_biggest_dim = args['raw_img_resize_val']
+                test_biggest_dim = args['raw_img_resize_val']
 
             datasets['train'].add_transform(to_square_transform((train_biggest_dim, train_biggest_dim)))
             datasets['val'].add_transform(to_square_transform((val_biggest_dim, val_biggest_dim)))
