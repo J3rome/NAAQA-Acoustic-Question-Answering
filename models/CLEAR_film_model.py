@@ -31,7 +31,8 @@ class CLEAR_FiLM_model(nn.Module):
         self.question_pipeline = Question_pipeline(config, nb_words, dropout_drop_prob, sequence_padding_idx)
 
         # Image Pipeline
-        self.image_pipeline = Image_pipeline(config, input_image_channels, feature_extraction_config)
+        #self.image_pipeline = Image_pipeline(config, input_image_channels, feature_extraction_config)
+        self.image_pipeline = Base_image_pipeline(config, input_image_channels)
 
         # Question and Image Fusion
         resblock_out_channels = config['stem']['conv_out']
@@ -117,6 +118,75 @@ class CLEAR_FiLM_model(nn.Module):
         if self.current_device != device:
             self.current_device = device
             super(CLEAR_FiLM_model, self).to(device, dtype, non_blocking)
+
+
+class Base_image_pipeline(nn.Module):
+    def __init__(self, config, input_image_channels):
+        super(Base_image_pipeline, self).__init__()
+
+        # Used for text summary
+        self.summary_level = 1
+
+        self.config = config
+        nb_features = config['stem']['conv_out']
+
+        spatial_location_extra_channels = 2 if config['stem']['spatial_location'] else 0
+
+        # FIXME : Padding same -- tensorflow
+
+        self.conv1 = nn.Sequential(OrderedDict([
+            ('conv', nn.Conv2d(in_channels=input_image_channels,
+                               out_channels=nb_features, kernel_size=[4, 4],
+                               stride=2, dilation=1, bias=False)),
+            ('batchnorm', nn.BatchNorm2d(nb_features, eps=0.001)),
+            ('relu', nn.ReLU(inplace=True))
+        ]))
+
+        self.conv2 = nn.Sequential(OrderedDict([
+            ('conv', nn.Conv2d(in_channels=nb_features,
+                               out_channels=nb_features, kernel_size=[4, 4],
+                               stride=2, dilation=1, bias=False)),
+            ('batchnorm', nn.BatchNorm2d(nb_features, eps=0.001)),
+            ('relu', nn.ReLU(inplace=True))
+        ]))
+
+        self.conv3 = nn.Sequential(OrderedDict([
+            ('conv', nn.Conv2d(in_channels=nb_features,
+                               out_channels=nb_features, kernel_size=[4, 4],
+                               stride=2, dilation=1, bias=False)),
+            ('batchnorm', nn.BatchNorm2d(nb_features, eps=0.001)),
+            ('relu', nn.ReLU(inplace=True))
+        ]))
+
+        self.conv4 = nn.Sequential(OrderedDict([
+            ('conv', nn.Conv2d(in_channels=nb_features,
+                               out_channels=nb_features, kernel_size=[4, 4],
+                               stride=2, dilation=1, bias=False)),
+            ('batchnorm', nn.BatchNorm2d(nb_features, eps=0.001)),
+            ('relu', nn.ReLU(inplace=True))
+        ]))
+
+        self.stem_conv = nn.Sequential(OrderedDict([
+            ('conv', nn.Conv2d(in_channels=nb_features + spatial_location_extra_channels,
+                               out_channels=nb_features, kernel_size=[3, 3],
+                               stride=1, dilation=1, bias=False)),
+            ('batchnorm', nn.BatchNorm2d(nb_features, eps=0.001)),
+            ('relu', nn.ReLU(inplace=True))
+        ]))
+
+    def forward(self, input_image):
+        out = self.conv1(input_image)
+        out = self.conv2(out)
+        out = self.conv3(out)
+        out = self.conv4(out)
+
+        if self.config['stem']['spatial_location']:
+            out = append_spatial_location(out)
+
+        out = self.stem_conv(out)
+
+        return out
+
 
 class Question_pipeline(nn.Module):
     def __init__(self, config, nb_words, dropout_drop_prob=0, sequence_padding_idx=0):
