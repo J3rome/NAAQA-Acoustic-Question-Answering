@@ -392,8 +392,8 @@ def train_model(device, model, dataloaders, output_folder, criterion, optimizer,
                                                                                         criterion, optimizer,
                                                                                         scheduler=scheduler,
                                                                                         epoch_id=epoch,
-                                                                                        tensorboard=tensorboard_per_set,
-                                                                                        gamma_beta_path="%s/train_gamma_beta.h5" % epoch_output_folder_path)
+                                                                                        tensorboard=tensorboard_per_set)#,
+                                                                                        #gamma_beta_path="%s/train_gamma_beta.h5" % epoch_output_folder_path)
         epoch_train_time = datetime.now() - epoch_time
 
         print('\n{} Loss: {:.4f} Acc: {:.4f}'.format('Train', train_loss, train_acc))
