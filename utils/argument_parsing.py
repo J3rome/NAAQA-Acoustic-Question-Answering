@@ -19,7 +19,7 @@ def validate_arguments(args):
                                  args['visualize_gamma_beta'], args['visualize_grad_cam'], args['lr_finder'],
                                  args['calc_clear_mean'], args['random_answer_baseline'],
                                  args['random_weight_baseline'], args['prepare_images'], args['notebook_data_analysis'],
-                                 args['notebook_model_inference']]
+                                 args['notebook_model_inference'], args['tf_weight_transfer']]
 
     assert sum(mutually_exclusive_params) == 1, \
         "[ERROR] Can only do one task at a time " \
@@ -56,7 +56,8 @@ def create_flags_from_args(task, args):
                                           'feature_extract',
                                           'lr_finder',
                                           'random_weight_baseline',
-                                          'notebook_model_inference']
+                                          'notebook_model_inference',
+                                          'tf_weight_transfer']
 
     return flags
 
@@ -78,7 +79,7 @@ def get_paths_from_args(task, args):
 def get_task_from_args(args):
     tasks = ['training', 'inference', 'visualize_gamma_beta', 'visualize_grad_cam', 'feature_extract', 'prepare_images',
              'create_dict', 'lr_finder', 'calc_clear_mean', 'random_weight_baseline',
-             'random_answer_baseline', 'notebook_data_analysis', 'notebook_model_inference']
+             'random_answer_baseline', 'notebook_data_analysis', 'notebook_model_inference', 'tf_weight_transfer']
 
     for task in tasks:
         if task in args and args[task]:

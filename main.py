@@ -22,6 +22,8 @@ from utils.visualization import save_model_summary, save_graph_to_tensorboard
 from utils.argument_parsing import get_args_task_flags_paths, get_feature_extractor_config_from_args
 from utils.logging import create_tensorboard_writers, close_tensorboard_writers
 
+from utils.model import tf_weight_transfer
+
 
 parser = argparse.ArgumentParser('FiLM model for CLEAR Dataset (Acoustic Question Answering)', fromfile_prefix_chars='@')
 
@@ -42,6 +44,10 @@ parser.add_argument("--notebook_model_inference", help="Will prepare dataloaders
                                                      "(Should not be run via main.py)", action='store_true')
 parser.add_argument("--calc_clear_mean", help="Will calculate the mean and std of the dataset and write it in a json at"
                                               "the root of the dataset", action='store_true')
+
+parser.add_argument("--tf_weight_transfer", help="Will create a pytorch checkpoint from dumped tensorflow weights."
+                                                 "path to the weights are specified by --tf_weight_path",
+                    action='store_true')
 
 # Input parameters
 parser.add_argument("--data_root_path", type=str, default='data', help="Directory with data")
@@ -110,7 +116,8 @@ parser.add_argument("--tensorboard_save_graph", help="Save model graph to tensor
 parser.add_argument("--tensorboard_save_images", help="Save input images to tensorboard", action='store_true')
 parser.add_argument("--tensorboard_save_texts", help="Save input texts to tensorboard", action='store_true')
 parser.add_argument("--gpu_index", type=str, default='0', help="Index of the GPU to use")
-
+parser.add_argument("--tf_weight_path", type=str, help="Specify where to load dumped tensorflow weights "
+                                                       "(Used with --tf_weight_transfer)")
 
 # Other parameters
 parser.add_argument("--nb_epoch", type=int, default=15, help="Nb of epoch for training")
@@ -313,6 +320,9 @@ def execute_task(task, args, output_dated_folder, dataloaders, model, model_conf
     elif task == 'random_weight_baseline':
         random_weight_baseline(model, device, dataloaders['train'], output_dated_folder)
         random_weight_baseline(model, device, dataloaders['val'], output_dated_folder)
+
+    elif task == 'tf_weight_transfer':
+        tf_weight_transfer(model, args['tf_weight_path'], output_dated_folder)
 
     assert not task.startswith('notebook'), "Task not meant to be run from main.py. " \
                                             "Used to prepare dataloaders & model for analysis in notebook"
