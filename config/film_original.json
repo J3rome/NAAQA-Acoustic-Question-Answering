@@ -19,19 +19,19 @@
     "output_layer":"block3/unit_22/bottleneck_v1"
   },
   "question":{
-    "word_embedding_dim":64,
-    "rnn_state_size":128
+    "word_embedding_dim":200,
+    "rnn_state_size":4096
   },
   "stem":{
     "spatial_location":true,
-    "conv_out":32,
+    "conv_out":128,
     "conv_kernel":[
       3,
       3
     ]
   },
   "resblock":{
-    "no_resblock":3,
+    "no_resblock":4,
     "spatial_location":true,
     "film_projection_type":"plus",
     "kernel1":[
@@ -45,15 +45,15 @@
   },
   "classifier":{
     "spatial_location":true,
-    "type": "fcn",
+    "type":"fcn",
     "global_pool_type":"max",
-    "conv_out":32,
+    "conv_out":512,
     "conv_kernel":[
       1,
       1
     ],
-    "no_mlp_units":64,
-    "projection_size": 128
+    "no_mlp_units":1024,
+    "projection_size":1024
   },
   "optimizer":{
     "type":"adam",
