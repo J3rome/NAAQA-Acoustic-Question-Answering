@@ -178,7 +178,7 @@ class Image_pipeline(nn.Module):
             ('conv', Conv2d_tf(in_channels=input_image_channels + spatial_location_extra_channels,
                                out_channels=config['stem']['conv_out'], kernel_size=config['stem']['conv_kernel'],
                                stride=1, padding='SAME', dilation=1)),
-            ('batchnorm', nn.BatchNorm2d(config['stem']['conv_out'])),
+            ('batchnorm', nn.BatchNorm2d(config['stem']['conv_out'], eps=0.001)),
             ('relu', nn.ReLU(inplace=True))
         ]))
 
@@ -186,7 +186,7 @@ class Image_pipeline(nn.Module):
             ('conv', Conv2d_tf(in_channels=config['stem']['conv_out'] + spatial_location_extra_channels,
                                out_channels=config['stem']['conv_out'], kernel_size=config['stem']['conv_kernel'],
                                stride=1, padding='SAME', dilation=1)),
-            ('batchnorm', nn.BatchNorm2d(config['stem']['conv_out'])),
+            ('batchnorm', nn.BatchNorm2d(config['stem']['conv_out'], eps=0.001)),
             ('relu', nn.ReLU(inplace=True))
         ]))
 
@@ -194,7 +194,7 @@ class Image_pipeline(nn.Module):
             ('conv', Conv2d_tf(in_channels=config['stem']['conv_out'] + spatial_location_extra_channels,
                                out_channels=config['stem']['conv_out'], kernel_size=config['stem']['conv_kernel'],
                                stride=1, padding='SAME', dilation=1)),
-            ('batchnorm', nn.BatchNorm2d(config['stem']['conv_out'])),
+            ('batchnorm', nn.BatchNorm2d(config['stem']['conv_out'], eps=0.001)),
             ('relu', nn.ReLU(inplace=True))
         ]))
 
@@ -202,7 +202,7 @@ class Image_pipeline(nn.Module):
             ('conv', Conv2d_tf(in_channels=config['stem']['conv_out'] + spatial_location_extra_channels,
                                out_channels=config['stem']['conv_out'], kernel_size=config['stem']['conv_kernel'],
                                stride=1, padding='SAME', dilation=1)),
-            ('batchnorm', nn.BatchNorm2d(config['stem']['conv_out'])),
+            ('batchnorm', nn.BatchNorm2d(config['stem']['conv_out'], eps=0.001)),
             ('relu', nn.ReLU(inplace=True))
         ]))
 
@@ -210,7 +210,7 @@ class Image_pipeline(nn.Module):
             ('conv', Conv2d_tf(in_channels=config['stem']['conv_out'] + spatial_location_extra_channels,
                                out_channels=config['stem']['conv_out'], kernel_size=config['stem']['conv_kernel'],
                                stride=1, padding='SAME', dilation=1)),
-            ('batchnorm', nn.BatchNorm2d(config['stem']['conv_out'])),
+            ('batchnorm', nn.BatchNorm2d(config['stem']['conv_out'], eps=0.001)),
             ('relu', nn.ReLU(inplace=True))
         ]))
 
