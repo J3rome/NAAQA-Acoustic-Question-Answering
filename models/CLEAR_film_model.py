@@ -97,7 +97,7 @@ class CLEAR_FiLM_model(nn.Module):
     def get_cleaned_state_dict(self):
         state_dict = self.state_dict()
 
-        if self.image_pipeline.feature_extractor is not None:
+        if hasattr(self.image_pipeline, 'feature_extractor') and self.image_pipeline.feature_extractor:
             state_dict = {k : p for k,p in state_dict.items() if 'feature_extractor' not in k}
 
         return state_dict
@@ -108,8 +108,8 @@ class CLEAR_FiLM_model(nn.Module):
             super(CLEAR_FiLM_model, self).train(mode)
 
         # Keep the feature extractor in eval mode
-        if self.image_pipeline.feature_extractor and self.image_pipeline.feature_extractor.training:
-            self.feature_extractor.eval()
+        if hasattr(self.image_pipeline, 'feature_extractor') and self.image_pipeline.feature_extractor and self.image_pipeline.feature_extractor.training:
+            self.image_pipeline.feature_extractor.eval()
 
     def to(self, device=None, dtype=None, non_blocking=False):
         # Copy model to device only once
