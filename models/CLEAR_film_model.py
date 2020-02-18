@@ -246,25 +246,27 @@ class Image_pipeline(nn.Module):
         conv_out = self.max_pool_in_time(conv_out)
 
         # Additionals
-        if self.config['stem']['spatial_location']:
-            conv_out = append_spatial_location(conv_out)
-
-        conv_out = self.stem_conv3(conv_out)
-        conv_out = self.max_pool_in_freq(conv_out)
-
-        if self.config['stem']['spatial_location']:
-            conv_out = append_spatial_location(conv_out)
-
-        conv_out = self.stem_conv4(conv_out)
-        conv_out = self.max_pool_in_time(conv_out)
-
-        if self.config['stem']['spatial_location']:
-            conv_out = append_spatial_location(conv_out)
-
-        conv_out = self.stem_conv5(conv_out)
-        conv_out = self.max_pool_square(conv_out)
+        # if self.config['stem']['spatial_location']:
+        #     conv_out = append_spatial_location(conv_out)
+        #
+        # conv_out = self.stem_conv3(conv_out)
+        # conv_out = self.max_pool_in_freq(conv_out)
+        #
+        # if self.config['stem']['spatial_location']:
+        #     conv_out = append_spatial_location(conv_out)
+        #
+        # conv_out = self.stem_conv4(conv_out)
+        # conv_out = self.max_pool_in_time(conv_out)
+        #
+        # if self.config['stem']['spatial_location']:
+        #     conv_out = append_spatial_location(conv_out)
+        #
+        # conv_out = self.stem_conv5(conv_out)
+        # conv_out = self.max_pool_square(conv_out)
 
         return conv_out
+
+
 
 
 if __name__ == "__main__":
