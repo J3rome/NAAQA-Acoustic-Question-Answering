@@ -57,6 +57,7 @@ class CLEAR_FiLM_model(nn.Module):
         self.classifier = classifier_class(in_channels=resblock_out_channels,
                                            projection_size=config["classifier"]['projection_size'],
                                            output_size=nb_answers,
+                                           pooling_type=config['classifier']['global_pool_type'],
                                            spatial_location_layer=config['classifier']['spatial_location'],
                                            dropout_drop_prob=dropout_drop_prob)
 
