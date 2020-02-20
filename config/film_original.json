@@ -59,7 +59,7 @@
     "type":"adam",
     "learning_rate":0.0003,
     "clip_val":0.0,
-    "weight_decay":0.00003,
+    "weight_decay":5e-6,
     "sgd_momentum":0.0,
     "dropout_drop_prob":0.25,
     "cyclical":{
