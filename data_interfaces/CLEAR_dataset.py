@@ -124,7 +124,7 @@ class CLEAR_dataset(Dataset):
                 self.games_per_family[self.answer_to_family[str(sample['answer']).lower()]].append(i)
                 game['program'] = sample['program'] if 'program' in sample else []
 
-            self.games[i] = self.prepare_game(game)
+            self.games[question_id] = self.prepare_game(game)
 
             self.answers.append(answer)
             self.answer_counter[answer] += 1
