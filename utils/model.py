@@ -125,6 +125,21 @@ def tf_weight_transfer(model, weights_path, output_path):
                         model.classifier.logits.weight = torch.nn.Parameter(torch.from_numpy(np.load(filepath)))
                     elif "biases" in filename:
                         model.classifier.logits.bias = torch.nn.Parameter(torch.from_numpy(np.load(filepath)))
+            elif "word_embedding" in filename and "weights" in filename:
+                model.question_pipeline.word_emb.weight = torch.nn.Parameter(torch.from_numpy(np.load(filepath)))
+            elif "gru_cell" in filename:
+                if "candidate" in filename:
+                    if 'weights' in filename:
+                        model.question_pipeline.rnn_state.weight_ih_l0 = torch.nn.Parameter(torch.from_numpy(np.load(filepath)))
+                    elif "biases" in filename:
+                        model.question_pipeline.rnn_state.bias_ih_l0 = torch.nn.Parameter(torch.from_numpy(np.load(filepath)))
+
+                elif "gates" in filename:
+                    if 'weights' in filename:
+                        model.question_pipeline.rnn_state.weight_hh_l0 = torch.nn.Parameter(torch.from_numpy(np.load(filepath)))
+                    elif "biases" in filename:
+                        model.question_pipeline.rnn_state.bias_hh_l0 = torch.nn.Parameter(torch.from_numpy(np.load(filepath)))
+
 
     # Finished transfering weights
     # Save training weights
