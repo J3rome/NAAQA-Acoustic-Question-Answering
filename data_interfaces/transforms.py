@@ -22,7 +22,7 @@ class ResizeTensor(object):
         self.output_shape = output_shape
 
     def __call__(self, sample):
-        sample['image'] = F.interpolate(sample['image'].unsqueeze(0), size=self.output_shape, mode='bicubic',
+        sample['image'] = F.interpolate(sample['image'].unsqueeze(0), size=self.output_shape, mode='bilinear',
                                         align_corners=False).squeeze(0)
         return sample
 
@@ -50,7 +50,7 @@ class ResizeTensorBasedOnHeight(object):
 
         if output_width + self.output_height != sample['image'].shape[2] + sample['image'].shape[1]:
             sample['image'] = F.interpolate(sample['image'].unsqueeze(0), size=(self.output_height, output_width),
-                                            mode='bicubic', align_corners=False).squeeze(0)
+                                            mode='bilinear', align_corners=False).squeeze(0)
 
         return sample
 
@@ -87,7 +87,7 @@ class ResizeTensorBasedOnWidth(object):
 
         if output_height + output_width != sample['image'].shape[1] + sample['image'].shape[2]:
             sample['image'] = F.interpolate(sample['image'].unsqueeze(0), size=(output_height, output_width),
-                                            mode='bicubic', align_corners=False).squeeze(0)
+                                            mode='bilinear', align_corners=False).squeeze(0)
 
         return sample
 
