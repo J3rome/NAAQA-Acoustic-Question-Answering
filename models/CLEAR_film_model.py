@@ -135,41 +135,41 @@ class Base_image_pipeline(nn.Module):
         # FIXME : Padding same -- tensorflow
 
         self.conv1 = nn.Sequential(OrderedDict([
-            ('conv', nn.Conv2d(in_channels=input_image_channels,
+            ('conv', Conv2d_tf(in_channels=input_image_channels,
                                out_channels=nb_features, kernel_size=[4, 4],
-                               stride=2, dilation=1, bias=False)),
+                               stride=2, dilation=1, bias=False, padding='SAME')),
             ('batchnorm', nn.BatchNorm2d(nb_features, eps=0.001)),
             ('relu', nn.ReLU(inplace=True))
         ]))
 
         self.conv2 = nn.Sequential(OrderedDict([
-            ('conv', nn.Conv2d(in_channels=nb_features,
+            ('conv', Conv2d_tf(in_channels=nb_features,
                                out_channels=nb_features, kernel_size=[4, 4],
-                               stride=2, dilation=1, bias=False)),
+                               stride=2, dilation=1, bias=False, padding='SAME')),
             ('batchnorm', nn.BatchNorm2d(nb_features, eps=0.001)),
             ('relu', nn.ReLU(inplace=True))
         ]))
 
         self.conv3 = nn.Sequential(OrderedDict([
-            ('conv', nn.Conv2d(in_channels=nb_features,
+            ('conv', Conv2d_tf(in_channels=nb_features,
                                out_channels=nb_features, kernel_size=[4, 4],
-                               stride=2, dilation=1, bias=False)),
+                               stride=2, dilation=1, bias=False, padding='SAME')),
             ('batchnorm', nn.BatchNorm2d(nb_features, eps=0.001)),
             ('relu', nn.ReLU(inplace=True))
         ]))
 
         self.conv4 = nn.Sequential(OrderedDict([
-            ('conv', nn.Conv2d(in_channels=nb_features,
+            ('conv', Conv2d_tf(in_channels=nb_features,
                                out_channels=nb_features, kernel_size=[4, 4],
-                               stride=2, dilation=1, bias=False)),
+                               stride=2, dilation=1, bias=False, padding='SAME')),
             ('batchnorm', nn.BatchNorm2d(nb_features, eps=0.001)),
             ('relu', nn.ReLU(inplace=True))
         ]))
 
         self.stem_conv = nn.Sequential(OrderedDict([
-            ('conv', nn.Conv2d(in_channels=nb_features + spatial_location_extra_channels,
+            ('conv', Conv2d_tf(in_channels=nb_features + spatial_location_extra_channels,
                                out_channels=nb_features, kernel_size=[3, 3],
-                               stride=1, dilation=1, bias=False)),
+                               stride=1, dilation=1, bias=False, padding='SAME')),
             ('batchnorm', nn.BatchNorm2d(nb_features, eps=0.001)),
             ('relu', nn.ReLU(inplace=True))
         ]))
