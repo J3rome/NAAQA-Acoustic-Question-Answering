@@ -98,7 +98,7 @@ def update_arguments(args, paths, flags):
 
     if args['input_image_type'] == 'raw':
         # Default values when in RAW mode
-        args['normalize_zero_one'] = True
+        #args['normalize_zero_one'] = True
 
         if args['raw_img_resize_val'] is None:
             args['raw_img_resize_val'] = 224
