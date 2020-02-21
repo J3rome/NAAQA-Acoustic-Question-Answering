@@ -13,7 +13,7 @@ from torchvision import transforms as viz_transforms
 from data_interfaces.CLEAR_image_loader import get_img_builder, CLEARImage
 from utils.file import read_json, get_size_from_image_header
 from utils.generic import get_answer_to_family_map
-from data_interfaces.transforms import ResizeTensorBasedOnWidth, ResizeTensorBasedOnHeight
+from data_interfaces.transforms import ResizeTensorBasedOnMaxWidth
 
 import multiprocessing
 import ctypes
@@ -246,7 +246,7 @@ class CLEAR_dataset(Dataset):
     def get_resize_transform(self):
         if self.transforms:
             for transform in self.transforms.transforms:
-                if type(transform) is ResizeTensorBasedOnHeight or type(transform) is ResizeTensorBasedOnWidth:
+                if type(transform) is ResizeTensorBasedOnMaxWidth:
                     return transform
 
         return None
