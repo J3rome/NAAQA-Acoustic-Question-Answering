@@ -61,12 +61,8 @@ def get_lr_finder_curves(model, device, train_dataloader, output_dated_folder, n
     return fig, ax
 
 
-def write_clear_stats_to_file(dataloader, device, overwrite_mean=False,
-                               filename='clear_stats.json'):
+def write_clear_stats_to_file(dataloader, device, filename='clear_stats.json'):
     stats_file_path = f"{dataloader.dataset.root_folder_path}/{filename}"
-
-    assert overwrite_mean or not overwrite_mean and not os.path.exists(stats_file_path), \
-        f"CLEAR stats is already present at {stats_file_path}"
 
     dataloader.dataset.keep_1_game_per_scene()
 
@@ -78,79 +74,6 @@ def write_clear_stats_to_file(dataloader, device, overwrite_mean=False,
         }, stats_file_path)
 
     print(f"Clear stats written to '{stats_file_path}'")
-
-
-# >>> Feature Extraction
-def images_to_h5(dataloaders, square_image, output_folder_name='preprocessed'):
-    dataloaders_first_key = list(dataloaders.keys())[0]
-    first_dataloader = dataloaders[dataloaders_first_key]
-
-    assert first_dataloader.dataset.is_raw_img(), 'Input must be set to RAW in config to pre extract features.'
-
-    data_path = first_dataloader.dataset.root_folder_path
-    batch_size = first_dataloader.batch_size
-    output_folder_path = '%s/%s' % (data_path, output_folder_name)
-
-    # NOTE : When testing multiple dataset configurations, Images and questions are generated in separate folder and
-    #        linked together so we don't have multiple copies of the dataset (And multiple preprocessing runs)
-    #
-    #        We use the default symlink to create the new folder at the correct destination so it is available
-    #        to other configuration of the dataset (When extracting using different value of 'output_folder_name')
-    #
-    #        If "preprocessed" is not a symlink, 'output_folder_name' will be created in requested 'data_path'
-
-    output_exist = os.path.exists(output_folder_path)
-    preprocessed_default_folder_path = '%s/preprocessed' % data_path
-    if not output_exist and os.path.exists(preprocessed_default_folder_path) and \
-            os.path.islink(preprocessed_default_folder_path):
-
-        # Retrieve paths from symlink
-        default_link_value = os.readlink(preprocessed_default_folder_path)
-        new_link_value = default_link_value.replace('preprocessed', output_folder_name)
-
-        # Create folder in appropriate directory
-        create_folder_if_necessary("%s/%s" % (data_path, new_link_value))
-
-        # Create symlink in requested directory
-        if not output_exist:
-            os.symlink(new_link_value, output_folder_path)
-    else:
-        create_folder_if_necessary(output_folder_path)
-
-    for set_type, dataloader in dataloaders.items():
-        print("Creating H5 file from '%s' set" % set_type)
-        output_filepath = '%s/%s_features.h5' % (output_folder_path, set_type)
-
-        # Retrieve min & max dims of images
-        max_width_id, height, max_width = dataloader.dataset.get_max_width_image_dims(return_scene_id=True)
-        #game_id = dataloader.dataset.get_random_id_for_scene(max_width_id)
-        #max_width_img = dataloader.dataset[game_id]['image'].unsqueeze(0)
-
-        if square_image:
-            max_dim = max(height, max_width)
-            image_dim = [3, max_dim, max_dim]
-        else:
-            image_dim = [3, height, max_width]
-
-        # Keep only 1 game per scene (We want to process every image only once)
-        dataloader.dataset.keep_1_game_per_scene()
-
-        nb_games = len(dataloader.dataset)
-
-        with h5py.File(output_filepath, 'w') as f:
-            # FIXME : Change dataset name ?
-            # FIXME : We loose padding informations when saving in h5 file
-            h5_dataset = f.create_dataset('features', shape=[nb_games] + image_dim, dtype=np.float32)
-            h5_idx2img = f.create_dataset('idx2img', shape=[nb_games], dtype=np.int32)
-            h5_idx = 0
-            for batch in tqdm(dataloader):
-                h5_dataset[h5_idx: h5_idx + batch_size] = batch['image']
-
-                for i, scene_id in enumerate(batch['scene_id']):
-                    h5_idx2img[h5_idx + i] = scene_id
-
-                h5_idx += batch_size
-        print("Images extracted successfully to '%s'" % output_filepath)
 
 
 # >>> Feature Extraction
@@ -233,6 +156,72 @@ def extract_features(device, feature_extractor, dataloaders, output_folder_name=
 
                 h5_idx += batch_size
         print("Features extracted succesfully to '%s'" % output_filepath)
+
+
+def images_to_h5(dataloaders, output_folder_name='preprocessed'):
+    dataloaders_first_key = list(dataloaders.keys())[0]
+    first_dataloader = dataloaders[dataloaders_first_key]
+
+    assert first_dataloader.dataset.is_raw_img(), 'Input must be set to RAW in config to pre extract features.'
+
+    data_path = first_dataloader.dataset.root_folder_path
+    batch_size = first_dataloader.batch_size
+    output_folder_path = '%s/%s' % (data_path, output_folder_name)
+
+    # NOTE : When testing multiple dataset configurations, Images and questions are generated in separate folder and
+    #        linked together so we don't have multiple copies of the dataset (And multiple preprocessing runs)
+    #
+    #        We use the default symlink to create the new folder at the correct destination so it is available
+    #        to other configuration of the dataset (When extracting using different value of 'output_folder_name')
+    #
+    #        If "preprocessed" is not a symlink, 'output_folder_name' will be created in requested 'data_path'
+
+    output_exist = os.path.exists(output_folder_path)
+    preprocessed_default_folder_path = '%s/preprocessed' % data_path
+    if not output_exist and os.path.exists(preprocessed_default_folder_path) and \
+            os.path.islink(preprocessed_default_folder_path):
+
+        # Retrieve paths from symlink
+        default_link_value = os.readlink(preprocessed_default_folder_path)
+        new_link_value = default_link_value.replace('preprocessed', output_folder_name)
+
+        # Create folder in appropriate directory
+        create_folder_if_necessary("%s/%s" % (data_path, new_link_value))
+
+        # Create symlink in requested directory
+        if not output_exist:
+            os.symlink(new_link_value, output_folder_path)
+    else:
+        create_folder_if_necessary(output_folder_path)
+
+    for set_type, dataloader in dataloaders.items():
+        print("Creating H5 file from '%s' set" % set_type)
+        output_filepath = '%s/%s_features.h5' % (output_folder_path, set_type)
+
+        # Retrieve min & max dims of images
+        max_width_id, height, max_width = dataloader.dataset.get_max_width_image_dims(return_scene_id=True)
+
+        image_dim = [3, height, max_width]
+
+        # Keep only 1 game per scene (We want to process every image only once)
+        dataloader.dataset.keep_1_game_per_scene()
+
+        nb_games = len(dataloader.dataset)
+
+        with h5py.File(output_filepath, 'w') as f:
+            # FIXME : Change dataset name ?
+            # FIXME : We loose padding informations when saving in h5 file
+            h5_dataset = f.create_dataset('features', shape=[nb_games] + image_dim, dtype=np.float32)
+            h5_idx2img = f.create_dataset('idx2img', shape=[nb_games], dtype=np.int32)
+            h5_idx = 0
+            for batch in tqdm(dataloader):
+                h5_dataset[h5_idx: h5_idx + batch_size] = batch['image']
+
+                for i, scene_id in enumerate(batch['scene_id']):
+                    h5_idx2img[h5_idx + i] = scene_id
+
+                h5_idx += batch_size
+        print("Images extracted successfully to '%s'" % output_filepath)
 
 
 # >>> Dictionary Creation (For word tokenization)

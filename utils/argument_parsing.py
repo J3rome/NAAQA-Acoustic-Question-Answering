@@ -27,13 +27,6 @@ def validate_arguments(args):
         "--prepare_images, --lr_finder, --calc_clear_mean, --random_answer_baseline, " \
         "--random_weight_baseline, --notebook_data_analysis, --notebook_model_inference)"
 
-    mutually_exclusive_params = [args['raw_img_resize_based_on_height'], args['raw_img_resize_based_on_width']]
-    assert sum(mutually_exclusive_params) < 2, "[ERROR] Image resize can be either --raw_img_resize_based_on_height " \
-                                               "or --raw_img_resize_based_on_width but not both"
-
-    mutually_exclusive_params = [args['pad_to_square_images'], args['resize_to_square_images']]
-    assert sum(mutually_exclusive_params) < 2, "[ERROR] Can either --pad_to_square_images or --resize_to_square_images"
-
     assert not args['continue_training'] or (args['training'] and args['continue_training']), \
         "[ERROR] Must be in --training mode for --continue_training"
 
@@ -98,10 +91,7 @@ def update_arguments(args, paths, flags):
 
     if args['input_image_type'] == 'raw':
         # Default values when in RAW mode
-        #args['normalize_zero_one'] = True
-
-        if args['raw_img_resize_val'] is None:
-            args['raw_img_resize_val'] = 224
+        args['normalize_zero_one'] = True
 
     args['normalize_zero_one'] = args['normalize_zero_one'] and not args['keep_image_range']
 
