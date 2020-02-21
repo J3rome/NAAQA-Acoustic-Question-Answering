@@ -299,7 +299,7 @@ def execute_task(task, args, output_dated_folder, dataloaders, model, model_conf
                              val_dataloader=dataloaders['val'], loss_criterion=loss_criterion)
 
     elif task == "calc_clear_mean":
-        write_clear_stats_to_file(dataloaders['train'], device, args['overwrite_clear_mean'])
+        write_clear_stats_to_file(dataloaders['train'], device)
 
     elif task == 'random_answer_baseline':
         random_answer_baseline(dataloaders['train'], output_dated_folder)
