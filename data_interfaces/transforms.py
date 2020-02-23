@@ -97,17 +97,19 @@ class ResizeTensorBasedOnMaxWidth(object):
     """
     Resize Tensor to 'output_width' while keeping time axis ratio
     """
-    def __init__(self, output_width, max_width, output_height):
+    def __init__(self, output_width, max_width=None, output_height=None):
         self.output_height = output_height
         self.output_width = output_width
         self.max_width = max_width
 
-        self.width_ratio = self.output_width / self.max_width
+        if self.max_width:
+            self.width_ratio = self.output_width / self.max_width
 
     def get_resized_dim(self, height, width):
         output_height = self.output_height if self.output_height else height
+        output_width = self.output_width if self.max_width is None else int(width * self.width_ratio + 0.5)
 
-        return output_height, int(width * self.width_ratio + 0.5)
+        return output_height, output_width
 
     def __call__(self, sample):
         output_height, output_width = self.get_resized_dim(sample['image'].shape[1], sample['image'].shape[2])

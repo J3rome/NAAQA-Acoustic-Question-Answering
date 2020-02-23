@@ -60,6 +60,8 @@ parser.add_argument("--resize_img", help="Will resize the image according to --i
                     action='store_true')
 parser.add_argument("--resize_width_only", help="Will prevent the height from being resized (Do nothing if --pad_height)",
                     action='store_true')
+parser.add_argument("--resize_img_width_no_ratio", help="Will resize images to --img_resize_width without keeping ratio",
+                    action='store_true')
 parser.add_argument("--pad_to_largest_image", help="If set, images will be padded to meet the largest image in the set."
                                                    "All input will have the same size.", action='store_true')
 parser.add_argument("--pad_height", help="If set, the height will be padded to --img_resize_height instead of resized",
@@ -194,12 +196,16 @@ def create_datasets(args, data_path, preprocessing_config, load_dataset_extra_st
 
         if args['resize_img']:
             resize_height = args['img_resize_height']
+            max_width_ref = max_train_img_dims[1]
 
             if args['pad_height'] or args['resize_width_only']:
                 resize_height = None
 
+            if args['resize_img_width_no_ratio']:
+                max_width_ref = None
+
             resize_transform = ResizeTensorBasedOnMaxWidth(output_width=args['img_resize_width'],
-                                                           max_width=max_train_img_dims[1],
+                                                           max_width=max_width_ref,
                                                            output_height=resize_height)
 
             datasets['train'].add_transform(resize_transform)
