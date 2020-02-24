@@ -166,6 +166,10 @@ def get_answer_to_family_map(attributes_filepath, to_lowercase=True, reduced_tex
     return answer_to_family
 
 
+def get_imagenet_stats():
+    return {"mean": [0.485, 0.456, 0.406], "std": [0.229, 0.224, 0.225]}
+
+
 def optimizer_load_state_dict(optimizer, state_dict, device):
     """
     Load optimizer state_dict and send everything to specified device (https://github.com/pytorch/pytorch/issues/2830)

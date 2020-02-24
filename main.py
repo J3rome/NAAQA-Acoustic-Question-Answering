@@ -21,6 +21,7 @@ from utils.random import set_random_seed, get_random_state, set_random_state
 from utils.visualization import save_model_summary, save_graph_to_tensorboard
 from utils.argument_parsing import get_args_task_flags_paths, get_feature_extractor_config_from_args
 from utils.logging import create_tensorboard_writers, close_tensorboard_writers
+from utils.generic import get_imagenet_stats
 
 from models.tools.TF_weight_transfer import tf_weight_transfer
 
@@ -142,7 +143,7 @@ parser.add_argument("--tf_weight_path", type=str, help="Specify where to load du
                                                        "(Used with --tf_weight_transfer)")
 
 
-def get_transforms_from_args(args, data_path, preprocessing_config):
+def get_transforms_from_args(args, data_path):
     transforms_list = []
 
     if args['normalize_zero_one']:
@@ -154,7 +155,7 @@ def get_transforms_from_args(args, data_path, preprocessing_config):
 
         if args['normalize_with_imagenet_stats'] or args['normalize_with_clear_stats']:
             if args['normalize_with_imagenet_stats']:
-                stats = preprocessing_config['imagenet_stats']
+                stats = get_imagenet_stats()
             else:
                 stats = get_clear_stats(data_path)
 
@@ -164,9 +165,9 @@ def get_transforms_from_args(args, data_path, preprocessing_config):
 
 
 # Data loading & preparation
-def create_datasets(args, data_path, preprocessing_config, load_dataset_extra_stats=False):
+def create_datasets(args, data_path, load_dataset_extra_stats=False):
     print("Creating Datasets")
-    transforms_to_apply = get_transforms_from_args(args, data_path, preprocessing_config)
+    transforms_to_apply = get_transforms_from_args(args, data_path)
 
     datasets = {
         'train': CLEAR_dataset(args['data_root_path'], args['version_name'], args['input_image_type'], 'train',
@@ -360,7 +361,7 @@ def prepare_for_task(args):
     ####################################
     #   Dataloading
     ####################################
-    datasets = create_datasets(args, paths['data_path'], film_model_config['preprocessing'], flags['load_dataset_extra_stats'])
+    datasets = create_datasets(args, paths['data_path'], flags['load_dataset_extra_stats'])
     dataloaders = create_dataloaders(datasets, args['batch_size'], nb_process=8)
 
     ####################################
