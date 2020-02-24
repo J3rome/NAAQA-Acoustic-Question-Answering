@@ -124,7 +124,7 @@ def extract_features(device, feature_extractor, dataloaders, output_folder_name=
         max_width_id, height, max_width = dataloader.dataset.get_max_width_image_dims(return_scene_id=True)
         game_id = dataloader.dataset.get_random_id_for_scene(max_width_id)
         max_width_img = dataloader.dataset[game_id]['image'].unsqueeze(0).to(device)
-        feature_extractor_output_shape = feature_extractor.get_output_shape(max_width_img, channel_first=False)
+        feature_extractor_output_shape = feature_extractor.get_output_shape(max_width_img, channel_first=True)
 
         # Keep only 1 game per scene (We want to process every image only once)
         dataloader.dataset.keep_1_game_per_scene()
@@ -142,12 +142,6 @@ def extract_features(device, feature_extractor, dataloaders, output_folder_name=
 
                 with torch.set_grad_enabled(False):
                     features = feature_extractor(images).detach().cpu().numpy()
-
-                # swap axis
-                # numpy image: H x W x C
-                # torch image: C X H X W
-                # We want to save in numpy format
-                features = features.transpose((0, 2, 3, 1))
 
                 h5_dataset[h5_idx: h5_idx + batch_size] = features
 
