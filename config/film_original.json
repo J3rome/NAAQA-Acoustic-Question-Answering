@@ -73,8 +73,8 @@
   },
   "early_stopping":{
     "enable":true,
-    "wait_first_n_epoch":0,
-    "stop_threshold":0.2,
+    "wait_first_n_epoch":5,
+    "stop_threshold":0.15,
     "min_step":0.001
   }
 }
