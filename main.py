@@ -363,23 +363,12 @@ def prepare_for_task(args):
     print("\nTask '%s' for version '%s'\n" % (task.replace('_', ' ').title(), paths["output_name"]))
     print("Using device '%s'" % device)
 
-    film_model_config = read_json(args['config_path'])
-    # FIXME : Should be in args ?
-    early_stopping = not args['no_early_stopping'] and film_model_config['early_stopping']['enable']
-    film_model_config['early_stopping']['enable'] = early_stopping
-
-    if flags["force_sgd_optimizer"]:
-        film_model_config['optimizer']['type'] = 'sgd'
-
     # Create required folders if necessary
     if flags['create_output_folder']:
         create_folders_save_args(args, paths)
 
-        if flags['instantiate_model']:
-            save_model_config(args, paths, film_model_config)
-
     # Make sure all variables exists
-    film_model, optimizer, loss_criterion, tensorboard, scheduler = None, None, None, None, None
+    film_model, film_model_config, optimizer, loss_criterion, tensorboard, scheduler = None, None, None, None, None, None
 
     ####################################
     #   Dataloading
@@ -391,6 +380,17 @@ def prepare_for_task(args):
     #   Model Definition
     ####################################
     if flags['instantiate_model']:
+        film_model_config = read_json(args['config_path'])
+        # FIXME : Should be in args ?
+        early_stopping = not args['no_early_stopping'] and film_model_config['early_stopping']['enable']
+        film_model_config['early_stopping']['enable'] = early_stopping
+
+        if flags["force_sgd_optimizer"]:
+            film_model_config['optimizer']['type'] = 'sgd'
+
+        if flags['create_output_folder'] and flags['instantiate_model']:
+            save_model_config(args, paths, film_model_config)
+
         input_image_torch_shape = datasets['train'].get_input_shape(channel_first=True)  # Torch size have Channel as first dimension
         feature_extractor_config = get_feature_extractor_config_from_args(args)
 
