@@ -113,6 +113,8 @@ parser.add_argument("--cyclical_lr", help="Will use cyclical learning rate (Boun
 parser.add_argument("--enable_image_cache", help="Will enable image loading cache (In RAM)", action='store_true')
 parser.add_argument("--max_image_cache_size", type=int, default=5000,
                     help="Max number of images that can be stored in cache")
+parser.add_argument("--run_test_after_training", help="Will run on test set after the training is done",
+                    action='store_true')
 
 # Input parameters
 parser.add_argument("--h5_image_input", help="If set, images will be read from h5 file in preprocessed folder",
@@ -267,6 +269,11 @@ def execute_task(task, args, output_dated_folder, dataloaders, model, model_conf
                     scheduler=scheduler, nb_epoch=args['nb_epoch'],
                     nb_epoch_to_keep=args['nb_epoch_stats_to_keep'], start_epoch=args['start_epoch'],
                     tensorboard=tensorboard)
+
+        if args['run_test_after_training']:
+            inference(device=device, model=model, set_type='test',
+                      dataloader=dataloaders['test'], criterion=loss_criterion,
+                      output_folder=output_dated_folder)
 
     elif task == "inference":
         assert args['inference_set'] in dataloaders, "Invalid set name. A dataloader must exist for this set"

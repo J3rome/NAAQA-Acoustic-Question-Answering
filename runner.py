@@ -475,8 +475,10 @@ def train_model(device, model, dataloaders, output_folder, criterion, optimizer,
     print(f'Training complete in {time_elapsed}')
     print(f'Best val Acc: {best_epoch["val_acc"]}')
 
-    # TODO : load best model weights ?
-    #model.load_state_dict(best_model_state)
+    # Load the best weights before leaving the training function
+    checkpoint = torch.load(f"{best_epoch_symlink_path}/model.pt.tar", map_location=device)
+    model.load_state_dict(checkpoint['model_state_dict'], strict=False)
+
     return model
 
 
