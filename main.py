@@ -17,7 +17,7 @@ from data_interfaces.transforms import ResizeTensorBasedOnMaxWidth
 
 from utils.file import save_model_config, save_json, read_json, create_symlink_to_latest_folder
 from utils.file import create_folders_save_args, fix_best_epoch_symlink_if_necessary, get_clear_stats
-from utils.random import set_random_seed
+from utils.random import set_random_seed, get_random_state, set_random_state
 from utils.visualization import save_model_summary, save_graph_to_tensorboard
 from utils.argument_parsing import get_args_task_flags_paths, get_feature_extractor_config_from_args
 from utils.logging import create_tensorboard_writers, close_tensorboard_writers
@@ -332,6 +332,10 @@ def prepare_for_task(args):
     if args['random_seed'] is not None:
         set_random_seed(args['random_seed'])
 
+    # Save initial random state, will reset to this seed after this function
+    # This is done to make sure that difference in model initialisation won't cause difference in training
+    initial_random_state = get_random_state()
+
     print("\nTask '%s' for version '%s'\n" % (task.replace('_', ' ').title(), paths["output_name"]))
     print("Using device '%s'" % device)
 
@@ -378,6 +382,8 @@ def prepare_for_task(args):
             if args['tensorboard_save_graph']:
                 save_graph_to_tensorboard(film_model, tensorboard, input_image_torch_shape)
 
+    # Set back the random state
+    set_random_state(initial_random_state)
     return (
         (task, args, flags, paths, device),
         dataloaders,
