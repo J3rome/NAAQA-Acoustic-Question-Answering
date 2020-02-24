@@ -325,12 +325,13 @@ def one_game_inference(device, model, game, collate_fn, tokenizer, nb_top_pred=1
 
 
 def inference(set_type, device, model, dataloader, output_folder, criterion):
-    print(f"Running model on {set_type} set")
+    print(f"Running model on {set_type} set ({dataloader.dataset.version_name})")
     loss, acc, predictions, metrics = process_dataloader(False, device, model, dataloader, criterion,
                                                          gamma_beta_path=f"{output_folder}/{set_type}_gamma_beta.h5")
 
     save_json(predictions, output_folder, filename=f"{set_type}_predictions.json")
-    save_json({'accuracy': acc, 'loss': loss}, output_folder, filename=f"{set_type}_stats.json")
+    save_json({'accuracy': acc, 'loss': loss, 'version_name': dataloader.dataset.version_name}, output_folder,
+              filename=f"{set_type}_stats.json")
 
     print(f"Accuracy : {acc} --- Loss : {loss}")
     print(f"All stats saved to '{output_folder}'")

@@ -123,6 +123,7 @@ parser.add_argument("--conv_feature_input", help="If set, conv feature will be r
                     action='store_true')
 parser.add_argument("--data_root_path", type=str, default='data', help="Directory with data")
 parser.add_argument("--version_name", type=str, help="Name of the dataset version")
+parser.add_argument("--test_dataset_path", type=str, default=None, help="Path to the test dataset (Optional)")
 
 # Output parameters
 parser.add_argument("--output_root_path", type=str, default='output', help="Directory with image")
@@ -171,6 +172,15 @@ def create_datasets(args, data_path, load_dataset_extra_stats=False):
     print("Creating Datasets")
     transforms_to_apply = get_transforms_from_args(args, data_path)
 
+    if args['test_dataset_path']:
+        splitted = args['test_dataset_path'].split('/')
+
+        test_data_root_path = '/'.join(splitted[:-1])
+        test_version_name = splitted[-1]
+    else:
+        test_data_root_path = args['data_root_path']
+        test_version_name = args['version_name']
+
     datasets = {
         'train': CLEAR_dataset(args['data_root_path'], args['version_name'], args['input_image_type'], 'train',
                                dict_file_path=args['dict_file_path'], transforms=transforms_to_apply,
@@ -184,7 +194,7 @@ def create_datasets(args, data_path, load_dataset_extra_stats=False):
                              preprocessed_folder_name=args['preprocessed_folder_name'],
                              use_cache=args['enable_image_cache'], max_cache_size=args['max_image_cache_size']),
 
-        'test': CLEAR_dataset(args['data_root_path'], args['version_name'], args['input_image_type'], 'test',
+        'test': CLEAR_dataset(test_data_root_path, test_version_name, args['input_image_type'], 'test',
                               dict_file_path=args['dict_file_path'], transforms=transforms_to_apply,
                               tokenize_text=not args['create_dict'], extra_stats=load_dataset_extra_stats,
                               preprocessed_folder_name=args['preprocessed_folder_name'],
