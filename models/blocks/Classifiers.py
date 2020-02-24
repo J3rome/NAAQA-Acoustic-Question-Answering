@@ -2,7 +2,7 @@ from collections import OrderedDict
 
 import torch.nn as nn
 
-from utils.model import Conv2d_tf, append_spatial_location
+from models.utils import Conv2d_padded, append_spatial_location
 
 class Conv_classifier(nn.Module):
     def __init__(self, in_channels, output_size, pooling_type, projection_size=None, spatial_location_layer=True, dropout_drop_prob=0):
@@ -20,7 +20,7 @@ class Conv_classifier(nn.Module):
 
         if projection_size:
             self.classif_prof_conv = nn.Sequential(OrderedDict([
-                ('conv', Conv2d_tf(in_channels=in_channels,
+                ('conv', Conv2d_padded(in_channels=in_channels,
                                    out_channels=projection_size,
                                    kernel_size=[1, 1], stride=1, padding="VALID", dilation=1)),
                 ('batchnorm', nn.BatchNorm2d(projection_size, eps=0.001)),
@@ -73,7 +73,7 @@ class Fcn_classifier(nn.Module):
         first_conv_out = 512
 
         self.classif_conv = nn.Sequential(OrderedDict([
-            ('conv', Conv2d_tf(in_channels=in_channels + (2 if spatial_location_layer else 0),
+            ('conv', Conv2d_padded(in_channels=in_channels + (2 if spatial_location_layer else 0),
                                out_channels=first_conv_out,
                                kernel_size=[1, 1], stride=1, padding="VALID", dilation=1, bias=False)),
             ('batchnorm', nn.BatchNorm2d(first_conv_out, eps=0.001)),

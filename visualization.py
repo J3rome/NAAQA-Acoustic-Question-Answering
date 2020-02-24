@@ -13,7 +13,7 @@ from plotly.io import write_html
 from sklearn.manifold import TSNE as sk_TSNE
 from tsnecuda import TSNE as cuda_TSNE
 
-from models.gradcam import GradCAM
+from models.tools.gradcam import GradCAM
 
 from torchvision.utils import make_grid
 

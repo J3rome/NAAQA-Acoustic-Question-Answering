@@ -13,7 +13,7 @@ import torch
 import torch.nn as nn
 import ujson
 
-from models.lr_finder import LRFinder
+from models.tools.lr_finder import LRFinder
 import matplotlib.pyplot as plt
 
 

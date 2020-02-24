@@ -3,12 +3,15 @@ from collections import OrderedDict
 import torch
 import torch.nn as nn
 
-from models.FiLM_layers import FiLMed_resblock
-from models.classifiers import Conv_classifier, Fcn_classifier
+from models.CLEAR_nlp import Question_pipeline
+from models.CLEAR_feature_extractor import Original_Film_Extractor, Freq_Time_Extractor
+from models.blocks.FiLM_layers import FiLMed_resblock
+from models.blocks.Classifiers import Conv_classifier, Fcn_classifier
+from models.utils import get_trainable_childs
 
-from models.feature_extractor import Resnet_feature_extractor
+from models.utils import append_spatial_location
+from models.Resnet_feature_extractor import Resnet_feature_extractor
 from utils.random import set_random_state, get_random_state
-from utils.model import Conv2d_tf, append_spatial_location
 
 
 class CLEAR_FiLM_model(nn.Module):
@@ -29,10 +32,12 @@ class CLEAR_FiLM_model(nn.Module):
 
         # Question Pipeline
         self.question_pipeline = Question_pipeline(config, nb_words, dropout_drop_prob, sequence_padding_idx)
+        #self.question_pipeline = Question_pipeline_no_GRU(config, nb_words, dropout_drop_prob, sequence_padding_idx)
 
         # Image Pipeline
-        #self.image_pipeline = Image_pipeline(config, input_image_channels, feature_extraction_config)
-        self.image_pipeline = Base_image_pipeline(config, input_image_channels)
+        self.image_pipeline = Original_Film_Extractor(config, input_image_channels)
+        #self.image_pipeline = Freq_Time_Extractor(input_image_channels, config['stem']['conv_out'])
+        #self.image_pipeline = Separable_conv_image_pipeline(config, input_image_channels)
 
         # Question and Image Fusion
         resblock_out_channels = config['stem']['conv_out']
@@ -118,230 +123,3 @@ class CLEAR_FiLM_model(nn.Module):
         if self.current_device != device:
             self.current_device = device
             super(CLEAR_FiLM_model, self).to(device, dtype, non_blocking)
-
-
-class Base_image_pipeline(nn.Module):
-    def __init__(self, config, input_image_channels):
-        super(Base_image_pipeline, self).__init__()
-
-        # Used for text summary
-        self.summary_level = 1
-
-        self.config = config
-        nb_features = config['stem']['conv_out']
-
-        spatial_location_extra_channels = 2 if config['stem']['spatial_location'] else 0
-
-        # FIXME : Padding same -- tensorflow
-
-        self.conv1 = nn.Sequential(OrderedDict([
-            ('conv', Conv2d_tf(in_channels=input_image_channels,
-                               out_channels=nb_features, kernel_size=[4, 4],
-                               stride=2, dilation=1, bias=False, padding='SAME')),
-            ('batchnorm', nn.BatchNorm2d(nb_features, eps=0.001)),
-            ('relu', nn.ReLU(inplace=True))
-        ]))
-
-        self.conv2 = nn.Sequential(OrderedDict([
-            ('conv', Conv2d_tf(in_channels=nb_features,
-                               out_channels=nb_features, kernel_size=[4, 4],
-                               stride=2, dilation=1, bias=False, padding='SAME')),
-            ('batchnorm', nn.BatchNorm2d(nb_features, eps=0.001)),
-            ('relu', nn.ReLU(inplace=True))
-        ]))
-
-        self.conv3 = nn.Sequential(OrderedDict([
-            ('conv', Conv2d_tf(in_channels=nb_features,
-                               out_channels=nb_features, kernel_size=[4, 4],
-                               stride=2, dilation=1, bias=False, padding='SAME')),
-            ('batchnorm', nn.BatchNorm2d(nb_features, eps=0.001)),
-            ('relu', nn.ReLU(inplace=True))
-        ]))
-
-        self.conv4 = nn.Sequential(OrderedDict([
-            ('conv', Conv2d_tf(in_channels=nb_features,
-                               out_channels=nb_features, kernel_size=[4, 4],
-                               stride=2, dilation=1, bias=False, padding='SAME')),
-            ('batchnorm', nn.BatchNorm2d(nb_features, eps=0.001)),
-            ('relu', nn.ReLU(inplace=True))
-        ]))
-
-        self.stem_conv = nn.Sequential(OrderedDict([
-            ('conv', Conv2d_tf(in_channels=nb_features + spatial_location_extra_channels,
-                               out_channels=nb_features, kernel_size=[3, 3],
-                               stride=1, dilation=1, bias=False, padding='SAME')),
-            ('batchnorm', nn.BatchNorm2d(nb_features, eps=0.001)),
-            ('relu', nn.ReLU(inplace=True))
-        ]))
-
-    def forward(self, input_image):
-        out = self.conv1(input_image)
-        out = self.conv2(out)
-        out = self.conv3(out)
-        out = self.conv4(out)
-
-        if self.config['stem']['spatial_location']:
-            out = append_spatial_location(out)
-
-        out = self.stem_conv(out)
-
-        return out
-
-
-class Question_pipeline(nn.Module):
-    def __init__(self, config, nb_words, dropout_drop_prob=0, sequence_padding_idx=0):
-        super(Question_pipeline, self).__init__()
-
-        # Question Pipeline
-        self.word_emb = nn.Embedding(num_embeddings=nb_words,
-                                     embedding_dim=config['question']['word_embedding_dim'],
-                                     padding_idx=sequence_padding_idx)
-
-        # FIXME : Dropout always set to zero ?
-        # FIXME: Are we using correct rnn_state ?
-        # FIXME : Bidirectional
-        # FIXME : Are we missing normalization here ?
-        # TODO : Make sure we have the correct activation fct (Validate that default is tanh)
-        self.rnn_state = nn.GRU(input_size=config['question']['word_embedding_dim'],
-                                hidden_size=config["question"]["rnn_state_size"],
-                                batch_first=True,
-                                dropout=0)
-
-        self.dropout = nn.Dropout(p=dropout_drop_prob)
-
-    def forward(self, question, question_lengths, pack_sequence):
-        word_emb = self.word_emb(question)
-        word_emb = self.dropout(word_emb)
-
-        if pack_sequence:
-            word_emb = torch.nn.utils.rnn.pack_padded_sequence(word_emb, question_lengths, batch_first=True,
-                                                               enforce_sorted=False)
-
-        rnn_out, rnn_hidden = self.rnn_state(word_emb)
-
-        rnn_hidden_state = self.dropout(rnn_hidden.squeeze(0))
-
-        return rnn_hidden_state
-
-
-class Image_pipeline(nn.Module):
-    def __init__(self, config, input_image_channels, feature_extraction_config, dropout_drop_prob=0):
-        super(Image_pipeline, self).__init__()
-
-        self.config = config
-
-        spatial_location_extra_channels = 2 if config['stem']['spatial_location'] else 0
-
-        if feature_extraction_config is not None:
-            # Instantiating the feature extractor affects the random state (Raw Vs Pre-Extracted Features).
-            # We restore it to ensure reproducibility between input type
-            random_state = get_random_state()
-            self.feature_extractor = Resnet_feature_extractor(resnet_version=feature_extraction_config['version'],
-                                                              layer_index=feature_extraction_config['layer_index'])
-            input_image_channels = self.feature_extractor.get_out_channels()
-            set_random_state(random_state)
-        else:
-            self.feature_extractor = None
-
-        ## Stem
-        self.stem_conv = nn.Sequential(OrderedDict([
-            ('conv', Conv2d_tf(in_channels=input_image_channels + spatial_location_extra_channels,
-                               out_channels=config['stem']['conv_out'], kernel_size=config['stem']['conv_kernel'],
-                               stride=1, padding='SAME', dilation=1)),
-            ('batchnorm', nn.BatchNorm2d(config['stem']['conv_out'], eps=0.001)),
-            ('relu', nn.ReLU(inplace=True))
-        ]))
-
-        self.stem_conv2 = nn.Sequential(OrderedDict([
-            ('conv', Conv2d_tf(in_channels=config['stem']['conv_out'] + spatial_location_extra_channels,
-                               out_channels=config['stem']['conv_out'], kernel_size=config['stem']['conv_kernel'],
-                               stride=1, padding='SAME', dilation=1)),
-            ('batchnorm', nn.BatchNorm2d(config['stem']['conv_out'], eps=0.001)),
-            ('relu', nn.ReLU(inplace=True))
-        ]))
-
-        self.stem_conv3 = nn.Sequential(OrderedDict([
-            ('conv', Conv2d_tf(in_channels=config['stem']['conv_out'] + spatial_location_extra_channels,
-                               out_channels=config['stem']['conv_out'], kernel_size=config['stem']['conv_kernel'],
-                               stride=1, padding='SAME', dilation=1)),
-            ('batchnorm', nn.BatchNorm2d(config['stem']['conv_out'], eps=0.001)),
-            ('relu', nn.ReLU(inplace=True))
-        ]))
-
-        self.stem_conv4 = nn.Sequential(OrderedDict([
-            ('conv', Conv2d_tf(in_channels=config['stem']['conv_out'] + spatial_location_extra_channels,
-                               out_channels=config['stem']['conv_out'], kernel_size=config['stem']['conv_kernel'],
-                               stride=1, padding='SAME', dilation=1)),
-            ('batchnorm', nn.BatchNorm2d(config['stem']['conv_out'], eps=0.001)),
-            ('relu', nn.ReLU(inplace=True))
-        ]))
-
-        self.stem_conv5 = nn.Sequential(OrderedDict([
-            ('conv', Conv2d_tf(in_channels=config['stem']['conv_out'] + spatial_location_extra_channels,
-                               out_channels=config['stem']['conv_out'], kernel_size=config['stem']['conv_kernel'],
-                               stride=1, padding='SAME', dilation=1)),
-            ('batchnorm', nn.BatchNorm2d(config['stem']['conv_out'], eps=0.001)),
-            ('relu', nn.ReLU(inplace=True))
-        ]))
-
-        # Pooling
-        # TODO : Combine with avg pooling ?
-        self.max_pool_in_freq = nn.MaxPool2d((3, 1))
-        self.max_pool_in_time = nn.MaxPool2d((1, 3))
-        self.max_pool_square = nn.MaxPool2d((2, 2))
-        # self.max_pool_square = nn.MaxPool2d((3, 3))
-
-        self.dropout = nn.Dropout(p=dropout_drop_prob)
-
-    def forward(self, input_image):
-        conv_out = input_image
-        if self.feature_extractor:
-            # Extract features using pretrained network
-            conv_out = self.feature_extractor(conv_out)
-
-        if self.config['stem']['spatial_location']:
-            conv_out = append_spatial_location(conv_out)
-
-        # FIXME : Move the stem logic inside our own feature extractor
-        # FIXME : Probably need to be resnet style, otherwise we'll get vanishing gradients
-        # FIXME : We should keep a stem layer after our feature extractor (I guess ?)
-
-        conv_out = self.stem_conv(conv_out)
-        conv_out = self.max_pool_in_freq(conv_out)
-
-        if self.config['stem']['spatial_location']:
-            conv_out = append_spatial_location(conv_out)
-
-        conv_out = self.stem_conv2(conv_out)
-        conv_out = self.max_pool_in_time(conv_out)
-
-        # Additionals
-        # if self.config['stem']['spatial_location']:
-        #     conv_out = append_spatial_location(conv_out)
-        #
-        # conv_out = self.stem_conv3(conv_out)
-        # conv_out = self.max_pool_in_freq(conv_out)
-        #
-        # if self.config['stem']['spatial_location']:
-        #     conv_out = append_spatial_location(conv_out)
-        #
-        # conv_out = self.stem_conv4(conv_out)
-        # conv_out = self.max_pool_in_time(conv_out)
-        #
-        # if self.config['stem']['spatial_location']:
-        #     conv_out = append_spatial_location(conv_out)
-        #
-        # conv_out = self.stem_conv5(conv_out)
-        # conv_out = self.max_pool_square(conv_out)
-
-        return conv_out
-
-
-
-
-if __name__ == "__main__":
-    print("Main")
-
-
-
-

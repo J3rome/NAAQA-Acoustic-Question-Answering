@@ -22,7 +22,7 @@ from utils.visualization import save_model_summary, save_graph_to_tensorboard
 from utils.argument_parsing import get_args_task_flags_paths, get_feature_extractor_config_from_args
 from utils.logging import create_tensorboard_writers, close_tensorboard_writers
 
-from utils.model import tf_weight_transfer
+from models.tools.TF_weight_transfer import tf_weight_transfer
 
 
 parser = argparse.ArgumentParser('FiLM model for CLEAR Dataset (Acoustic Question Answering)', fromfile_prefix_chars='@')

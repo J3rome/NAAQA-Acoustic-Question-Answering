@@ -2,7 +2,7 @@ from collections import OrderedDict
 
 import torch.nn as nn
 
-from utils.model import Conv2d_tf, append_spatial_location
+from models.utils import Conv2d_padded, append_spatial_location
 
 
 class FiLM_layer_separated(nn.Module):
@@ -108,7 +108,7 @@ class FiLMed_resblock(nn.Module):
         self.summary_level = 1
 
         self.conv1 = nn.Sequential(OrderedDict([
-            ('conv', Conv2d_tf(in_channels=in_channels, out_channels=out_channels, kernel_size=kernel1, stride=1,
+            ('conv', Conv2d_padded(in_channels=in_channels, out_channels=out_channels, kernel_size=kernel1, stride=1,
                                padding='SAME', dilation=1)),
             ('relu', nn.ReLU(inplace=True))
         ]))
@@ -116,7 +116,7 @@ class FiLMed_resblock(nn.Module):
         #self.dropout = nn.Dropout(p=dropout_drop_prob)
 
         self.conv2 = nn.Sequential(OrderedDict([
-            ('conv', Conv2d_tf(in_channels=out_channels, out_channels=out_channels, kernel_size=kernel2, stride=1,
+            ('conv', Conv2d_padded(in_channels=out_channels, out_channels=out_channels, kernel_size=kernel2, stride=1,
                                padding='SAME', dilation=1)),
             # Center/reduce output (Batch Normalization with no training parameters)
             ('batchnorm', nn.BatchNorm2d(out_channels, affine=False, eps=0.001))
