@@ -1,26 +1,13 @@
 {
-  "preprocessing":{
-    "imagenet_stats":{
-      "mean":[
-        0.485,
-        0.456,
-        0.406
-      ],
-      "std":[
-        0.229,
-        0.224,
-        0.225
-      ]
-    }
-  },
-  "feature_extractor":{
-    "type":"resnet",
-    "version":101,
-    "output_layer":"block3/unit_22/bottleneck_v1"
-  },
   "question":{
     "word_embedding_dim":200,
     "rnn_state_size":4096
+  },
+  "image_extractor":{
+    "type":"conv",
+    "out": [128, 128, 128, 128],
+    "kernels": [[4, 4], [4, 4], [4, 4], [4, 4]],
+    "strides": [2, 2, 2, 2]
   },
   "stem":{
     "spatial_location":true,

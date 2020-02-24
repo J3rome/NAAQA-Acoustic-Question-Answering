@@ -35,9 +35,13 @@ class CLEAR_FiLM_model(nn.Module):
         #self.question_pipeline = Question_pipeline_no_GRU(config, nb_words, dropout_drop_prob, sequence_padding_idx)
 
         # Image Pipeline
-        self.image_pipeline = Original_Film_Extractor(config, input_image_channels)
-        # self.image_pipeline = Freq_Time_Extractor(input_image_channels, config['stem']['conv_out'])
-        # self.image_pipeline = Separable_conv_image_pipeline(config, input_image_channels)
+        if config['image_extractor']['type'].lower() == "conv":
+            self.image_pipeline = Original_Film_Extractor(config['image_extractor'], input_image_channels)
+        elif config['image_extractor']['type'].lower() == "resnet":
+            # TODO : Way to use preprocessed from h5
+            self.image_pipeline = Resnet_feature_extractor()
+        elif config['image_extractor']['type'].lower() == "freq_time_conv":
+            self.image_pipeline = Freq_Time_Extractor(input_image_channels, config['stem']['conv_out'])
 
         stem_conv_in = self.image_pipeline.get_out_channels() + 2 if config['stem']['spatial_location'] else 0
         self.stem_conv = nn.Sequential(OrderedDict([

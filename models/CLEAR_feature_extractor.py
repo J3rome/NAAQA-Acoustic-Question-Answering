@@ -14,51 +14,31 @@ class Original_Film_Extractor(nn.Module):
         self.summary_level = 1
 
         self.config = config
-        nb_features = config['stem']['conv_out']
+        self.convs = nn.ModuleList()
 
-        # FIXME : Padding same -- tensorflow
-        self.conv1 = nn.Sequential(OrderedDict([
-            ('conv', Conv2d_padded(in_channels=input_image_channels,
-                               out_channels=nb_features, kernel_size=[4, 4],
-                               stride=2, dilation=1, bias=False, padding='SAME')),
-            ('batchnorm', nn.BatchNorm2d(nb_features, eps=0.001)),
-            ('relu', nn.ReLU(inplace=True))
-        ]))
+        in_channels = input_image_channels
 
-        self.conv2 = nn.Sequential(OrderedDict([
-            ('conv', Conv2d_padded(in_channels=nb_features,
-                               out_channels=nb_features, kernel_size=[4, 4],
-                               stride=2, dilation=1, bias=False, padding='SAME')),
-            ('batchnorm', nn.BatchNorm2d(nb_features, eps=0.001)),
-            ('relu', nn.ReLU(inplace=True))
-        ]))
+        for out_chan, kernel, stride in zip(config['out'], config['kernels'], config['strides']):
+            self.convs.append(nn.Sequential(OrderedDict([
+                ('conv', Conv2d_padded(in_channels=in_channels,
+                                       out_channels=out_chan, kernel_size=kernel,
+                                       stride=stride, dilation=1, bias=False, padding='SAME')),
+                ('batchnorm', nn.BatchNorm2d(out_chan, eps=0.001)),
+                ('relu', nn.ReLU(inplace=True))
+            ])))
 
-        self.conv3 = nn.Sequential(OrderedDict([
-            ('conv', Conv2d_padded(in_channels=nb_features,
-                               out_channels=nb_features, kernel_size=[4, 4],
-                               stride=2, dilation=1, bias=False, padding='SAME')),
-            ('batchnorm', nn.BatchNorm2d(nb_features, eps=0.001)),
-            ('relu', nn.ReLU(inplace=True))
-        ]))
-
-        self.conv4 = nn.Sequential(OrderedDict([
-            ('conv', Conv2d_padded(in_channels=nb_features,
-                               out_channels=nb_features, kernel_size=[4, 4],
-                               stride=2, dilation=1, bias=False, padding='SAME')),
-            ('batchnorm', nn.BatchNorm2d(nb_features, eps=0.001)),
-            ('relu', nn.ReLU(inplace=True))
-        ]))
+            in_channels = out_chan
 
     def forward(self, input_image):
-        out = self.conv1(input_image)
-        out = self.conv2(out)
-        out = self.conv3(out)
-        out = self.conv4(out)
+        out = input_image
+
+        for conv in self.convs:
+            out = conv(out)
 
         return out
 
     def get_out_channels(self):
-        return self.config['stem']['conv_out']
+        return self.config['out'][-1]
 
 
 class Freq_Time_Extractor(nn.Module):
@@ -85,7 +65,7 @@ class Freq_Time_Extractor(nn.Module):
 
     def get_out_channels(self):
         return self.out_channels
-    
+
 
 class Image_pipeline(nn.Module):
     def __init__(self, config, input_image_channels, feature_extraction_config, dropout_drop_prob=0):
