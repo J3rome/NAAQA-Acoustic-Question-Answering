@@ -141,6 +141,7 @@ parser.add_argument("--tensorboard_save_texts", help="Save input texts to tensor
 
 # Other parameters
 parser.add_argument("--inference_set", type=str, default='test', help="Define on which set the inference will run")
+parser.add_argument("--test_set_batch_size", type=int, default=None, help="Use different batchsize for test set (optional)")
 parser.add_argument("--no_model_summary", help="Will hide the model summary", action='store_true')
 parser.add_argument("--tf_weight_path", type=str, help="Specify where to load dumped tensorflow weights "
                                                        "(Used with --tf_weight_transfer)")
@@ -253,19 +254,21 @@ def create_datasets(args, data_path, load_dataset_extra_stats=False):
     return datasets
 
 
-def create_dataloaders(datasets, batch_size, nb_process=8, pin_memory=True):
+def create_dataloaders(args, datasets, nb_process=8, pin_memory=True):
     print("Creating Dataloaders")
     collate_fct = CLEAR_collate_fct(padding_token=datasets['train'].get_padding_token())
 
+    test_set_batch_size = args['test_set_batch_size'] if args['test_set_batch_size'] else args['batch_size']
+
     # FIXME : Should take into account --nb_process, or at least the nb of core on the machine
     return {
-        'train': DataLoader(datasets['train'], batch_size=batch_size, shuffle=True,
+        'train': DataLoader(datasets['train'], batch_size=args['batch_size'], shuffle=True,
                             num_workers=4, collate_fn=collate_fct, pin_memory=pin_memory),
 
-        'val': DataLoader(datasets['val'], batch_size=batch_size, shuffle=True,
+        'val': DataLoader(datasets['val'], batch_size=args['batch_size'], shuffle=True,
                           num_workers=4, collate_fn=collate_fct, pin_memory=pin_memory),
 
-        'test': DataLoader(datasets['test'], batch_size=batch_size, shuffle=True,
+        'test': DataLoader(datasets['test'], batch_size=test_set_batch_size, shuffle=False,
                            num_workers=4, collate_fn=collate_fct, pin_memory=pin_memory)
     }
 
@@ -379,7 +382,7 @@ def prepare_for_task(args):
     #   Dataloading
     ####################################
     datasets = create_datasets(args, paths['data_path'], flags['load_dataset_extra_stats'])
-    dataloaders = create_dataloaders(datasets, args['batch_size'], nb_process=8)
+    dataloaders = create_dataloaders(args, datasets, nb_process=8)
 
     ####################################
     #   Model Definition
