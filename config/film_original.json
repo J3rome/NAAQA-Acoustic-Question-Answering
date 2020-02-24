@@ -18,7 +18,7 @@
     ]
   },
   "resblock":{
-    "no_resblock":4,
+    "conv_out": [128, 128, 128, 128],
     "spatial_location":true,
     "film_projection_type":"plus",
     "kernel1":[

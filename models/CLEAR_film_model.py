@@ -53,11 +53,9 @@ class CLEAR_FiLM_model(nn.Module):
         ]))
 
         # Question and Image Fusion
-        resblock_out_channels = config['stem']['conv_out']
-        resblock_in_channels = resblock_out_channels + 2 if config['resblock']['spatial_location'] else 0
+        resblock_in_channels = config['stem']['conv_out'] + 2 if config['resblock']['spatial_location'] else 0
         self.resblocks = nn.ModuleList()
-        self.nb_resblock = config['resblock']['no_resblock']
-        for i in range(self.nb_resblock):
+        for resblock_out_channels in config['resblock']['conv_out']:
             self.resblocks.append(FiLMed_resblock(in_channels=resblock_in_channels,
                                                   out_channels=resblock_out_channels,
                                                   context_size=config["question"]["rnn_state_size"],
@@ -65,6 +63,8 @@ class CLEAR_FiLM_model(nn.Module):
                                                   kernel2=config['resblock']['kernel2'],
                                                   dropout_drop_prob=dropout_drop_prob,
                                                   film_layer_transformation=film_layer_transformation))
+
+            resblock_in_channels = resblock_out_channels + 2 if config['resblock']['spatial_location'] else 0
 
         if config['classifier'].get('type', '').lower() == 'conv':
             # Classification (Via 1x1 conv & GlobalPooling)
