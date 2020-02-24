@@ -338,7 +338,7 @@ def inference(set_type, device, model, dataloader, output_folder, criterion):
 
 
 def train_model(device, model, dataloaders, output_folder, criterion, optimizer, scheduler=None,
-                nb_epoch=25, nb_epoch_to_keep=None, start_epoch=0, tensorboard=None):
+                nb_epoch=25, nb_epoch_to_keep=None, start_epoch=0, stop_at_val_acc=None, tensorboard=None):
 
     assert nb_epoch > 0, "Must train for at least 1 epoch"
 
@@ -458,6 +458,10 @@ def train_model(device, model, dataloaders, output_folder, criterion, optimizer,
         subprocess.run("ln -snf %s %s" % (best_epoch['epoch'], best_epoch_symlink_path), shell=True)
 
         # Early Stopping
+        if stop_at_val_acc and val_acc >= stop_at_val_acc:
+            print(f"Early Stopping -- Attained {val_acc} > {stop_at_val_acc} after {epoch} epochs.")
+            break
+
         if early_stopping:
             if val_loss < best_val_loss - model.early_stopping['min_step']:
                 best_val_loss = val_loss

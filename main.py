@@ -115,6 +115,9 @@ parser.add_argument("--max_image_cache_size", type=int, default=5000,
                     help="Max number of images that can be stored in cache")
 parser.add_argument("--run_test_after_training", help="Will run on test set after the training is done",
                     action='store_true')
+parser.add_argument("--stop_at_val_acc", type=float, default=None,
+                    help="Will stop the training if validation accuracy reach this threshold. "
+                         "Specified in integer percentage (95).")
 
 # Input parameters
 parser.add_argument("--h5_image_input", help="If set, images will be read from h5 file in preprocessed folder",
@@ -279,7 +282,7 @@ def execute_task(task, args, output_dated_folder, dataloaders, model, model_conf
     if task == "training":
         train_model(device=device, model=model, dataloaders=dataloaders,
                     output_folder=output_dated_folder, criterion=loss_criterion, optimizer=optimizer,
-                    scheduler=scheduler, nb_epoch=args['nb_epoch'],
+                    scheduler=scheduler, nb_epoch=args['nb_epoch'], stop_at_val_acc=args['stop_at_val_acc'],
                     nb_epoch_to_keep=args['nb_epoch_stats_to_keep'], start_epoch=args['start_epoch'],
                     tensorboard=tensorboard)
 
