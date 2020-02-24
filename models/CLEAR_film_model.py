@@ -9,7 +9,7 @@ from models.blocks.FiLM_layers import FiLMed_resblock
 from models.blocks.Classifiers import Conv_classifier, Fcn_classifier
 from models.utils import get_trainable_childs
 
-from models.utils import append_spatial_location
+from models.utils import append_spatial_location, Conv2d_padded
 from models.Resnet_feature_extractor import Resnet_feature_extractor
 from utils.random import set_random_state, get_random_state
 
@@ -36,12 +36,21 @@ class CLEAR_FiLM_model(nn.Module):
 
         # Image Pipeline
         self.image_pipeline = Original_Film_Extractor(config, input_image_channels)
-        #self.image_pipeline = Freq_Time_Extractor(input_image_channels, config['stem']['conv_out'])
-        #self.image_pipeline = Separable_conv_image_pipeline(config, input_image_channels)
+        # self.image_pipeline = Freq_Time_Extractor(input_image_channels, config['stem']['conv_out'])
+        # self.image_pipeline = Separable_conv_image_pipeline(config, input_image_channels)
+
+        stem_conv_in = self.image_pipeline.get_out_channels() + 2 if config['stem']['spatial_location'] else 0
+        self.stem_conv = nn.Sequential(OrderedDict([
+            ('conv', Conv2d_padded(in_channels= stem_conv_in,
+                                   out_channels=config['stem']['conv_out'], kernel_size=[3, 3],
+                                   stride=1, dilation=1, bias=False, padding='SAME')),
+            ('batchnorm', nn.BatchNorm2d(config['stem']['conv_out'], eps=0.001)),
+            ('relu', nn.ReLU(inplace=True))
+        ]))
 
         # Question and Image Fusion
         resblock_out_channels = config['stem']['conv_out']
-        resblock_in_channels = resblock_out_channels + ( 2 if config['resblock']['spatial_location'] else 0 )
+        resblock_in_channels = resblock_out_channels + 2 if config['resblock']['spatial_location'] else 0
         self.resblocks = nn.ModuleList()
         self.nb_resblock = config['resblock']['no_resblock']
         for i in range(self.nb_resblock):
@@ -81,6 +90,11 @@ class CLEAR_FiLM_model(nn.Module):
 
         # Image Pipeline
         conv_out = self.image_pipeline(input_image)
+
+        if self.config['stem']['spatial_location']:
+            conv_out = append_spatial_location(conv_out)
+
+        conv_out = self.stem_conv(conv_out)
 
         # Question and Image fusion
         for i, resblock in enumerate(self.resblocks):

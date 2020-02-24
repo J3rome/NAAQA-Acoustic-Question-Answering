@@ -3,6 +3,7 @@ from collections import OrderedDict
 import torch
 from torch import nn
 from models.utils import Conv2d_padded, append_spatial_location
+from models.blocks.Freq_Time_Blocks import Freq_Time_Block
 
 
 class Original_Film_Extractor(nn.Module):
@@ -14,8 +15,6 @@ class Original_Film_Extractor(nn.Module):
 
         self.config = config
         nb_features = config['stem']['conv_out']
-
-        spatial_location_extra_channels = 2 if config['stem']['spatial_location'] else 0
 
         # FIXME : Padding same -- tensorflow
         self.conv1 = nn.Sequential(OrderedDict([
@@ -50,32 +49,23 @@ class Original_Film_Extractor(nn.Module):
             ('relu', nn.ReLU(inplace=True))
         ]))
 
-        # TODO : move out of here
-        self.stem_conv = nn.Sequential(OrderedDict([
-            ('conv', Conv2d_padded(in_channels=nb_features + spatial_location_extra_channels,
-                               out_channels=nb_features, kernel_size=[3, 3],
-                               stride=1, dilation=1, bias=False, padding='SAME')),
-            ('batchnorm', nn.BatchNorm2d(nb_features, eps=0.001)),
-            ('relu', nn.ReLU(inplace=True))
-        ]))
-
     def forward(self, input_image):
         out = self.conv1(input_image)
         out = self.conv2(out)
         out = self.conv3(out)
         out = self.conv4(out)
 
-        if self.config['stem']['spatial_location']:
-            out = append_spatial_location(out)
-
-        out = self.stem_conv(out)
-
         return out
+
+    def get_out_channels(self):
+        return self.config['stem']['conv_out']
+
 
 class Freq_Time_Extractor(nn.Module):
     def __init__(self, input_image_channels, out_channels, nb_blocks=4):
         super(Freq_Time_Extractor, self).__init__()
 
+        self.out_channels = out_channels
         self.blocks = nn.ModuleList()
 
         in_channels = input_image_channels
@@ -92,6 +82,10 @@ class Freq_Time_Extractor(nn.Module):
             out = block(out)
 
         return out
+
+    def get_out_channels(self):
+        return self.out_channels
+    
 
 class Image_pipeline(nn.Module):
     def __init__(self, config, input_image_channels, feature_extraction_config, dropout_drop_prob=0):
@@ -187,26 +181,11 @@ class Image_pipeline(nn.Module):
         conv_out = self.stem_conv2(conv_out)
         conv_out = self.max_pool_in_time(conv_out)
 
-        # Additionals
-        # if self.config['stem']['spatial_location']:
-        #     conv_out = append_spatial_location(conv_out)
-        #
-        # conv_out = self.stem_conv3(conv_out)
-        # conv_out = self.max_pool_in_freq(conv_out)
-        #
-        # if self.config['stem']['spatial_location']:
-        #     conv_out = append_spatial_location(conv_out)
-        #
-        # conv_out = self.stem_conv4(conv_out)
-        # conv_out = self.max_pool_in_time(conv_out)
-        #
-        # if self.config['stem']['spatial_location']:
-        #     conv_out = append_spatial_location(conv_out)
-        #
-        # conv_out = self.stem_conv5(conv_out)
-        # conv_out = self.max_pool_square(conv_out)
-
         return conv_out
+
+    def get_out_channels(self):
+        return self.config['stem']['conv_out']
+
 
 class Separable_conv_image_pipeline(nn.Module):
     def __init__(self, config, input_image_channels, dropout_drop_prob=0):
