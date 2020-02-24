@@ -460,6 +460,8 @@ def train_model(device, model, dataloaders, output_folder, criterion, optimizer,
         # Early Stopping
         if stop_at_val_acc and val_acc >= stop_at_val_acc:
             print(f"Early Stopping -- Attained {val_acc} > {stop_at_val_acc} after {epoch} epochs.")
+            save_json({'epoch': epoch, 'cause': f'stop at vall accuracy {stop_at_val_acc}'},
+                      f"{output_folder}/early_stopped.json")
             break
 
         if early_stopping:
@@ -472,6 +474,8 @@ def train_model(device, model, dataloaders, output_folder, criterion, optimizer,
 
                 if early_stop_counter >= stop_threshold:
                     print("Early Stopping at epoch %d on %d" % (epoch, start_epoch + nb_epoch))
+                    save_json({'epoch': epoch, 'cause': f'Accuracy loss didn\'t go down for {stop_threshold} epochs'},
+                              f"{output_folder}/early_stopped.json")
                     break
 
         print()
