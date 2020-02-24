@@ -115,3 +115,7 @@ ENV/
 /*.json
 /*beholder
 /*.npy
+/dump
+*.tar.gz
+*.png
+*.txt
