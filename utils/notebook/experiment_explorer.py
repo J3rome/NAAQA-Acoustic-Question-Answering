@@ -72,13 +72,15 @@ def get_experiments(data_path, prefix=None):
             epochs_stats_reversed = reversed(epoch_stats)
             for epoch_stat in epochs_stats_reversed:
                 epoch_idx = int(epoch_stat['epoch'].split('_')[1])
-                if experiment['0.6_at_epoch'] is None and epoch_stat['val_acc'] >= 0.6:
+                val_acc = float(epoch_stat['val_acc'])
+                
+                if experiment['0.6_at_epoch'] is None and val_acc >= 0.6:
                     experiment['0.6_at_epoch'] = epoch_idx
-                elif experiment['0.7_at_epoch'] is None and epoch_stat['val_acc'] >= 0.7:
+                elif experiment['0.7_at_epoch'] is None and val_acc >= 0.7:
                     experiment['0.7_at_epoch'] = epoch_idx
-                elif experiment['0.8_at_epoch'] is None and epoch_stat['val_acc'] >= 0.8:
+                elif experiment['0.8_at_epoch'] is None and val_acc >= 0.8:
                     experiment['0.8_at_epoch'] = epoch_idx
-                elif experiment['0.9_at_epoch'] is None and epoch_stat['val_acc'] >= 0.9:
+                elif experiment['0.9_at_epoch'] is None and val_acc >= 0.9:
                     experiment['0.9_at_epoch'] = epoch_idx
 
             if experiment['nb_epoch_runned'] < experiment['nb_epoch']:
