@@ -73,7 +73,7 @@ def get_experiments(data_path, prefix=None):
             for epoch_stat in epochs_stats_reversed:
                 epoch_idx = int(epoch_stat['epoch'].split('_')[1])
                 val_acc = float(epoch_stat['val_acc'])
-                
+
                 if experiment['0.6_at_epoch'] is None and val_acc >= 0.6:
                     experiment['0.6_at_epoch'] = epoch_idx
                 elif experiment['0.7_at_epoch'] is None and val_acc >= 0.7:
@@ -142,7 +142,7 @@ def get_experiments(data_path, prefix=None):
                                   columns=['prefix', 'nb_sample', 'nb_scene', 'nb_q_per_scene', 'config', 'nb_epoch',
                                            'nb_epoch_runned', 'stop_accuracy', 'best_val_acc', 'best_val_loss',
                                            'test_acc', 'test_loss', 'train_acc', 'train_loss', 'stopped_early',
-                                           '0.6_at_epoch', '0.7_at_epoch', '0.8_at_epoch', '0.9_at_epoch'
+                                           '0.6_at_epoch', '0.7_at_epoch', '0.8_at_epoch', '0.9_at_epoch',
                                            'batch_size', 'resnet_features', 'nb_trainable_param', 'test_version',
                                            'random_seed',  'date', 'total_nb_param', 'nb_non_trainable_param',
                                            'word_embedding_dim', 'rnn_state_size', 'extractor_type', 'stem_out_chan',
