@@ -7,11 +7,11 @@ import pandas as pd
 from utils.file import read_json
 
 
-def get_experiments(data_path, prefix=None):
+def get_experiments(experiment_result_path, prefix=None):
     experiments = []
 
-    for exp_folder in os.listdir(data_path):
-        exp_folder_path = f'{data_path}/{exp_folder}'
+    for exp_folder in os.listdir(experiment_result_path):
+        exp_folder_path = f'{experiment_result_path}/{exp_folder}'
 
         if not os.path.isdir(exp_folder_path):
             continue
@@ -111,13 +111,22 @@ def get_experiments(data_path, prefix=None):
             arguments = read_json(f"{exp_dated_folder_path}/arguments.json")
             experiment['batch_size'] = arguments['batch_size']
             experiment['resnet_features'] = arguments['conv_feature_input']
-            # TODO : Retrieve img_size, pad_to_largest. Those are only exposed when preparing/extracting features. We could write some json in output folder
+
+            if arguments['h5_image_input']:
+                preprocessed_data_path = f"{arguments['data_root_path']}/{arguments['version_name']}/{arguments['preprocessed_folder_name']}"
+                img_arguments = read_json(preprocessed_data_path, 'arguments.json')
+            else:
+                img_arguments = arguments
+
+            experiment['pad_to_largest'] = img_arguments['pad_to_largest_image']
+            experiment['resized_height'] = img_arguments['img_resize_height'] if img_arguments['resize_img'] else None
+            experiment['resized_width'] = img_arguments['img_resize_width'] if img_arguments['resize_img'] else None
 
             # Load timing
 
             # Load git-revision
             with open(f'{exp_dated_folder_path}/git.revision', 'r') as f:
-                experiment['git_revision'] = f.readlines()[0].replace('\n' ,'')
+                experiment['git_revision'] = f.readlines()[0].replace('\n', '')
 
             # Load config
             config = read_json(f'config/{experiment["config"]}.json')
@@ -144,11 +153,12 @@ def get_experiments(data_path, prefix=None):
                                            'test_acc', 'test_loss', 'train_acc', 'train_loss', 'stopped_early',
                                            '0.6_at_epoch', '0.7_at_epoch', '0.8_at_epoch', '0.9_at_epoch',
                                            'batch_size', 'resnet_features', 'nb_trainable_param', 'test_version',
-                                           'random_seed',  'date', 'total_nb_param', 'nb_non_trainable_param',
+                                           'random_seed', 'date', 'total_nb_param', 'nb_non_trainable_param',
                                            'word_embedding_dim', 'rnn_state_size', 'extractor_type', 'stem_out_chan',
                                            'nb_resblock', 'resblocks_out_chan', 'classifier_conv_out_chan',
                                            'classifier_type', 'classifier_global_pool', 'optimizer_type',
-                                           'optimizer_lr', 'optimizer_weight_decay', 'dropout_drop_prob', 'git_revision'
+                                           'optimizer_lr', 'optimizer_weight_decay', 'dropout_drop_prob',
+                                           'git_revision', 'pad_to_largest', 'resized_height', 'resized_width'
                                            ]
                                   )
     return experiments_df
