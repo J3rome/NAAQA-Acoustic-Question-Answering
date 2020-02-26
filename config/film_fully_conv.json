@@ -1,13 +1,26 @@
 {
-  "question":{
-    "word_embedding_dim":128,
-    "rnn_state_size":512
+  "preprocessing":{
+    "imagenet_stats":{
+      "mean":[
+        0.485,
+        0.456,
+        0.406
+      ],
+      "std":[
+        0.229,
+        0.224,
+        0.225
+      ]
+    }
   },
-  "image_extractor":{
-    "type":"conv",
-    "out": [128, 128, 128, 128],
-    "kernels": [[4, 4], [4, 4], [4, 4], [4, 4]],
-    "strides": [2, 2, 2, 2]
+  "feature_extractor":{
+    "type":"resnet",
+    "version":101,
+    "output_layer":"block3/unit_22/bottleneck_v1"
+  },
+  "question":{
+    "word_embedding_dim":200,
+    "rnn_state_size":4096
   },
   "stem":{
     "spatial_location":true,
@@ -18,7 +31,7 @@
     ]
   },
   "resblock":{
-    "conv_out": [128, 128, 128, 128],
+    "no_resblock":4,
     "spatial_location":true,
     "film_projection_type":"plus",
     "kernel1":[
@@ -32,7 +45,7 @@
   },
   "classifier":{
     "spatial_location":true,
-    "type":"fcn",
+    "type":"conv",
     "global_pool_type":"max",
     "conv_out":512,
     "conv_kernel":[
@@ -60,8 +73,8 @@
   },
   "early_stopping":{
     "enable":true,
-    "wait_first_n_epoch":5,
-    "stop_threshold":6,
-    "min_step":0.0005
+    "wait_first_n_epoch":0,
+    "stop_threshold":0.2,
+    "min_step":0.001
   }
 }
