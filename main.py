@@ -280,11 +280,14 @@ def execute_task(task, args, output_dated_folder, dataloaders, model, model_conf
                  loss_criterion=None, scheduler=None, tensorboard=None):
 
     if task == "training":
-        train_model(device=device, model=model, dataloaders=dataloaders,
-                    output_folder=output_dated_folder, criterion=loss_criterion, optimizer=optimizer,
-                    scheduler=scheduler, nb_epoch=args['nb_epoch'], stop_at_val_acc=args['stop_at_val_acc'],
-                    nb_epoch_to_keep=args['nb_epoch_stats_to_keep'], start_epoch=args['start_epoch'],
-                    tensorboard=tensorboard)
+        try:
+            train_model(device=device, model=model, dataloaders=dataloaders,
+                        output_folder=output_dated_folder, criterion=loss_criterion, optimizer=optimizer,
+                        scheduler=scheduler, nb_epoch=args['nb_epoch'], stop_at_val_acc=args['stop_at_val_acc'],
+                        nb_epoch_to_keep=args['nb_epoch_stats_to_keep'], start_epoch=args['start_epoch'],
+                        tensorboard=tensorboard)
+        except KeyboardInterrupt:
+            print("\n\n>>> Received keyboard interrupt, Gracefully exiting\n")
 
         if args['run_test_after_training']:
             inference(device=device, model=model, set_type='test',
@@ -429,11 +432,9 @@ def main(args):
         create_symlink_to_latest_folder(paths["output_experiment_folder"], paths["current_datetime_str"])
 
 
-    try:
-        execute_task(task, args, paths["output_dated_folder"], dataloaders, film_model, film_model_config, device,
-                     optimizer, loss_criterion, scheduler, tensorboard)
-    except KeyboardInterrupt:
-        print("\n\n>>> Received keyboard interrupt, Gracefully exiting\n")
+    execute_task(task, args, paths["output_dated_folder"], dataloaders, film_model, film_model_config, device,optimizer,
+                 loss_criterion, scheduler, tensorboard)
+
 
     ####################################
     #   Exit
