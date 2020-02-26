@@ -61,7 +61,7 @@
   "early_stopping":{
     "enable":true,
     "wait_first_n_epoch":5,
-    "stop_threshold":10,
+    "stop_threshold":6,
     "min_step":0.0005
   }
 }
