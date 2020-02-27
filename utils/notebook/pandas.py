@@ -16,3 +16,12 @@ def grouped_scatter(dataframe, group_key, x_axis, y_axis, title=None, colormap=c
 
     for key, group in dataframe.groupby(group_key):
         group.plot.scatter(ax=ax, x=x_axis, y=y_axis, c=colorlist[key], label=key, title=title)
+
+
+def sub_cols_with_cond_and_create_new_col(df, new_col_name, col_to_sub, cond1, cond2, output_cond):
+    temp = df[cond1][col_to_sub].reset_index(drop=1) - df[cond2][col_to_sub].reset_index(drop=1)
+
+    temp.index = df[output_cond].index
+    df.loc[output_cond, new_col_name] = temp
+
+    return df
