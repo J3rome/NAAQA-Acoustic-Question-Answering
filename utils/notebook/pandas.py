@@ -25,3 +25,8 @@ def sub_cols_with_cond_and_create_new_col(df, new_col_name, col_to_sub, cond1, c
     df.loc[output_cond, new_col_name] = temp
 
     return df
+
+
+def color_row_by_attribute(sample, attribute, colors_by_config):
+    css = f"background-color: {colors_by_config[sample[attribute]]}"
+    return [css] * len(sample.index)
