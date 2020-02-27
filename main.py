@@ -266,13 +266,13 @@ def create_dataloaders(args, datasets, nb_process=8, pin_memory=True):
     # FIXME : Should take into account --nb_process, or at least the nb of core on the machine
     return {
         'train': DataLoader(datasets['train'], batch_size=args['batch_size'], shuffle=True,
-                            num_workers=4, collate_fn=collate_fct, pin_memory=pin_memory),
+                            num_workers=3, collate_fn=collate_fct, pin_memory=pin_memory),
 
         'val': DataLoader(datasets['val'], batch_size=args['batch_size'], shuffle=True,
-                          num_workers=4, collate_fn=collate_fct, pin_memory=pin_memory),
+                          num_workers=2, collate_fn=collate_fct, pin_memory=pin_memory),
 
         'test': DataLoader(datasets['test'], batch_size=test_set_batch_size, shuffle=False,
-                           num_workers=4, collate_fn=collate_fct, pin_memory=pin_memory)
+                           num_workers=2, collate_fn=collate_fct, pin_memory=pin_memory)
     }
 
 
