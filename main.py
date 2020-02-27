@@ -287,7 +287,7 @@ def execute_task(task, args, output_dated_folder, dataloaders, model, model_conf
                         nb_epoch_to_keep=args['nb_epoch_stats_to_keep'], start_epoch=args['start_epoch'],
                         tensorboard=tensorboard)
         except KeyboardInterrupt:
-            print("\n\n>>> Received keyboard interrupt, Gracefully exiting\n")
+            print("\n\n>>> Received keyboard interrupt, Gracefully terminating training\n")
 
         if args['run_test_after_training']:
             inference(device=device, model=model, set_type='test',
