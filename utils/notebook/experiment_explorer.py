@@ -30,9 +30,6 @@ def get_experiments(experiment_result_path, prefix=None):
                 # Failed experiment. Was stopped before first epoch could be saved
                 continue
 
-            # Parse experiment date
-            date = datetime.strptime(date_folder, '%Y-%m-%d_%Hh%M')
-
             # Retrieve info from experiment name
             matches = re.match('(.*)_(\d+)k_(\d+)_inst_1024_win_50_overlap_(.*)_(\d+)_epoch_stop_at_(.*)_(\d+)', exp_folder)
 
@@ -49,7 +46,7 @@ def get_experiments(experiment_result_path, prefix=None):
                 'nb_epoch': int(matches[4]),
                 'stop_accuracy': float(matches[5]),
                 'random_seed': matches[6],
-                'date': date,
+                'date': datetime.strptime(date_folder, '%Y-%m-%d_%Hh%M'),
 
             }
 
@@ -100,8 +97,8 @@ def get_experiments(experiment_result_path, prefix=None):
             if os.path.isfile(test_result_filepath):
                 test_stats = read_json(f"{exp_dated_folder_path}/test_stats.json")
                 experiment['test_version'] = test_stats['version_name']
-                experiment['test_acc'] = test_stats['accuracy']
-                experiment['test_loss'] = test_stats['loss']
+                experiment['test_acc'] = float(test_stats['accuracy'])
+                experiment['test_loss'] = float(test_stats['loss'])
             else:
                 experiment['test_version'] = None
                 experiment['test_acc'] = None
@@ -119,8 +116,8 @@ def get_experiments(experiment_result_path, prefix=None):
                 img_arguments = arguments
 
             experiment['pad_to_largest'] = img_arguments['pad_to_largest_image']
-            experiment['resized_height'] = img_arguments['img_resize_height'] if img_arguments['resize_img'] else None
-            experiment['resized_width'] = img_arguments['img_resize_width'] if img_arguments['resize_img'] else None
+            experiment['resized_height'] = int(img_arguments['img_resize_height']) if img_arguments['resize_img'] else None
+            experiment['resized_width'] = int(img_arguments['img_resize_width']) if img_arguments['resize_img'] else None
 
             # Load timing
 
@@ -131,19 +128,19 @@ def get_experiments(experiment_result_path, prefix=None):
             # Load config
             config = read_json(f'config/{experiment["config"]}.json')
 
-            experiment['word_embedding_dim'] = config['question']['word_embedding_dim']
-            experiment['rnn_state_size'] = config['question']['rnn_state_size']
+            experiment['word_embedding_dim'] = int(config['question']['word_embedding_dim'])
+            experiment['rnn_state_size'] = int(config['question']['rnn_state_size'])
             experiment['extractor_type'] = config['image_extractor']['type']
-            experiment['stem_out_chan'] = config['stem']['conv_out']
+            experiment['stem_out_chan'] = int(config['stem']['conv_out'])
             experiment['nb_resblock'] = len(config['resblock']['conv_out'])
-            experiment['resblocks_out_chan'] = config['resblock']['conv_out'][-1]
-            experiment['classifier_conv_out_chan'] = config['classifier']['conv_out']
+            experiment['resblocks_out_chan'] = int(config['resblock']['conv_out'][-1])
+            experiment['classifier_conv_out_chan'] = int(config['classifier']['conv_out'])
             experiment['classifier_type'] = config['classifier']['type']
             experiment['classifier_global_pool'] = config['classifier']['global_pool_type']
             experiment['optimizer_type'] = config['optimizer']['type']
-            experiment['optimizer_lr'] = config['optimizer']['learning_rate']
-            experiment['optimizer_weight_decay'] = config['optimizer']['weight_decay']
-            experiment['dropout_drop_prob'] = config['optimizer']['dropout_drop_prob']
+            experiment['optimizer_lr'] = float(config['optimizer']['learning_rate'])
+            experiment['optimizer_weight_decay'] = float(config['optimizer']['weight_decay'])
+            experiment['dropout_drop_prob'] = float(config['optimizer']['dropout_drop_prob'])
 
             experiments.append(experiment)
 
