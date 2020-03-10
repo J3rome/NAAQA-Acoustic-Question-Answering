@@ -5,7 +5,7 @@ from collections import OrderedDict
 import numpy as np
 
 
-def summary(model, input_infos, batch_size=-1, device="cpu"):
+def summary(model, input_infos, batch_size=-1, device="cpu", print_output=True):
 
     def register_hook(module):
 
@@ -78,11 +78,12 @@ def summary(model, input_infos, batch_size=-1, device="cpu"):
     for h in hooks:
         h.remove()
 
+    to_print = []
     line_new = "{:>20} {:>35} {:>30} {:>15}".format("Layer (type)", "Input Shape", "Output Shape", "Param #")
     nb_char_per_line = len(line_new)
-    print("-" * nb_char_per_line)
-    print(line_new)
-    print("=" * nb_char_per_line)
+    to_print.append("-" * nb_char_per_line)
+    to_print.append(line_new)
+    to_print.append("=" * nb_char_per_line)
     total_params = 0
     total_output = 0
     trainable_params = 0
@@ -99,7 +100,7 @@ def summary(model, input_infos, batch_size=-1, device="cpu"):
         if "trainable" in summary[layer]:
             if summary[layer]["trainable"] == True:
                 trainable_params += summary[layer]["nb_params"]
-        print(line_new)
+        to_print.append(line_new)
 
     # assume 4 bytes/number (float on cuda).
     #total_input_size = abs(np.prod(input_size) * batch_size * 4. / (1024 ** 2.))
@@ -109,14 +110,20 @@ def summary(model, input_infos, batch_size=-1, device="cpu"):
     total_params_size = abs(total_params.numpy() * 4. / (1024 ** 2.))
     total_size = total_params_size + total_output_size + total_input_size
 
-    print("=" * nb_char_per_line)
-    print("Total params: {0:,}".format(total_params))
-    print("Trainable params: {0:,}".format(trainable_params))
-    print("Non-trainable params: {0:,}".format(total_params - trainable_params))
-    print("-" * nb_char_per_line)
-    print("Input size (MB): %0.2f" % total_input_size)
-    print("Forward/backward pass size (MB): %0.2f" % total_output_size)
-    print("Params size (MB): %0.2f" % total_params_size)
-    print("Estimated Total Size (MB): %0.2f" % total_size)
-    print("-" * nb_char_per_line)
-    # return summary
+    to_print.append("=" * nb_char_per_line)
+    to_print.append("Total params: {0:,}".format(total_params))
+    to_print.append("Trainable params: {0:,}".format(trainable_params))
+    to_print.append("Non-trainable params: {0:,}".format(total_params - trainable_params))
+    to_print.append("-" * nb_char_per_line)
+    to_print.append("Input size (MB): %0.2f" % total_input_size)
+    to_print.append("Forward/backward pass size (MB): %0.2f" % total_output_size)
+    to_print.append("Params size (MB): %0.2f" % total_params_size)
+    to_print.append("Estimated Total Size (MB): %0.2f" % total_size)
+    to_print.append("-" * nb_char_per_line)
+
+    to_print = '\n'.join(to_print)
+
+    if print_output:
+        print(to_print)
+
+    return to_print

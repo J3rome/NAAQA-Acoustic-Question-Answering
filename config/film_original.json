@@ -1,37 +1,24 @@
 {
-  "preprocessing":{
-    "imagenet_stats":{
-      "mean":[
-        0.485,
-        0.456,
-        0.406
-      ],
-      "std":[
-        0.229,
-        0.224,
-        0.225
-      ]
-    }
-  },
-  "feature_extractor":{
-    "type":"resnet",
-    "version":101,
-    "output_layer":"block3/unit_22/bottleneck_v1"
-  },
   "question":{
-    "word_embedding_dim":64,
-    "rnn_state_size":128
+    "word_embedding_dim":200,
+    "rnn_state_size":4096
+  },
+  "image_extractor":{
+    "type":"conv",
+    "out": [128, 128, 128, 128],
+    "kernels": [[4, 4], [4, 4], [4, 4], [4, 4]],
+    "strides": [2, 2, 2, 2]
   },
   "stem":{
     "spatial_location":true,
-    "conv_out":32,
+    "conv_out":128,
     "conv_kernel":[
       3,
       3
     ]
   },
   "resblock":{
-    "no_resblock":3,
+    "conv_out": [128, 128, 128, 128],
     "spatial_location":true,
     "film_projection_type":"plus",
     "kernel1":[
@@ -45,21 +32,21 @@
   },
   "classifier":{
     "spatial_location":true,
-    "type": "fcn",
+    "type":"fcn",
     "global_pool_type":"max",
-    "conv_out":32,
+    "conv_out":512,
     "conv_kernel":[
       1,
       1
     ],
-    "no_mlp_units":64,
-    "projection_size": 128
+    "no_mlp_units":1024,
+    "projection_size":1024
   },
   "optimizer":{
     "type":"adam",
     "learning_rate":0.0003,
     "clip_val":0.0,
-    "weight_decay":0.00003,
+    "weight_decay":5e-6,
     "sgd_momentum":0.0,
     "dropout_drop_prob":0.25,
     "cyclical":{
@@ -73,8 +60,8 @@
   },
   "early_stopping":{
     "enable":true,
-    "wait_first_n_epoch":0,
-    "stop_threshold":0.2,
-    "min_step":0.001
+    "wait_first_n_epoch":5,
+    "stop_threshold":6,
+    "min_step":0.0005
   }
 }

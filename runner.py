@@ -38,9 +38,9 @@ def prepare_model(args, flags, paths, dataloaders, device, model_config, input_i
     trainable_parameters = filter(lambda p: p.requires_grad, film_model.parameters())
 
     if flags['create_optimizer']:
-        if model_config['optimizer'].get('type', '') == 'sgd' or flags["force_sgd_optimizer"]:
+        if model_config['optimizer'].get('type', '') == 'sgd':
             optimizer = torch.optim.SGD(trainable_parameters, lr=model_config['optimizer']['learning_rate'],
-                                        momentum=model_config['optimizer']['momentum'],
+                                        momentum=model_config['optimizer']['sgd_momentum'],
                                         weight_decay=model_config['optimizer']['weight_decay'])
         else:
             optimizer = torch.optim.Adam(trainable_parameters, lr=model_config['optimizer']['learning_rate'],
@@ -112,7 +112,12 @@ def prepare_model(args, flags, paths, dataloaders, device, model_config, input_i
         film_model.load_state_dict(checkpoint['model_state_dict'], strict=False)
 
         if optimizer and "optimizer_state_dict" in checkpoint:
-            optimizer_load_state_dict(optimizer, checkpoint['optimizer_state_dict'], device)
+            current_optimizer_param_keys = optimizer.state_dict()['param_groups'][0].keys()
+            checkpoint_optimizer_param_keys = checkpoint['optimizer_state_dict']['param_groups'][0].keys()
+
+            if current_optimizer_param_keys == checkpoint_optimizer_param_keys:
+                # If param_keys are different, we have different optimizer therefore we don't want to restore
+                optimizer_load_state_dict(optimizer, checkpoint['optimizer_state_dict'], device)
 
         if scheduler and 'scheduler_state_dict' in checkpoint:
             current_scheduler_state_dict = scheduler.state_dict()
@@ -175,7 +180,7 @@ def process_dataloader(is_training, device, model, dataloader, criterion=None, o
 
     for batch_idx, batch in enumerate(tqdm(dataloader)):
         #mem_trace.report('Batch %d/%d - Epoch %d' % (i, dataloader.batch_size, epoch))
-        images = batch['image'].to(device)
+        images = batch['image'].to(device, non_blocking=True)
         questions = batch['question'].to(device)
         answers = batch['answer'].to(device)
         seq_lengths = batch['seq_length'].to(device)
@@ -320,19 +325,20 @@ def one_game_inference(device, model, game, collate_fn, tokenizer, nb_top_pred=1
 
 
 def inference(set_type, device, model, dataloader, output_folder, criterion):
-    print(f"Running model on {set_type} set")
+    print(f"Running model on {set_type} set ({dataloader.dataset.version_name})")
     loss, acc, predictions, metrics = process_dataloader(False, device, model, dataloader, criterion,
                                                          gamma_beta_path=f"{output_folder}/{set_type}_gamma_beta.h5")
 
     save_json(predictions, output_folder, filename=f"{set_type}_predictions.json")
-    save_json({'accuracy': acc, 'loss': loss}, output_folder, filename=f"{set_type}_stats.json")
+    save_json({'accuracy': acc, 'loss': loss, 'version_name': dataloader.dataset.version_name}, output_folder,
+              filename=f"{set_type}_stats.json")
 
     print(f"Accuracy : {acc} --- Loss : {loss}")
     print(f"All stats saved to '{output_folder}'")
 
 
 def train_model(device, model, dataloaders, output_folder, criterion, optimizer, scheduler=None,
-                nb_epoch=25, nb_epoch_to_keep=None, start_epoch=0, tensorboard=None):
+                nb_epoch=25, nb_epoch_to_keep=None, start_epoch=0, stop_at_val_acc=None, tensorboard=None):
 
     assert nb_epoch > 0, "Must train for at least 1 epoch"
 
@@ -387,8 +393,8 @@ def train_model(device, model, dataloaders, output_folder, criterion, optimizer,
                                                                                         criterion, optimizer,
                                                                                         scheduler=scheduler,
                                                                                         epoch_id=epoch,
-                                                                                        tensorboard=tensorboard_per_set,
-                                                                                        gamma_beta_path="%s/train_gamma_beta.h5" % epoch_output_folder_path)
+                                                                                        tensorboard=tensorboard_per_set)#,
+                                                                                        #gamma_beta_path="%s/train_gamma_beta.h5" % epoch_output_folder_path)
         epoch_train_time = datetime.now() - epoch_time
 
         print('\n{} Loss: {:.4f} Acc: {:.4f}'.format('Train', train_loss, train_acc))
@@ -452,6 +458,12 @@ def train_model(device, model, dataloaders, output_folder, criterion, optimizer,
         subprocess.run("ln -snf %s %s" % (best_epoch['epoch'], best_epoch_symlink_path), shell=True)
 
         # Early Stopping
+        if stop_at_val_acc and val_acc >= stop_at_val_acc:
+            print(f"Early Stopping -- Attained {val_acc} > {stop_at_val_acc} after {epoch} epochs.")
+            save_json({'epoch': epoch, 'cause': f'stop at vall accuracy {stop_at_val_acc}'},
+                      f"{output_folder}/early_stopped.json")
+            break
+
         if early_stopping:
             if val_loss < best_val_loss - model.early_stopping['min_step']:
                 best_val_loss = val_loss
@@ -462,6 +474,8 @@ def train_model(device, model, dataloaders, output_folder, criterion, optimizer,
 
                 if early_stop_counter >= stop_threshold:
                     print("Early Stopping at epoch %d on %d" % (epoch, start_epoch + nb_epoch))
+                    save_json({'epoch': epoch, 'cause': f'Accuracy loss didn\'t go down for {stop_threshold} epochs'},
+                              f"{output_folder}/early_stopped.json")
                     break
 
         print()
@@ -470,8 +484,10 @@ def train_model(device, model, dataloaders, output_folder, criterion, optimizer,
     print(f'Training complete in {time_elapsed}')
     print(f'Best val Acc: {best_epoch["val_acc"]}')
 
-    # TODO : load best model weights ?
-    #model.load_state_dict(best_model_state)
+    # Load the best weights before leaving the training function
+    checkpoint = torch.load(f"{best_epoch_symlink_path}/model.pt.tar", map_location=device)
+    model.load_state_dict(checkpoint['model_state_dict'], strict=False)
+
     return model
 
 

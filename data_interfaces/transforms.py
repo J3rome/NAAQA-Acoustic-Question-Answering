@@ -1,33 +1,6 @@
 import torch
-import numpy as np
 import torchvision.transforms.functional as vis_F
 import torch.nn.functional as F
-
-
-class ToTensor(object):
-    """
-    Convert ndarrays in sample to Tensors.
-    Move channel dimension first (Pytorch Format)
-    Cast samples to correct types
-    """
-
-    def __call__(self, sample):
-        # swap color axis because (RGB/BGR)
-        # numpy image: H x W x C
-        # torch image: C X H X W
-        image = np.array(sample['image']).transpose((2, 0, 1))      # FIXME : Transpose in pytorch
-        to_return = {
-            'image': torch.from_numpy(image).float(),
-            'question': torch.from_numpy(sample['question']).int(),
-            'answer': torch.from_numpy(sample['answer']),
-            'id': sample['id'],             # Not processed by the network, no need to transform to tensor.. Seems to be transfered to tensor in collate function anyways
-            'scene_id': sample['scene_id']  # Not processed by the network, no need to transform to tensor
-        }
-
-        if 'program' in sample:
-            to_return['program'] = sample['program']    # Not processed by the network, no need to transform to tensor
-
-        return to_return
 
 
 class ImgBetweenZeroOne(object):
@@ -49,7 +22,102 @@ class ResizeTensor(object):
         self.output_shape = output_shape
 
     def __call__(self, sample):
-        sample['image'] = F.interpolate(sample['image'].unsqueeze(0), size=self.output_shape, mode='bicubic').squeeze(0)
+        sample['image'] = F.interpolate(sample['image'].unsqueeze(0), size=self.output_shape, mode='bilinear',
+                                        align_corners=False).squeeze(0)
+        return sample
+
+
+class ResizeTensorBasedOnHeight(object):
+    """ Resize PIL image to 'output_height' while keeping image ration """
+    def __init__(self, output_height):
+        self.output_height = output_height
+
+    def get_resized_dim(self, height, width):
+        new_height = self.get_output_height()
+        new_width = self.get_output_width(height, width)
+
+        return new_height, new_width
+
+    def get_output_height(self):
+        return self.output_height
+
+    def get_output_width(self, height, width):
+        return int(self.output_height * width / height + 0.5)
+
+    def __call__(self, sample):
+        # Images tensor are in format C x H x W
+        output_width = self.get_output_width(sample['image'].shape[1], sample['image'].shape[2])
+
+        if output_width + self.output_height != sample['image'].shape[2] + sample['image'].shape[1]:
+            sample['image'] = F.interpolate(sample['image'].unsqueeze(0), size=(self.output_height, output_width),
+                                            mode='bilinear', align_corners=False).squeeze(0)
+
+        return sample
+
+
+class ResizeTensorBasedOnWidth(object):
+    """
+    Resize PIL image to 'output_width' while keeping image ration
+    If max_width is provided,
+    the resizing will be made according to the max_width ratio instead of the sample width ratio
+    """
+    def __init__(self, output_width, max_width=None):
+        self.output_width = output_width
+        self.max_width = max_width
+
+    def get_resized_dim(self, height, width):
+        if self.max_width:
+            reference_width = self.max_width
+        else:
+            reference_width = width
+
+        new_height = self.get_output_height(height, reference_width)
+        new_width = self.get_output_width(new_height, height, width)
+
+        return int(new_height + 0.5), int(new_width + 0.5)
+
+    def get_output_height(self, height, width):
+        return self.output_width * height / width
+
+    def get_output_width(self, target_height, height, width):
+        return target_height * width / height
+
+    def __call__(self, sample):
+        output_height, output_width = self.get_resized_dim(sample['image'].shape[1], sample['image'].shape[2])
+
+
+        if output_height + output_width != sample['image'].shape[1] + sample['image'].shape[2]:
+            sample['image'] = F.interpolate(sample['image'].unsqueeze(0), size=(output_height, output_width),
+                                            mode='bilinear', align_corners=False).squeeze(0)
+
+        return sample
+
+
+class ResizeTensorBasedOnMaxWidth(object):
+    """
+    Resize Tensor to 'output_width' while keeping time axis ratio
+    """
+    def __init__(self, output_width, max_width=None, output_height=None):
+        self.output_height = output_height
+        self.output_width = output_width
+        self.max_width = max_width
+
+        if self.max_width:
+            self.width_ratio = self.output_width / self.max_width
+
+    def get_resized_dim(self, height, width):
+        output_height = self.output_height if self.output_height else height
+        output_width = self.output_width if self.max_width is None else int(width * self.width_ratio + 0.5)
+
+        return output_height, output_width
+
+    def __call__(self, sample):
+        output_height, output_width = self.get_resized_dim(sample['image'].shape[1], sample['image'].shape[2])
+
+        if output_height + output_width != sample['image'].shape[1] + sample['image'].shape[2]:
+            sample['image'] = F.interpolate(sample['image'].unsqueeze(0), size=(output_height, output_width),
+                                            mode='bilinear', align_corners=False).squeeze(0)
+
         return sample
 
 
@@ -91,6 +159,25 @@ class ResizeImgBasedOnWidth(object):
         return sample
 
 
+class PadTensorHeight(object):
+    """ Pad image Tensor to output_height -- Pad at bottom of image"""
+    def __init__(self, output_height):
+        self.output_height = output_height
+
+    def __call__(self, sample):
+        height_to_pad = self.output_height - sample['image'].shape[1]
+
+        if height_to_pad > 0:
+            sample['image'] = F.pad(sample['image'], [0, 0, 0, height_to_pad])
+
+        if 'image_padding' in sample:
+            sample['image_padding'][0] += height_to_pad
+        else:
+            sample['image_padding'] = torch.tensor([height_to_pad, 0], dtype=torch.int)
+
+        return sample
+
+
 class PadTensor(object):
     """ Pad image Tensor to output_height x output_width. Pad to right & bottom of image"""
     def __init__(self, output_shape):
@@ -103,7 +190,11 @@ class PadTensor(object):
         if width_to_pad + height_to_pad > 0:
             sample['image'] = F.pad(sample['image'], [0, width_to_pad, 0, height_to_pad])
 
-        sample['image_padding'] = torch.tensor([height_to_pad, width_to_pad], dtype=torch.int)
+        if 'image_padding' in sample:
+            sample['image_padding'][0] += height_to_pad
+            sample['image_padding'][1] += width_to_pad
+        else:
+            sample['image_padding'] = torch.tensor([height_to_pad, width_to_pad], dtype=torch.int)
 
         return sample
 

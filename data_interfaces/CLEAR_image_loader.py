@@ -1,6 +1,7 @@
 import os
 from PIL import Image
 import numpy as np
+import torch
 import h5py
 
 # Why doing an image builder/loader?
@@ -76,13 +77,18 @@ class RawImageLoader(AbstractImgLoader):
         AbstractImgLoader.__init__(self, img_path)
 
 
-    def get_image(self, **kwargs):
+    def get_image(self, return_tensor=True):
         # Our images are saved as RGBA. The A dimension is always 1.
         # We could simply get rid of it instead of converting
         #img = io.imread(self.img_path)[:,:,:3]
         img = Image.open(self.img_path).convert('RGB')
 
-        return img
+        if return_tensor:
+            # PIL images are in format H x W x C
+            # Images tensor are in format C x H x W thus the permutation
+            return torch.from_numpy(np.array(img)).permute(2, 0, 1).float()
+        else:
+            return img
 
 
 h5_basename="features.h5"
@@ -143,8 +149,13 @@ class h5FeatureLoader(AbstractImgLoader):
         self.h5file = h5file
         self.id = id
 
-    def get_image(self, **kwargs):
-        return self.h5file[h5_feature_key][self.id]
+    def get_image(self, return_tensor=True):
+        img = self.h5file[h5_feature_key][self.id]
+
+        if return_tensor:
+            return torch.tensor(img, dtype=torch.float32)
+        else:
+            return img
 
 # Load while loading dataset (requires a lot of memory)
 class h5FeatureBufloader(AbstractImgLoader):
