@@ -177,10 +177,16 @@ def create_datasets(args, data_path, load_dataset_extra_stats=False):
     transforms_to_apply = get_transforms_from_args(args, data_path)
 
     if args['test_dataset_path']:
-        splitted = args['test_dataset_path'].split('/')
+        if '/' in args['test_dataset_path']:
+            # --test_dataset_path is full path
+            splitted = args['test_dataset_path'].split('/')
 
-        test_data_root_path = '/'.join(splitted[:-1])
-        test_version_name = splitted[-1]
+            test_data_root_path = '/'.join(splitted[:-1])
+            test_version_name = splitted[-1]
+        else:
+            # --test_dataset_path is version name
+            test_data_root_path = args['data_root_path']
+            test_version_name = args['test_dataset_path']
     else:
         test_data_root_path = args['data_root_path']
         test_version_name = args['version_name']
