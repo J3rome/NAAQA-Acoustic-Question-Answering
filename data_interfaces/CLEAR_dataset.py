@@ -149,7 +149,7 @@ class CLEAR_dataset(Dataset):
                 'size': 0,
                 'max_size': min(max_cache_size, self.nb_scene)        # TODO : Set max cache size according to RAM
             }
-            
+
     @classmethod
     def from_dataset_object(cls, dataset_obj, questions=None):
         folder_path = dataset_obj.root_folder_path.replace('/%s' % dataset_obj.version_name, '')
