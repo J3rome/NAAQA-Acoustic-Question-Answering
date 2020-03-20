@@ -9,7 +9,7 @@ class Reproductible_Block:
     """
     Python, Numpy and PyTorch random states manager statement
     """
-    def __init__(self, state, clause_seed, reset_state_after=False):
+    def __init__(self, state=None, clause_seed=0, reset_state_after=False):
         self.clause_seed = clause_seed
         self.state = state
         self.reset_state_after = reset_state_after
@@ -19,7 +19,8 @@ class Reproductible_Block:
         if self.reset_state_after:
             self.initial_state = get_random_state()
 
-        set_random_state(self.state)
+        if self.state:
+            set_random_state(self.state)
 
         # Modify the random state by performing a serie of random operations.
         # This is done to create unique random state paths using the same initial state for different code blocks
@@ -29,7 +30,7 @@ class Reproductible_Block:
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         if self.reset_state_after:
-            set_random_seed(self.initial_state)
+            set_random_state(self.initial_state)
 
     @staticmethod
     def get_random_state():
