@@ -11,7 +11,7 @@ from models.utils import get_trainable_childs
 
 from models.utils import append_spatial_location, Conv2d_padded
 from models.Resnet_feature_extractor import Resnet_feature_extractor
-from utils.random import set_random_state, get_random_state
+from utils.Reproducibility_Handler import Reproductible_Block
 
 
 class CLEAR_FiLM_model(nn.Module):
@@ -30,41 +30,48 @@ class CLEAR_FiLM_model(nn.Module):
         film_layer_transformation = config['resblock'].get('film_projection_type', None)
         #self.dropout = nn.Dropout(p=dropout_drop_prob)
 
+        # Reproducibility Handling
+        initial_random_state = Reproductible_Block.get_random_state()
+
         # Question Pipeline
-        self.question_pipeline = Question_pipeline(config, nb_words, dropout_drop_prob, sequence_padding_idx)
-        #self.question_pipeline = Question_pipeline_no_GRU(config, nb_words, dropout_drop_prob, sequence_padding_idx)
+        with Reproductible_Block(initial_random_state, 10):
+            self.question_pipeline = Question_pipeline(config, nb_words, dropout_drop_prob, sequence_padding_idx)
+            #self.question_pipeline = Question_pipeline_no_GRU(config, nb_words, dropout_drop_prob, sequence_padding_idx)
 
         # Image Pipeline
-        if config['image_extractor']['type'].lower() == "conv":
-            self.image_pipeline = Original_Film_Extractor(config['image_extractor'], input_image_channels)
-        elif config['image_extractor']['type'].lower() == "resnet":
-            # TODO : Way to use preprocessed from h5
-            self.image_pipeline = Resnet_feature_extractor()
-        elif config['image_extractor']['type'].lower() == "freq_time_conv":
-            self.image_pipeline = Freq_Time_Extractor(input_image_channels, config['stem']['conv_out'])
+        with Reproductible_Block(initial_random_state, 125):
+            if config['image_extractor']['type'].lower() == "conv":
+                self.image_pipeline = Original_Film_Extractor(config['image_extractor'], input_image_channels)
+            elif config['image_extractor']['type'].lower() == "resnet":
+                # TODO : Way to use preprocessed from h5
+                self.image_pipeline = Resnet_feature_extractor()
+            elif config['image_extractor']['type'].lower() == "freq_time_conv":
+                self.image_pipeline = Freq_Time_Extractor(input_image_channels, config['stem']['conv_out'])
 
-        stem_conv_in = self.image_pipeline.get_out_channels() + 2 if config['stem']['spatial_location'] else 0
-        self.stem_conv = nn.Sequential(OrderedDict([
-            ('conv', Conv2d_padded(in_channels= stem_conv_in,
-                                   out_channels=config['stem']['conv_out'], kernel_size=[3, 3],
-                                   stride=1, dilation=1, bias=False, padding='SAME')),
-            ('batchnorm', nn.BatchNorm2d(config['stem']['conv_out'], eps=0.001)),
-            ('relu', nn.ReLU(inplace=True))
-        ]))
+        with Reproductible_Block(initial_random_state, 42):
+            stem_conv_in = self.image_pipeline.get_out_channels() + 2 if config['stem']['spatial_location'] else 0
+            self.stem_conv = nn.Sequential(OrderedDict([
+                ('conv', Conv2d_padded(in_channels= stem_conv_in,
+                                       out_channels=config['stem']['conv_out'], kernel_size=[3, 3],
+                                       stride=1, dilation=1, bias=False, padding='SAME')),
+                ('batchnorm', nn.BatchNorm2d(config['stem']['conv_out'], eps=0.001)),
+                ('relu', nn.ReLU(inplace=True))
+            ]))
 
         # Question and Image Fusion
-        resblock_in_channels = config['stem']['conv_out'] + 2 if config['resblock']['spatial_location'] else 0
-        self.resblocks = nn.ModuleList()
-        for resblock_out_channels in config['resblock']['conv_out']:
-            self.resblocks.append(FiLMed_resblock(in_channels=resblock_in_channels,
-                                                  out_channels=resblock_out_channels,
-                                                  context_size=config["question"]["rnn_state_size"],
-                                                  kernel1=config['resblock']['kernel1'],
-                                                  kernel2=config['resblock']['kernel2'],
-                                                  dropout_drop_prob=dropout_drop_prob,
-                                                  film_layer_transformation=film_layer_transformation))
+        with Reproductible_Block(initial_random_state, 4242):
+            resblock_in_channels = config['stem']['conv_out'] + 2 if config['resblock']['spatial_location'] else 0
+            self.resblocks = nn.ModuleList()
+            for resblock_out_channels in config['resblock']['conv_out']:
+                self.resblocks.append(FiLMed_resblock(in_channels=resblock_in_channels,
+                                                      out_channels=resblock_out_channels,
+                                                      context_size=config["question"]["rnn_state_size"],
+                                                      kernel1=config['resblock']['kernel1'],
+                                                      kernel2=config['resblock']['kernel2'],
+                                                      dropout_drop_prob=dropout_drop_prob,
+                                                      film_layer_transformation=film_layer_transformation))
 
-            resblock_in_channels = resblock_out_channels + 2 if config['resblock']['spatial_location'] else 0
+                resblock_in_channels = resblock_out_channels + 2 if config['resblock']['spatial_location'] else 0
 
         if config['classifier'].get('type', '').lower() == 'conv':
             # Classification (Via 1x1 conv & GlobalPooling)
@@ -73,12 +80,16 @@ class CLEAR_FiLM_model(nn.Module):
             # Fully connected classifier
             classifier_class = Fcn_classifier
 
-        self.classifier = classifier_class(in_channels=resblock_out_channels,
-                                           projection_size=config["classifier"]['projection_size'],
-                                           output_size=nb_answers,
-                                           pooling_type=config['classifier']['global_pool_type'],
-                                           spatial_location_layer=config['classifier']['spatial_location'],
-                                           dropout_drop_prob=dropout_drop_prob)
+        with Reproductible_Block(initial_random_state, 425):
+            self.classifier = classifier_class(in_channels=resblock_out_channels,
+                                               projection_size=config["classifier"]['projection_size'],
+                                               output_size=nb_answers,
+                                               pooling_type=config['classifier']['global_pool_type'],
+                                               spatial_location_layer=config['classifier']['spatial_location'],
+                                               dropout_drop_prob=dropout_drop_prob)
+
+        # Set back initial seed
+        Reproductible_Block.set_random_state(initial_random_state)
 
     def forward(self, question, question_lengths=None, input_image=None, pack_sequence=False):
         if question is not None and question_lengths is None and input_image is None:

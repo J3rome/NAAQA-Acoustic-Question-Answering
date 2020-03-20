@@ -416,7 +416,7 @@ def prepare_for_task(args):
                 save_graph_to_tensorboard(film_model, tensorboard, input_image_torch_shape)
 
     # Set back the random state
-    set_random_state(initial_random_state)
+    set_random_state(initial_random_state)      # FIXME : This is redundant, we already reset random state after initialising the model. Actions after model initialization doesn't seem to affect random state
     return (
         (task, args, flags, paths, device),
         dataloaders,
