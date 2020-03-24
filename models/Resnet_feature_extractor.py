@@ -1,6 +1,8 @@
 import torch.nn as nn
 import torchvision
 
+from utils.Reproducibility_Handler import Reproductible_Block
+
 class Resnet_feature_extractor(nn.Module):
     def __init__(self, resnet_version=101, layer_index=6, no_grads=True):      # TODO : Add Parameter to unfreeze some layers
         super(Resnet_feature_extractor, self).__init__()
@@ -40,13 +42,15 @@ class Resnet_feature_extractor(nn.Module):
 
         assert resnet_version == 101, 'Only Resnet-101 is implemented.'
 
-        resnet = torchvision.models.resnet101(pretrained=True)
+        # Prevent change to the Random State when instantiating Resnet Model
+        with Reproductible_Block(reset_state_after=True):
+            resnet = torchvision.models.resnet101(pretrained=True)
 
-        self.extractor = nn.Sequential(*list(resnet.children())[:layer_index+1])
+            self.extractor = nn.Sequential(*list(resnet.children())[:layer_index+1])
 
-        if no_grads:
-            for param in self.extractor.parameters():
-                param.requires_grad = False
+            if no_grads:
+                for param in self.extractor.parameters():
+                    param.requires_grad = False
 
     def forward(self, image):
         return self.extractor(image)
