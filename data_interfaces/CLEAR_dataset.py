@@ -119,8 +119,9 @@ class CLEAR_dataset(Dataset):
                 'answer': answer
             }
 
+            self.scenes[image_id]['question_idx'].append(i)
+
             if extra_stats:
-                self.scenes[image_id]['question_idx'].append(i)
                 self.games_per_family[self.answer_to_family[str(sample['answer']).lower()]].append(i)
                 game['program'] = sample['program'] if 'program' in sample else []
 
