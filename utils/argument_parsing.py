@@ -46,7 +46,6 @@ def create_flags_from_args(task, args):
     flags['instantiate_model'] = task in ['training',
                                           'inference',
                                           'visualize_grad_cam',
-                                          'feature_extract',
                                           'lr_finder',
                                           'random_weight_baseline',
                                           'notebook_model_inference',

@@ -23,6 +23,7 @@ from utils.argument_parsing import get_args_task_flags_paths, get_feature_extrac
 from utils.logging import create_tensorboard_writers, close_tensorboard_writers
 from utils.generic import get_imagenet_stats
 
+from models.Resnet_feature_extractor import Resnet_feature_extractor
 from models.tools.TF_weight_transfer import tf_weight_transfer
 
 
@@ -320,8 +321,9 @@ def execute_task(task, args, output_dated_folder, dataloaders, model, model_conf
                   filename="arguments.json")
 
     elif task == "feature_extract":
-        extract_features(device=device, feature_extractor=model.feature_extractor, dataloaders=dataloaders,
-                         output_folder_name=args['preprocessed_folder_name'])
+        resnet_extractor = Resnet_feature_extractor(layer_index=args['feature_extractor_layer_index'])
+        extract_features(device=device, feature_extractor=resnet_extractor,
+                         dataloaders=dataloaders, output_folder_name=args['preprocessed_folder_name'])
         # Save generation args with h5 file
         save_json(args, f"{dataloaders['train'].dataset.root_folder_path}/{args['preprocessed_folder_name']}",
                   filename="arguments.json")

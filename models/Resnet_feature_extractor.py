@@ -70,6 +70,6 @@ class Resnet_feature_extractor(nn.Module):
         output_size = output.size()[1:]     # Remove batch size dimension
 
         if channel_first:
-            return output_size
+            return list(output_size)
 
         return [output_size[1], output_size[2], output_size[0]]
