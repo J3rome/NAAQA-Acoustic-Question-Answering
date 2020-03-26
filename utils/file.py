@@ -140,7 +140,13 @@ def save_gamma_beta_h5(gammas_betas, set_type, folder, filename=None, nb_vals=No
 def create_folder_if_necessary(folder_path, overwrite_folder=False):
     is_symlink = os.path.islink(folder_path)
     if not os.path.isdir(folder_path) and not is_symlink:
-        os.mkdir(folder_path)
+        try:
+            os.mkdir(folder_path)
+        except FileExistsError:
+            # Race conditions can happen when starting multiple experiments in parallel
+            # os.path.isdir() might return False for both simultaneous runs.
+            # We don't care if one of the folder creation fail as long as one of them succeed
+            return
     # FIXME : What if broken symlink and not overwriting folder ?
     elif overwrite_folder:
         if is_symlink and not os.path.exists(os.readlink(folder_path)):
