@@ -52,17 +52,18 @@ class CLEAR_dataset(Dataset):
         if questions is None:
             question_file_path = '{}/questions/CLEAR_{}_questions.json'.format(self.root_folder_path, self.set)
 
-            self.questions = read_json(question_file_path)["questions"]
+            questions = read_json(question_file_path)["questions"]
         else:
-            self.questions = questions
+            # FIXME : Not having reference to self.questions break dataset cloning... (CLEAR_dataset.from_dataset_object)
+            questions = questions
 
         scene_file_path = '{}/scenes/CLEAR_{}_scenes.json'.format(self.root_folder_path, self.set)
         if os.path.isfile(scene_file_path):
-            self.scenes_def = {int(s['scene_index']): s for s in read_json(scene_file_path)['scenes']}
+            scenes_def = {int(s['scene_index']): s for s in read_json(scene_file_path)['scenes']}
         else:
-            self.scenes_def = None
+            scenes_def = None
 
-        nb_games = len(self.questions)
+        nb_games = len(questions)
         self.games = multiprocessing.Array(ctypes.c_wchar_p, [""]*nb_games)
         self.games_per_family = collections.defaultdict(list)
         self.scenes = {}
@@ -71,8 +72,11 @@ class CLEAR_dataset(Dataset):
         self.answers = []
         self.longest_question_length = 0
 
-        for i, sample in enumerate(self.questions):
-            question_id = int(sample["question_index"])
+        for i, sample in enumerate(questions):
+            # For some reason this keep a reference to the questions object (Which take huge amount of memory)
+            # Adding 0 ensure that a new object is created.. Kinda ugly hack but it works
+            # (copy.deepcopy not working with atomic types)
+            question_id = int(sample["question_index"]) + 0
             question = self.tokenizer.encode_question(sample["question"]) if tokenize_text else sample['question']
 
             if tokenize_text:
@@ -109,8 +113,8 @@ class CLEAR_dataset(Dataset):
 
                 self.nb_scene += 1
 
-                if self.scenes_def:
-                    self.scenes[image_id]['definition'] = self.scenes_def[image_id]
+                if scenes_def:
+                    self.scenes[image_id]['definition'] = scenes_def[image_id]
 
             game = {
                 'id': question_id,
@@ -119,10 +123,10 @@ class CLEAR_dataset(Dataset):
                 'answer': answer
             }
 
-            self.scenes[image_id]['question_idx'].append(i)
+            self.scenes[image_id]['question_idx'].append(question_id)
 
             if extra_stats:
-                self.games_per_family[self.answer_to_family[str(sample['answer']).lower()]].append(i)
+                self.games_per_family[self.answer_to_family[str(sample['answer']).lower()]].append(question_id)
                 game['program'] = sample['program'] if 'program' in sample else []
 
             self.games[question_id] = self.prepare_game(game)
