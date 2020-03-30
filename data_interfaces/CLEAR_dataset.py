@@ -3,7 +3,7 @@ import collections
 import multiprocessing as mp
 import random
 
-import ujson
+import json
 import numpy as np
 import torch
 from torch.utils.data import Dataset
@@ -164,7 +164,7 @@ class CLEAR_dataset(Dataset):
                    transforms=dataset_obj.transforms, max_cache_size=dataset_obj.image_cache['max_size'])
 
     def get_game(self, idx, decode_tokens=False):
-        game = ujson.loads(self.games[idx])
+        game = json.loads(self.games[idx])
         if not decode_tokens:
             return game
         else:
@@ -174,7 +174,7 @@ class CLEAR_dataset(Dataset):
             return game
 
     def prepare_game(self, game):
-        return ujson.dumps(game)
+        return json.dumps(game)
 
     def get_all_image_sizes(self):
         # FIXME : This is broken now that is_raw_img() return True for H5 file.
@@ -395,10 +395,9 @@ class CLEARTokenizer:
 
         self.tokenizer = CLEARTokenizer.get_tokenizer_inst()
 
-        with open(dictionary_file, 'r') as f:
-            data = ujson.load(f)
-            self.word2i = data['word2i']
-            self.answer2i = data['answer2i']
+        dict_data = read_json(dictionary_file)
+        self.word2i = dict_data['word2i']
+        self.answer2i = dict_data['answer2i']
 
         self.dictionary_file = dictionary_file
 

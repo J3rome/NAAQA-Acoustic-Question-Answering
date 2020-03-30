@@ -11,7 +11,6 @@ from utils.processing import calc_mean_and_std
 
 import torch
 import torch.nn as nn
-import ujson
 
 from models.tools.lr_finder import LRFinder
 import matplotlib.pyplot as plt
@@ -46,8 +45,7 @@ def get_lr_finder_curves(model, device, train_dataloader, output_dated_folder, n
 
         fig, ax = lr_finder.plot(fig_ax=(fig, ax), legend_label=f"Weight Decay : {weight_decay:.5}", show_fig=False)
 
-        with open(f'{output_dated_folder}/lr_finder_weight_decay_{weight_decay:.5}.json', 'w') as f:
-            ujson.dump(losses_per_lr, f, indent=2)
+        save_json(losses_per_lr, output_dated_folder, f'lr_finder_weight_decay_{weight_decay:.5}.json')
 
     if show_fig:
         plt.show()

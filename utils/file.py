@@ -4,7 +4,7 @@ import subprocess
 import shutil
 
 import h5py
-import ujson
+import json
 
 
 def save_json(results, output_folder, filename=None, indented=True, sort_keys=False):
@@ -15,7 +15,7 @@ def save_json(results, output_folder, filename=None, indented=True, sort_keys=Fa
         path = '%s/%s' % (output_folder, filename)
 
     with open(path, 'w') as f:
-        ujson.dump(results, f, sort_keys=sort_keys, indent=2 if indented else None, escape_forward_slashes=False)
+        json.dump(results, f, sort_keys=sort_keys, indent=2 if indented else None, escape_forward_slashes=False)
 
 
 def read_json(folder, filename=None):
@@ -26,7 +26,7 @@ def read_json(folder, filename=None):
         path = '%s/%s' % (folder, filename)
 
     with open(path, 'r') as f:
-        return ujson.load(f)
+        return json.load(f)
 
 
 def get_size_from_image_header(folder, filename=None):
@@ -52,8 +52,7 @@ def get_clear_stats(data_path, filename='clear_stats.json'):
 
     assert os.path.exists(stats_filepath), f"No stats file found at {stats_filepath}"
 
-    with open(stats_filepath, 'r') as f:
-        return ujson.load(f)
+    return read_json(stats_filepath)
 
 
 def read_gamma_beta_h5(filepath):

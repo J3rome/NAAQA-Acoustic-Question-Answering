@@ -2,5 +2,4 @@ numpy==1.16.1
 matplotlib==3.0.2
 pydub==0.23.1
 timbral-models==0.4.0
-ujson==1.35
 pysndfx==0.3.6
