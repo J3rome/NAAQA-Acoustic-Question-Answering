@@ -6,7 +6,8 @@ import numpy as np
 import torch
 import pandas as pd
 
-from utils.random import get_random_state, set_random_state
+
+from utils.Reproducibility_Handler import Reproductible_Block
 from models.torchsummary import summary     # Custom version of torchsummary to fix bugs with input
 
 
@@ -14,17 +15,15 @@ def save_model_summary(output_folder, model, input_image_torch_shape, device="cp
                        print_output=True):
     # Printing summary affects the random state (Raw Vs Pre-Extracted Features).
     # We restore it to ensure reproducibility between input type
-    random_state = get_random_state()
-    model_summary = summary(model,
-                            [((22,), torch.LongTensor),
-                             ((1,), torch.LongTensor),
-                             (input_image_torch_shape, torch.FloatTensor)],
-                            device=device, print_output=print_output)
+    with Reproductible_Block(reset_state_after=True):
+        model_summary = summary(model,
+                                [((22,), torch.LongTensor),
+                                 ((1,), torch.LongTensor),
+                                 (input_image_torch_shape, torch.FloatTensor)],
+                                device=device, print_output=print_output)
 
     with open(f"{output_folder}/{output_filename}", 'w') as f:
         f.write(model_summary)
-
-    set_random_state(random_state)
 
 
 def get_scene_image_axis_labels(image_width, image_height, scene_duration, max_freq, tick_ratio=0.2):
