@@ -15,7 +15,7 @@ def save_json(results, output_folder, filename=None, indented=True, sort_keys=Fa
         path = '%s/%s' % (output_folder, filename)
 
     with open(path, 'w') as f:
-        json.dump(results, f, sort_keys=sort_keys, indent=2 if indented else None, escape_forward_slashes=False)
+        json.dump(results, f, sort_keys=sort_keys, indent=2 if indented else None)
 
 
 def read_json(folder, filename=None):
