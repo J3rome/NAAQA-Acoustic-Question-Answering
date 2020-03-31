@@ -496,7 +496,7 @@ def preload_images_to_ram(dataloader, batch_size=1):
     # If the cache['max_size'] is smaller than the dataset, each worker will update its own cache.
     # No synchronisation between the workers will be done except for this primary preloading step
 
-    dataset_copy = CLEAR_dataset.from_dataset_object(dataloader.dataset)
+    dataset_copy = CLEAR_dataset.from_dataset_object(dataloader.dataset, dataloader.dataset.games)
     dataset_copy.keep_1_game_per_scene()
 
     # We need to retrieve the data in the main thread (worker=0) to be able to retrieve the cache

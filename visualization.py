@@ -243,7 +243,7 @@ def grad_cam_visualization(device, model, dataloader, output_folder, nb_game_per
         dataset = dataloader.dataset
     else:
         dataset = CLEAR_dataset.from_dataset_object(orig_dataloader.dataset,
-                                                    orig_dataloader.dataset.questions[:limit_dataset])
+                                                    orig_dataloader.dataset.games[:limit_dataset])
 
     dataloader = DataLoader(dataset, shuffle=False, num_workers=1, collate_fn=orig_dataloader.collate_fn,
                             batch_size=min(len(dataset), dataloader.batch_size))

@@ -48,14 +48,12 @@ class CLEAR_dataset(Dataset):
         self.answer_to_family = get_answer_to_family_map('%s/%s' % (self.root_folder_path, 'attributes.json'))
         self.answer_families = list(set(self.answer_to_family.values()))
 
-        # Questions can either be read from file or provided as an array
+        # If questions were provided, no need to load questions from file.
+        # Only happen when cloning the dataset via CLEAR_dataset.from_dataset_object()
         if questions is None:
             question_file_path = '{}/questions/CLEAR_{}_questions.json'.format(self.root_folder_path, self.set)
 
             questions = read_json(question_file_path)["questions"]
-        else:
-            # FIXME : Not having reference to self.questions break dataset cloning... (CLEAR_dataset.from_dataset_object)
-            questions = questions
 
         scene_file_path = '{}/scenes/CLEAR_{}_scenes.json'.format(self.root_folder_path, self.set)
         if os.path.isfile(scene_file_path):
@@ -156,8 +154,29 @@ class CLEAR_dataset(Dataset):
             }
 
     @classmethod
-    def from_dataset_object(cls, dataset_obj, questions=None):
+    def from_dataset_object(cls, dataset_obj, games=None):
+        # Doesn't support cloning a dataset without a tokenizer
         folder_path = dataset_obj.root_folder_path.replace('/%s' % dataset_obj.version_name, '')
+
+        if games:
+            questions = []
+            for game in games:
+                game = json.loads(game)
+                question = {
+                    'question_index': game['id'],
+                    'scene_index': game['image']['id'],
+                    'scene_filename': game['image']['filename'].replace('.png', '.wav'),
+                    'question': dataset_obj.tokenizer.decode_question(game['question']),
+                    'answer': dataset_obj.tokenizer.decode_answer(game['answer'])
+                }
+
+                if 'program' in game:
+                    question['program'] = game["program"]
+
+                questions.append(question)
+        else:
+            questions = None
+
         return cls(folder_path, version_name=dataset_obj.version_name,
                    input_image_type=dataset_obj.input_image_type, set_type=dataset_obj.set,
                    questions=questions, dict_file_path=dataset_obj.tokenizer.dictionary_file,
