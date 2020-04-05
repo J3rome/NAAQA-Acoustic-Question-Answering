@@ -109,11 +109,13 @@ def get_experiments(experiment_result_path, prefix=None):
             experiment['batch_size'] = arguments['batch_size']
             experiment['resnet_features'] = arguments['conv_feature_input']
 
+            img_arguments = arguments
+
             if arguments['h5_image_input']:
                 preprocessed_data_path = f"{arguments['data_root_path']}/{arguments['version_name']}/{arguments['preprocessed_folder_name']}"
-                img_arguments = read_json(preprocessed_data_path, 'arguments.json')
-            else:
-                img_arguments = arguments
+
+                if os.path.exists(preprocessed_data_path):
+                    img_arguments = read_json(preprocessed_data_path, 'arguments.json')
 
             experiment['pad_to_largest'] = img_arguments['pad_to_largest_image']
             experiment['resized_height'] = int(img_arguments['img_resize_height']) if img_arguments['resize_img'] else None
