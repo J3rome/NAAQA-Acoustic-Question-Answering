@@ -1,24 +1,26 @@
 {
   "question":{
-    "word_embedding_dim":200,
-    "rnn_state_size":4096
+    "word_embedding_dim": 64,
+    "rnn_state_size": 128
   },
   "image_extractor":{
-    "type":"film_original",
-    "out": [128, 128, 128, 128],
-    "kernels": [[4, 4], [4, 4], [4, 4], [4, 4]],
-    "strides": [2, 2, 2, 2]
+    "type":"freq_time_separated",
+    "out": [8, 16, 32, 32],
+    "freq_kernels": [[3, 1], [3, 1], [3, 1]],
+    "freq_strides": [[2, 1], [2, 1], [2, 1]],
+    "time_kernels": [[1, 3], [1, 3], [1, 3]],
+    "time_strides": [[1, 2], [1, 2], [1, 2]]
   },
   "stem":{
     "spatial_location":true,
-    "conv_out":128,
+    "conv_out":64,
     "conv_kernel":[
       3,
       3
     ]
   },
   "resblock":{
-    "conv_out": [128, 128, 128, 128],
+    "conv_out": [64, 64, 64, 64],
     "spatial_location":true,
     "film_projection_type":"plus",
     "kernel1":[
@@ -34,13 +36,8 @@
     "spatial_location":true,
     "type":"fcn",
     "global_pool_type":"max",
-    "conv_out":512,
-    "conv_kernel":[
-      1,
-      1
-    ],
-    "no_mlp_units":1024,
-    "projection_size":1024
+    "no_mlp_units":128,
+    "projection_size":256
   },
   "optimizer":{
     "type":"adam",

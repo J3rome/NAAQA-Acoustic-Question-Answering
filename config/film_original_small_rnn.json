@@ -4,7 +4,7 @@
     "rnn_state_size":512
   },
   "image_extractor":{
-    "type":"conv",
+    "type":"film_original",
     "out": [128, 128, 128, 128],
     "kernels": [[4, 4], [4, 4], [4, 4], [4, 4]],
     "strides": [2, 2, 2, 2]

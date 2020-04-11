@@ -1,7 +1,7 @@
 {
   "question":{
-    "word_embedding_dim":200,
-    "rnn_state_size":4096
+    "word_embedding_dim":128,
+    "rnn_state_size":512
   },
   "image_extractor":{
     "type":"film_original",
@@ -32,7 +32,7 @@
   },
   "classifier":{
     "spatial_location":true,
-    "type":"fcn",
+    "type":"conv",
     "global_pool_type":"max",
     "conv_out":512,
     "conv_kernel":[
