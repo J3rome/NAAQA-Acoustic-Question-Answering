@@ -35,7 +35,7 @@
   },
   "classifier":{
     "spatial_location":true,
-    "type":"conv",
+    "type":"fcn",
     "global_pool_type":"max",
     "conv_out":512,
     "conv_kernel":[
