@@ -4,7 +4,7 @@ import torch
 import torch.nn as nn
 
 from models.CLEAR_nlp import Question_pipeline
-from models.CLEAR_feature_extractor import Original_Film_Extractor, Freq_Time_Extractor
+from models.CLEAR_feature_extractor import Original_Film_Extractor, Freq_Time_Pooled_Extractor, Freq_Time_Separated_Extractor, Freq_Time_Interlaced_Extractor
 from models.blocks.FiLM_layers import FiLMed_resblock
 from models.blocks.Classifiers import Conv_classifier, Fcn_classifier
 from models.utils import get_trainable_childs
@@ -40,13 +40,19 @@ class CLEAR_FiLM_model(nn.Module):
 
         # Image Pipeline
         with Reproductible_Block(initial_random_state, 125):
-            if config['image_extractor']['type'].lower() == "conv":
+            extractor_config = config['image_extractor']
+            extractor_type = extractor_config['type'].lower()
+            if extractor_type == "film_original":
                 self.image_pipeline = Original_Film_Extractor(config['image_extractor'], input_image_channels)
-            elif config['image_extractor']['type'].lower() == "resnet":
+            elif extractor_type == "resnet":
                 # TODO : Way to use preprocessed from h5
                 self.image_pipeline = Resnet_feature_extractor()
-            elif config['image_extractor']['type'].lower() == "freq_time_conv":
-                self.image_pipeline = Freq_Time_Extractor(input_image_channels, config['stem']['conv_out'])
+            elif extractor_type == "freq_time_separated":
+                self.image_pipeline = Freq_Time_Separated_Extractor(extractor_config, input_image_channels)
+            elif extractor_type == "freq_time_interlaced":
+                self.image_pipeline = Freq_Time_Interlaced_Extractor(extractor_config, input_image_channels)
+            elif extractor_type == "freq_time_pool":
+                self.image_pipeline = Freq_Time_Pooled_Extractor(input_image_channels, config['stem']['conv_out'])
 
         with Reproductible_Block(initial_random_state, 42):
             stem_conv_in = self.image_pipeline.get_out_channels() + 2 if config['stem']['spatial_location'] else 0

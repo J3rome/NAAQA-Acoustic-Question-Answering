@@ -5,10 +5,10 @@ from torch import nn
 from models.utils import Conv2d_padded
 
 
-class Freq_Time_Block(nn.Module):
+class Freq_Time_Depthwise_Block(nn.Module):
     def __init__(self, input_channels, output_channels, freq_kernel=[3, 1], time_kernel=[1, 3], freq_stride=1,
                  time_stride=1):
-        super(Freq_Time_Block, self).__init__()
+        super(Freq_Time_Depthwise_Block, self).__init__()
 
         # TODO : Add residual connection ?
 
@@ -28,7 +28,7 @@ class Freq_Time_Block(nn.Module):
             ('relu', nn.ReLU(inplace=True))
         ]))
 
-        self.prof_conv = nn.Sequential(OrderedDict([
+        self.proj_conv = nn.Sequential(OrderedDict([
             ('conv', Conv2d_padded(in_channels=2*output_channels,
                                out_channels=output_channels, kernel_size=[1, 1],
                                stride=1, dilation=1, bias=False, padding='SAME')),        # FIXME : Should we add Bias ?
@@ -43,7 +43,7 @@ class Freq_Time_Block(nn.Module):
 
         concatenated_features = torch.cat([time_features, freq_features], dim=1)
 
-        out = self.prof_conv(concatenated_features)
+        out = self.proj_conv(concatenated_features)
 
         return out
 
