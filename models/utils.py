@@ -64,6 +64,45 @@ def append_spatial_location(features, start=-1, end=1):
     return torch.cat([features, x_coords, y_coords], 1)
 
 
+def pad2d_and_cat_tensors(tensors, pad_mode="end"):
+    """
+    Take a list of tensors of shape [Batch_size, Channels, Height, Width]
+    Will pad height & width of each tensors to make them equal
+    Concatenate the padded tensors accross the channel dimension
+    """
+    dim_to_pad = [2, 3]
+    sizes = [list(t.size()) for t in tensors]
+    max_size = [None, None]
+
+    for dim in dim_to_pad:
+        max_size.append(max(sizes, key=lambda s: s[dim])[dim])
+
+    for i, (tensor, size) in enumerate(zip(tensors, sizes)):
+        to_pad = []
+
+        for dim in dim_to_pad:
+            size_diff = size[dim] - max_size[dim]
+            if size_diff < 0:
+                to_pad.append(abs(size_diff))
+            else:
+                to_pad.append(0)
+
+        if pad_mode == "end":
+            # F.pad arguments : [left, right, top, down] which is the reverse order of to_pad variable
+            padding = [0, to_pad[1], 0, to_pad[0]]
+        else:
+            left_pad = to_pad[1] // 2
+            right_pad = left_pad + (to_pad[1] % 2)
+            top_pad = to_pad[0] // 2
+            down_pad = top_pad + (to_pad[0] % 2)
+
+            padding = [left_pad, right_pad, top_pad, down_pad]
+
+        tensors[i] = F.pad(tensor, padding)
+
+    return torch.cat(tensors, dim=1)
+
+
 def get_trainable_childs(model):
     to_init = []
 
