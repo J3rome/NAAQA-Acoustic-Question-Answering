@@ -2,7 +2,7 @@ from collections import OrderedDict
 
 import torch
 from torch import nn
-from models.utils import Conv2d_padded, append_spatial_location
+from models.utils import Conv2d_padded, append_spatial_location, pad2d_and_cat_tensors
 from models.blocks.Freq_Time_Blocks import Freq_Time_Depthwise_Block
 
 
@@ -96,7 +96,7 @@ class Freq_Time_Separated_Extractor(nn.Module):
         # FIXME : Won't work if time block & freq block don't have the same kernels (inversed).
         # FIXME : We might want to pad and concat ? Or find a better fusing mechanism ?
 
-        out = torch.cat([time_out, freq_out], dim=1)
+        out = pad2d_and_cat_tensors([time_out, freq_out], pad_mode='end')
 
         # FIXME : Might want to let the stem conv do this job ?
         out = self.fusion_conv(out)
