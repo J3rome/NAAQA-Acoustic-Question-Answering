@@ -13,7 +13,7 @@ from torchvision import transforms as viz_transforms
 from data_interfaces.CLEAR_image_loader import get_img_builder, CLEARImage
 from utils.file import read_json, get_size_from_image_header
 from utils.generic import get_answer_to_family_map
-from data_interfaces.transforms import ResizeTensorBasedOnMaxWidth
+from data_interfaces.transforms import ResizeTensorBasedOnMaxWidth, PadTensor
 
 import multiprocessing
 import ctypes
@@ -267,13 +267,16 @@ class CLEAR_dataset(Dataset):
 
         return game_id
 
-    def get_resize_transform(self):
+    def get_transformed_dims(self, height, width):
         if self.transforms:
-            for transform in self.transforms.transforms:
+            # Transforms are reversed here because the last transform that affect dimensions contain the output size
+            for transform in reversed(self.transforms.transforms):
                 if type(transform) is ResizeTensorBasedOnMaxWidth:
-                    return transform
+                    return transform.get_resized_dim(height, width)
+                elif type(transform) is PadTensor:
+                    return transform.output_shape
 
-        return None
+        return height, width
 
     def get_min_width_image_dims(self, return_scene_id=False):
         return self._get_minmax_width_image_dims(return_scene_id, minmax_fct=min)
@@ -292,10 +295,7 @@ class CLEAR_dataset(Dataset):
         else:
             to_return = tuple()
 
-        resize_transform = self.get_resize_transform()
-
-        if resize_transform:
-            height, max_width = resize_transform.get_resized_dim(height, max_width)
+        height, max_width = self.get_transformed_dims(height, max_width)
 
         return to_return + (height, max_width)
 
