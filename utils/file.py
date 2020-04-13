@@ -27,7 +27,7 @@ def save_json(results, output_folder, filename=None, indented=True, sort_keys=Fa
         if indented:
             options |= orjson.OPT_INDENT_2
 
-        f.write(orjson.dumps(results, options=options))
+        f.write(orjson.dumps(results, option=options))
 
 
 def read_json(folder, filename=None):
