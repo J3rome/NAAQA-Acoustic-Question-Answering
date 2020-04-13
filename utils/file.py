@@ -19,7 +19,7 @@ def save_json(results, output_folder, filename=None, indented=True, sort_keys=Fa
     else:
         path = '%s/%s' % (output_folder, filename)
 
-    with open(path, 'w') as f:
+    with open(path, 'wb') as f:
         options = 0
         if sort_keys:
             options |= orjson.OPT_SORT_KEYS
