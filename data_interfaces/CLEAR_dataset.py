@@ -193,7 +193,7 @@ class CLEAR_dataset(Dataset):
             return game
 
     def prepare_game(self, game):
-        return orjson.dumps(game)
+        return orjson.dumps(game).decode('utf-8')    # orjson dumps return a byte string, we need to convert it to string
 
     def get_all_image_sizes(self):
         # FIXME : This is broken now that is_raw_img() return True for H5 file.
