@@ -3,7 +3,7 @@ import collections
 import multiprocessing as mp
 import random
 
-import json
+import orjson
 import numpy as np
 import torch
 from torch.utils.data import Dataset
@@ -161,7 +161,7 @@ class CLEAR_dataset(Dataset):
         if games:
             questions = []
             for game in games:
-                game = json.loads(game)
+                game = orjson.loads(game)
                 question = {
                     'question_index': game['id'],
                     'scene_index': game['image']['id'],
@@ -183,7 +183,7 @@ class CLEAR_dataset(Dataset):
                    transforms=dataset_obj.transforms, max_cache_size=dataset_obj.image_cache['max_size'])
 
     def get_game(self, idx, decode_tokens=False):
-        game = json.loads(self.games[idx])
+        game = orjson.loads(self.games[idx])
         if not decode_tokens:
             return game
         else:
@@ -193,7 +193,7 @@ class CLEAR_dataset(Dataset):
             return game
 
     def prepare_game(self, game):
-        return json.dumps(game)
+        return orjson.dumps(game)
 
     def get_all_image_sizes(self):
         # FIXME : This is broken now that is_raw_img() return True for H5 file.
