@@ -61,6 +61,18 @@ def get_experiments(experiment_result_path, prefix=None):
             experiment['train_acc'] = float(epoch_stats[0]['train_acc'])
             experiment['train_loss'] = float(epoch_stats[0]['train_loss'])
 
+            epoch_stats_chronological = sorted(epoch_stats, key=lambda x: int(x['epoch'].split('_')[1]))
+            experiment['all_train_acc'] = []
+            experiment['all_train_loss'] = []
+            experiment['all_val_acc'] = []
+            experiment['all_val_loss'] = []
+
+            for stat in epoch_stats_chronological:
+                experiment['all_train_acc'].append(stat['train_acc'])
+                experiment['all_train_loss'].append(stat['train_loss'])
+                experiment['all_val_acc'].append(stat['val_acc'])
+                experiment['all_val_loss'].append(stat['val_loss'])
+
             # Load test set results
             test_result_filepath = f"{exp_dated_folder_path}/test_stats.json"
             if os.path.isfile(test_result_filepath):
@@ -159,7 +171,8 @@ def get_experiments(experiment_result_path, prefix=None):
                                            'nb_resblock', 'resblocks_out_chan', 'classifier_conv_out_chan',
                                            'classifier_type', 'classifier_global_pool', 'optimizer_type',
                                            'optimizer_lr', 'optimizer_weight_decay', 'dropout_drop_prob',
-                                           'git_revision', 'pad_to_largest', 'resized_height', 'resized_width'
+                                           'git_revision', 'pad_to_largest', 'resized_height', 'resized_width',
+                                           'all_train_acc', 'all_train_loss', 'all_val_acc', 'all_val_loss'
                                            ]
                                   )
     return experiments_df
