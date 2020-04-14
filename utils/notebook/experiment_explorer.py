@@ -61,6 +61,18 @@ def get_experiments(experiment_result_path, prefix=None):
             experiment['train_acc'] = float(epoch_stats[0]['train_acc'])
             experiment['train_loss'] = float(epoch_stats[0]['train_loss'])
 
+            # Load test set results
+            test_result_filepath = f"{exp_dated_folder_path}/test_stats.json"
+            if os.path.isfile(test_result_filepath):
+                test_stats = read_json(f"{exp_dated_folder_path}/test_stats.json")
+                experiment['test_version'] = test_stats['version_name']
+                experiment['test_acc'] = float(test_stats['accuracy'])
+                experiment['test_loss'] = float(test_stats['loss'])
+            else:
+                experiment['test_version'] = None
+                experiment['test_acc'] = None
+                experiment['test_loss'] = None
+
             experiment['0.6_at_epoch'] = None
             experiment['0.7_at_epoch'] = None
             experiment['0.8_at_epoch'] = None
@@ -84,6 +96,8 @@ def get_experiments(experiment_result_path, prefix=None):
                 # TODO : Check stopped_early.json
                 if experiment['best_val_acc'] >= experiment['stop_accuracy']:
                     experiment['stopped_early'] = 'stop_threshold'
+                elif experiment['test_acc'] is None:
+                    experiment['stopped_early'] = 'RUNNING'
                 else:
                     experiment['stopped_early'] = 'not_learning'
             else:
@@ -91,18 +105,6 @@ def get_experiments(experiment_result_path, prefix=None):
 
             # Load number of params from model_summary
             experiment['total_nb_param'], experiment['nb_trainable_param'], experiment['nb_non_trainable_param'] = get_nb_param_from_summary(f'{exp_dated_folder_path}/model_summary.txt')
-
-            # Load test set results
-            test_result_filepath = f"{exp_dated_folder_path}/test_stats.json"
-            if os.path.isfile(test_result_filepath):
-                test_stats = read_json(f"{exp_dated_folder_path}/test_stats.json")
-                experiment['test_version'] = test_stats['version_name']
-                experiment['test_acc'] = float(test_stats['accuracy'])
-                experiment['test_loss'] = float(test_stats['loss'])
-            else:
-                experiment['test_version'] = None
-                experiment['test_acc'] = None
-                experiment['test_loss'] = None
 
             # Load arguments
             arguments = read_json(f"{exp_dated_folder_path}/arguments.json")
