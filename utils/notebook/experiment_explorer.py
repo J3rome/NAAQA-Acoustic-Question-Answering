@@ -68,10 +68,10 @@ def get_experiments(experiment_result_path, prefix=None):
             experiment['all_val_loss'] = []
 
             for stat in epoch_stats_chronological:
-                experiment['all_train_acc'].append(stat['train_acc'])
-                experiment['all_train_loss'].append(stat['train_loss'])
-                experiment['all_val_acc'].append(stat['val_acc'])
-                experiment['all_val_loss'].append(stat['val_loss'])
+                experiment['all_train_acc'].append(float(stat['train_acc']))
+                experiment['all_train_loss'].append(float(stat['train_loss']))
+                experiment['all_val_acc'].append(float(stat['val_acc']))
+                experiment['all_val_loss'].append(float(stat['val_loss']))
 
             # Load test set results
             test_result_filepath = f"{exp_dated_folder_path}/test_stats.json"
