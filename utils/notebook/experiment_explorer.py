@@ -135,6 +135,11 @@ def get_experiments(experiment_result_path, prefix=None):
             experiment['resized_height'] = int(img_arguments['img_resize_height']) if img_arguments['resize_img'] else None
             experiment['resized_width'] = int(img_arguments['img_resize_width']) if img_arguments['resize_img'] else None
 
+            # Load dict
+            exp_dict = read_json(f'{exp_dated_folder_path}/dict.json')
+            experiment['nb_answer'] = len(exp_dict['answer2i'])
+
+
             # Load timing
 
             # Load git-revision
@@ -169,7 +174,7 @@ def get_experiments(experiment_result_path, prefix=None):
                                            'random_seed', 'date', 'total_nb_param', 'nb_non_trainable_param',
                                            'word_embedding_dim', 'rnn_state_size', 'extractor_type', 'stem_out_chan',
                                            'nb_resblock', 'resblocks_out_chan', 'classifier_conv_out_chan',
-                                           'classifier_type', 'classifier_global_pool', 'optimizer_type',
+                                           'classifier_type', 'classifier_global_pool', 'optimizer_type', 'nb_answer',
                                            'optimizer_lr', 'optimizer_weight_decay', 'dropout_drop_prob',
                                            'git_revision', 'pad_to_largest', 'resized_height', 'resized_width',
                                            'all_train_acc', 'all_train_loss', 'all_val_acc', 'all_val_loss'
