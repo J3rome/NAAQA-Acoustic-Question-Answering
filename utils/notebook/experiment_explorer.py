@@ -7,6 +7,22 @@ import pandas as pd
 from utils.file import read_json
 
 
+def to_float(string):
+    # Conversion with None handling
+    if string:
+        return float(string)
+    else:
+        return None
+
+
+def to_int(string):
+    # Conversion with None handling
+    if string:
+        return int(string)
+    else:
+        return None
+
+
 def get_experiments(experiment_result_path, prefix=None):
     experiments = []
 
@@ -40,11 +56,11 @@ def get_experiments(experiment_result_path, prefix=None):
 
             experiment = {
                 'prefix': matches[0],
-                'nb_scene': int(matches[1]) * 1000,
-                'nb_q_per_scene': int(matches[2]),
+                'nb_scene': to_int(matches[1]) * 1000,
+                'nb_q_per_scene': to_int(matches[2]),
                 'config': matches[3],
-                'nb_epoch': int(matches[4]),
-                'stop_accuracy': float(matches[5]),
+                'nb_epoch': to_int(matches[4]),
+                'stop_accuracy': to_float(matches[5]),
                 'random_seed': matches[6],
                 'date': datetime.strptime(date_folder, '%Y-%m-%d_%Hh%M'),
 
@@ -56,30 +72,30 @@ def get_experiments(experiment_result_path, prefix=None):
             epoch_stats = read_json(f'{exp_dated_folder_path}/stats.json')
 
             experiment['nb_epoch_runned'] = len(epoch_stats)
-            experiment['best_val_acc'] = float(epoch_stats[0]['val_acc'])
-            experiment['best_val_loss'] = float(epoch_stats[0]['val_loss'])
-            experiment['train_acc'] = float(epoch_stats[0]['train_acc'])
-            experiment['train_loss'] = float(epoch_stats[0]['train_loss'])
+            experiment['best_val_acc'] = to_float(epoch_stats[0]['val_acc'])
+            experiment['best_val_loss'] = to_float(epoch_stats[0]['val_loss'])
+            experiment['train_acc'] = to_float(epoch_stats[0]['train_acc'])
+            experiment['train_loss'] = to_float(epoch_stats[0]['train_loss'])
 
-            epoch_stats_chronological = sorted(epoch_stats, key=lambda x: int(x['epoch'].split('_')[1]))
+            epoch_stats_chronological = sorted(epoch_stats, key=lambda x: to_int(x['epoch'].split('_')[1]))
             experiment['all_train_acc'] = []
             experiment['all_train_loss'] = []
             experiment['all_val_acc'] = []
             experiment['all_val_loss'] = []
 
             for stat in epoch_stats_chronological:
-                experiment['all_train_acc'].append(float(stat['train_acc']))
-                experiment['all_train_loss'].append(float(stat['train_loss']))
-                experiment['all_val_acc'].append(float(stat['val_acc']))
-                experiment['all_val_loss'].append(float(stat['val_loss']))
+                experiment['all_train_acc'].append(to_float(stat['train_acc']))
+                experiment['all_train_loss'].append(to_float(stat['train_loss']))
+                experiment['all_val_acc'].append(to_float(stat['val_acc']))
+                experiment['all_val_loss'].append(to_float(stat['val_loss']))
 
             # Load test set results
             test_result_filepath = f"{exp_dated_folder_path}/test_stats.json"
             if os.path.isfile(test_result_filepath):
                 test_stats = read_json(f"{exp_dated_folder_path}/test_stats.json")
                 experiment['test_version'] = test_stats['version_name']
-                experiment['test_acc'] = float(test_stats['accuracy'])
-                experiment['test_loss'] = float(test_stats['loss'])
+                experiment['test_acc'] = to_float(test_stats['accuracy'])
+                experiment['test_loss'] = to_float(test_stats['loss'])
             else:
                 experiment['test_version'] = None
                 experiment['test_acc'] = None
@@ -92,8 +108,8 @@ def get_experiments(experiment_result_path, prefix=None):
 
             epochs_stats_reversed = reversed(epoch_stats)
             for epoch_stat in epochs_stats_reversed:
-                epoch_idx = int(epoch_stat['epoch'].split('_')[1])
-                val_acc = float(epoch_stat['val_acc'])
+                epoch_idx = to_int(epoch_stat['epoch'].split('_')[1])
+                val_acc = to_float(epoch_stat['val_acc'])
 
                 if experiment['0.6_at_epoch'] is None and val_acc >= 0.6:
                     experiment['0.6_at_epoch'] = epoch_idx
@@ -132,8 +148,8 @@ def get_experiments(experiment_result_path, prefix=None):
                     img_arguments = read_json(preprocessed_data_path, 'arguments.json')
 
             experiment['pad_to_largest'] = img_arguments['pad_to_largest_image']
-            experiment['resized_height'] = int(img_arguments['img_resize_height']) if img_arguments['resize_img'] else None
-            experiment['resized_width'] = int(img_arguments['img_resize_width']) if img_arguments['resize_img'] else None
+            experiment['resized_height'] = to_int(img_arguments['img_resize_height']) if img_arguments['resize_img'] else None
+            experiment['resized_width'] = to_int(img_arguments['img_resize_width']) if img_arguments['resize_img'] else None
 
             # Load dict
             exp_dict = read_json(f'{exp_dated_folder_path}/dict.json')
@@ -160,19 +176,19 @@ def get_experiments(experiment_result_path, prefix=None):
 
             config = read_json(config_filepath)
 
-            experiment['word_embedding_dim'] = int(config['question']['word_embedding_dim'])
-            experiment['rnn_state_size'] = int(config['question']['rnn_state_size'])
+            experiment['word_embedding_dim'] = to_int(config['question']['word_embedding_dim'])
+            experiment['rnn_state_size'] = to_int(config['question']['rnn_state_size'])
             experiment['extractor_type'] = config['image_extractor']['type']
-            experiment['stem_out_chan'] = int(config['stem']['conv_out'])
+            experiment['stem_out_chan'] = to_int(config['stem']['conv_out'])
             experiment['nb_resblock'] = len(config['resblock']['conv_out'])
-            experiment['resblocks_out_chan'] = int(config['resblock']['conv_out'][-1])
-            experiment['classifier_projection_out'] = int(config['classifier']['projection_size'])
+            experiment['resblocks_out_chan'] = to_int(config['resblock']['conv_out'][-1])
+            experiment['classifier_projection_out'] = to_int(config['classifier']['projection_size'])
             experiment['classifier_type'] = config['classifier']['type']
             experiment['classifier_global_pool'] = config['classifier']['global_pool_type']
             experiment['optimizer_type'] = config['optimizer']['type']
-            experiment['optimizer_lr'] = float(config['optimizer']['learning_rate'])
-            experiment['optimizer_weight_decay'] = float(config['optimizer']['weight_decay'])
-            experiment['dropout_drop_prob'] = float(config['optimizer']['dropout_drop_prob'])
+            experiment['optimizer_lr'] = to_float(config['optimizer']['learning_rate'])
+            experiment['optimizer_weight_decay'] = to_float(config['optimizer']['weight_decay'])
+            experiment['dropout_drop_prob'] = to_float(config['optimizer']['dropout_drop_prob'])
 
             experiments.append(experiment)
 
