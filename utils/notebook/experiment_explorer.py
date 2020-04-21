@@ -147,7 +147,18 @@ def get_experiments(experiment_result_path, prefix=None):
                 experiment['git_revision'] = f.readlines()[0].replace('\n', '')
 
             # Load config
-            config = read_json(f'config/{experiment["config"]}.json')
+            config_filepath = f'config/{experiment["config"]}.json'
+
+            if not os.path.exists(config_filepath):
+                # Config file doesn't exist on local instance, use the one in the exp_dated_folder
+                config_filename = [f for f in os.listdir(exp_dated_folder_path) if 'config' in f and '.json' in f]
+
+                if len(config_filename) == 0:
+                    raise FileNotFoundError(f"No config file in '{exp_dated_folder_path}'")
+
+                config_filepath = f"{exp_dated_folder_path}/{config_filename[0]}"
+
+            config = read_json(config_filepath)
 
             experiment['word_embedding_dim'] = int(config['question']['word_embedding_dim'])
             experiment['rnn_state_size'] = int(config['question']['rnn_state_size'])
