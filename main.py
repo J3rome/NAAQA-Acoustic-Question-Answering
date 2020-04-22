@@ -149,6 +149,8 @@ parser.add_argument("--test_set_batch_size", type=int, default=None, help="Use d
 parser.add_argument("--no_model_summary", help="Will hide the model summary", action='store_true')
 parser.add_argument("--tf_weight_path", type=str, help="Specify where to load dumped tensorflow weights "
                                                        "(Used with --tf_weight_transfer)")
+parser.add_argument("--single_worker", help="Will limit the number of worker for each dataloader to 1 "
+                                            "(Useful when running multiple runs in parallel)", action='store_true')
 
 
 def get_transforms_from_args(args, data_path):
@@ -264,22 +266,24 @@ def create_datasets(args, data_path, load_dataset_extra_stats=False):
     return datasets
 
 
-def create_dataloaders(args, datasets, nb_process=8, pin_memory=True):
+def create_dataloaders(args, datasets, pin_memory=True):
     print("Creating Dataloaders")
     collate_fct = CLEAR_collate_fct(padding_token=datasets['train'].get_padding_token())
 
     test_set_batch_size = args['test_set_batch_size'] if args['test_set_batch_size'] else args['batch_size']
 
-    # FIXME : Should take into account --nb_process, or at least the nb of core on the machine
     return {
         'train': DataLoader(datasets['train'], batch_size=args['batch_size'], shuffle=True,
-                            num_workers=3, collate_fn=collate_fct, pin_memory=pin_memory),
+                            num_workers=3 if not args['single_worker'] else 1, collate_fn=collate_fct,
+                            pin_memory=pin_memory),
 
         'val': DataLoader(datasets['val'], batch_size=args['batch_size'], shuffle=True,
-                          num_workers=2, collate_fn=collate_fct, pin_memory=pin_memory),
+                          num_workers=2 if not args['single_worker'] else 1, collate_fn=collate_fct,
+                          pin_memory=pin_memory),
 
         'test': DataLoader(datasets['test'], batch_size=test_set_batch_size, shuffle=False,
-                           num_workers=2, collate_fn=collate_fct, pin_memory=pin_memory)
+                           num_workers=2 if not args['single_worker'] else 1, collate_fn=collate_fct,
+                           pin_memory=pin_memory)
     }
 
 
@@ -385,7 +389,7 @@ def prepare_for_task(args):
     #   Dataloading
     ####################################
     datasets = create_datasets(args, paths['data_path'], flags['load_dataset_extra_stats'])
-    dataloaders = create_dataloaders(args, datasets, nb_process=8)
+    dataloaders = create_dataloaders(args, datasets)
 
     ####################################
     #   Model Definition
