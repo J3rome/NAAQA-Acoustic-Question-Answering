@@ -63,7 +63,7 @@ def get_experiments(experiment_result_path, prefix=None):
                 'stop_accuracy': to_float(matches[5]),
                 'random_seed': matches[6],
                 'date': datetime.strptime(date_folder, '%Y-%m-%d_%Hh%M'),
-
+                'folder': exp_folder
             }
 
             experiment['nb_sample'] = experiment['nb_scene'] * experiment['nb_q_per_scene']
@@ -204,7 +204,8 @@ def get_experiments(experiment_result_path, prefix=None):
                                            'classifier_type', 'classifier_global_pool', 'optimizer_type', 'nb_answer',
                                            'optimizer_lr', 'optimizer_weight_decay', 'dropout_drop_prob',
                                            'git_revision', 'pad_to_largest', 'resized_height', 'resized_width',
-                                           'all_train_acc', 'all_train_loss', 'all_val_acc', 'all_val_loss'
+                                           'all_train_acc', 'all_train_loss', 'all_val_acc', 'all_val_loss',
+                                           'folder'
                                            ]
                                   )
     return experiments_df
