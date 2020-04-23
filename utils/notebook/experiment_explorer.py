@@ -95,6 +95,7 @@ def get_experiments(experiment_result_path, prefix=None):
                 parsed_time = datetime.strptime(stat['train_time'], "%H:%M:%S.%f")
                 epoch_time = timedelta(hours=parsed_time.hour, minutes=parsed_time.minute, seconds=parsed_time.second,
                                        microseconds=parsed_time.microsecond)
+                epoch_times.append(epoch_time)
                 experiment['train_time'] += epoch_time
 
             experiment['mean_epoch_time'] = np.mean(epoch_times)
