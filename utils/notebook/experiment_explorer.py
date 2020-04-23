@@ -3,6 +3,7 @@ from datetime import datetime, timedelta
 import re
 
 import pandas as pd
+import numpy as np
 
 from utils.file import read_json
 
@@ -83,6 +84,7 @@ def get_experiments(experiment_result_path, prefix=None):
             experiment['all_val_acc'] = []
             experiment['all_val_loss'] = []
             experiment['train_time'] = timedelta(0)
+            epoch_times = []
 
             for stat in epoch_stats_chronological:
                 experiment['all_train_acc'].append(to_float(stat['train_acc']))
@@ -91,10 +93,11 @@ def get_experiments(experiment_result_path, prefix=None):
                 experiment['all_val_loss'].append(to_float(stat['val_loss']))
 
                 parsed_time = datetime.strptime(stat['train_time'], "%H:%M:%S.%f")
-                experiment['train_time'] += timedelta(hours=parsed_time.hour,
-                                                      minutes=parsed_time.minute,
-                                                      seconds=parsed_time.second,
-                                                      microseconds=parsed_time.microsecond)
+                epoch_time = timedelta(hours=parsed_time.hour, minutes=parsed_time.minute, seconds=parsed_time.second,
+                                       microseconds=parsed_time.microsecond)
+                experiment['train_time'] += epoch_time
+
+            experiment['mean_epoch_time'] = np.mean(epoch_times)
 
             # Load test set results
             test_result_filepath = f"{exp_dated_folder_path}/test_stats.json"
@@ -212,7 +215,7 @@ def get_experiments(experiment_result_path, prefix=None):
                                            'optimizer_lr', 'optimizer_weight_decay', 'dropout_drop_prob',
                                            'git_revision', 'pad_to_largest', 'resized_height', 'resized_width',
                                            'all_train_acc', 'all_train_loss', 'all_val_acc', 'all_val_loss',
-                                           'train_time', 'folder'
+                                           'train_time', 'mean_epoch_time', 'folder'
                                            ]
                                   )
     return experiments_df
