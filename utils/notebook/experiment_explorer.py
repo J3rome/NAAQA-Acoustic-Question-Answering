@@ -47,8 +47,11 @@ def get_experiments(experiment_result_path, prefix=None):
                 # Failed experiment. Was stopped before first epoch could be saved
                 continue
 
-            # Retrieve info from experiment name
-            matches = re.match('(.*)_(\d+)k_(\d+)_inst_1024_win_50_overlap_(.*)_(\d+)_epoch_stop_at_(.*)_(\d+)', exp_folder)
+            # Load arguments
+            arguments = read_json(f"{exp_dated_folder_path}/arguments.json")
+
+            # Retrieve Prefix, nb_scene and nb_question_per_scene from version name
+            matches = re.match('(.*)_(\d+)k_(\d+)_inst_1024_win_50_overlap', arguments['version_name'])
 
             if not matches:
                 continue
@@ -59,10 +62,10 @@ def get_experiments(experiment_result_path, prefix=None):
                 'prefix': matches[0],
                 'nb_scene': to_int(matches[1]) * 1000,
                 'nb_q_per_scene': to_int(matches[2]),
-                'config': matches[3],
-                'nb_epoch': to_int(matches[4]),
-                'stop_accuracy': to_float(matches[5]),
-                'random_seed': matches[6],
+                'config': arguments['config_path'].replace('config/','').replace('/','_').replace('.json', ''),
+                'nb_epoch': arguments['nb_epoch'],
+                'stop_accuracy': arguments['stop_at_val_acc'],
+                'random_seed': arguments['random_seed'],
                 'date': datetime.strptime(date_folder, '%Y-%m-%d_%Hh%M'),
                 'folder': exp_folder
             }
@@ -133,7 +136,7 @@ def get_experiments(experiment_result_path, prefix=None):
 
             if experiment['nb_epoch_runned'] < experiment['nb_epoch']:
                 # TODO : Check stopped_early.json
-                if experiment['best_val_acc'] >= experiment['stop_accuracy']:
+                if experiment['stop_accuracy'] and experiment['best_val_acc'] >= experiment['stop_accuracy']:
                     experiment['stopped_early'] = 'stop_threshold'
                 elif experiment['test_acc'] is None:
                     experiment['stopped_early'] = 'RUNNING'
@@ -145,8 +148,6 @@ def get_experiments(experiment_result_path, prefix=None):
             # Load number of params from model_summary
             experiment['total_nb_param'], experiment['nb_trainable_param'], experiment['nb_non_trainable_param'] = get_nb_param_from_summary(f'{exp_dated_folder_path}/model_summary.txt')
 
-            # Load arguments
-            arguments = read_json(f"{exp_dated_folder_path}/arguments.json")
             experiment['batch_size'] = arguments['batch_size']
             experiment['resnet_features'] = arguments['conv_feature_input']
 
