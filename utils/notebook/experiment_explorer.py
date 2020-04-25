@@ -70,6 +70,20 @@ def get_experiments(experiment_result_path, prefix=None):
                 'folder': exp_folder
             }
 
+            additional_note = arguments['output_name_suffix'].split(f'_{experiment["nb_epoch"]}_epoch')[0].replace(experiment['config'], '')
+
+            # Trim note
+            if len(additional_note) > 0:
+                if additional_note[0] == '_':
+                    additional_note = additional_note[1:]
+
+                if additional_note[-1] == '_':
+                    additional_note = additional_note[:-1]
+            else:
+                additional_note = None
+
+            experiment['note'] = additional_note
+
             experiment['nb_sample'] = experiment['nb_scene'] * experiment['nb_q_per_scene']
 
             # Load experiment stats
@@ -217,7 +231,7 @@ def get_experiments(experiment_result_path, prefix=None):
                                            'optimizer_lr', 'optimizer_weight_decay', 'dropout_drop_prob',
                                            'git_revision', 'pad_to_largest', 'resized_height', 'resized_width',
                                            'all_train_acc', 'all_train_loss', 'all_val_acc', 'all_val_loss',
-                                           'train_time', 'mean_epoch_time', 'folder'
+                                           'train_time', 'mean_epoch_time', 'folder', 'note'
                                            ]
                                   )
     return experiments_df
