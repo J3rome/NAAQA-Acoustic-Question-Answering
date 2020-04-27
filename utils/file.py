@@ -203,7 +203,7 @@ def save_git_revision(output_folder, filename='git.revision'):
     subprocess.run(command, shell=True)
 
 
-def create_folders_save_args(args, paths):
+def create_folders_save_args(args, paths, gpu_name):
     create_folder_if_necessary(args['output_root_path'])
     create_folder_if_necessary(paths["output_task_folder"])
     create_folder_if_necessary(paths["output_experiment_folder"])
@@ -212,6 +212,7 @@ def create_folders_save_args(args, paths):
     # Save arguments & config to output folder
     save_json(args, paths["output_dated_folder"], filename="arguments.json")
     save_git_revision(paths["output_dated_folder"])
+    save_json({'gpu_name': gpu_name}, paths["output_dated_folder"], filename="gpu.json")
 
 
 def save_model_config(args, paths, model_config):

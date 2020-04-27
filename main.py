@@ -380,7 +380,8 @@ def prepare_for_task(args):
 
     # Create required folders if necessary
     if flags['create_output_folder']:
-        create_folders_save_args(args, paths)
+        gpu_name = torch.cuda.get_device_name(args['gpu_index']) if 'cuda' in device else None
+        create_folders_save_args(args, paths, gpu_name)
 
     # Make sure all variables exists
     film_model, film_model_config, optimizer, loss_criterion, tensorboard, scheduler = None, None, None, None, None, None
