@@ -105,7 +105,7 @@ parser.add_argument("--continue_training", help="Will use the --film_model_weigh
 parser.add_argument("--random_seed", type=int, default=None, help="Random seed used for the experiment")
 parser.add_argument("--use_cpu", help="Model will be run/train on CPU", action='store_true')
 parser.add_argument("--no_early_stopping", help="Override the early stopping config", action='store_true')
-parser.add_argument("--gpu_index", type=str, default='0', help="Index of the GPU to use")
+parser.add_argument("--gpu_index", type=int, default=0, help="Index of the GPU to use")
 parser.add_argument("--perf_over_determinist", help="Will let torch use nondeterministic algorithms (Better "
                                                     "performance but less reproductibility)", action='store_true')
 parser.add_argument("--f1_score", help="Use f1 score in loss calculation", action='store_true')
