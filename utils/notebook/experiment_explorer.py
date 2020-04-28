@@ -210,6 +210,13 @@ def get_experiments(experiment_result_path, prefix=None):
             experiment['optimizer_weight_decay'] = to_float(config['optimizer']['weight_decay'])
             experiment['dropout_drop_prob'] = to_float(config['optimizer']['dropout_drop_prob'])
 
+            # Gpu name
+            gpu_name_filepath = f"{exp_dated_folder_path}/gpu.json"
+            if os.path.exists(gpu_name_filepath):
+                experiment['gpu_name'] = read_json(gpu_name_filepath)['gpu_name']
+            else:
+                experiment['gpu_name'] = None
+
             experiments.append(experiment)
 
     experiments_df = pd.DataFrame(experiments,
@@ -225,7 +232,7 @@ def get_experiments(experiment_result_path, prefix=None):
                                            'optimizer_lr', 'optimizer_weight_decay', 'dropout_drop_prob',
                                            'git_revision', 'pad_to_largest', 'resized_height', 'resized_width',
                                            'all_train_acc', 'all_train_loss', 'all_val_acc', 'all_val_loss',
-                                           'train_time', 'mean_epoch_time', 'folder', 'note'
+                                           'train_time', 'mean_epoch_time', 'gpu_name', 'folder', 'note'
                                            ]
                                   )
     return experiments_df
