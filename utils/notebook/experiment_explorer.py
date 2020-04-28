@@ -10,18 +10,12 @@ from utils.file import read_json
 
 def to_float(string):
     # Conversion with None handling
-    if string:
-        return float(string)
-    else:
-        return None
+    return float(string) if string else None
 
 
 def to_int(string):
     # Conversion with None handling
-    if string:
-        return int(string)
-    else:
-        return None
+    return int(string) if string else None
 
 
 def get_experiments(experiment_result_path, prefix=None):
