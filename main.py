@@ -405,9 +405,6 @@ def prepare_for_task(args):
         if flags["force_sgd_optimizer"]:
             film_model_config['optimizer']['type'] = 'sgd'
 
-        if flags['create_output_folder'] and flags['instantiate_model']:
-            save_model_config(args, paths, film_model_config)
-
         input_image_torch_shape = datasets['train'].get_input_shape(channel_first=True)  # Torch size have Channel as first dimension
         feature_extractor_config = get_feature_extractor_config_from_args(args)
 
@@ -415,8 +412,10 @@ def prepare_for_task(args):
                                                                          film_model_config, input_image_torch_shape,
                                                                          feature_extractor_config)
 
-        save_model_summary(paths['output_dated_folder'], film_model, input_image_torch_shape, device,
-                           print_output=not args['no_model_summary'])
+        if flags['create_output_folder'] and flags['instantiate_model']:
+            save_model_config(args, paths, film_model_config)
+            save_model_summary(paths['output_dated_folder'], film_model, input_image_torch_shape, device,
+                               print_output=not args['no_model_summary'])
 
         if flags['use_tensorboard']:
             tensorboard = create_tensorboard_writers(args, paths)
