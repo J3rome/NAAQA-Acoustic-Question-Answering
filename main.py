@@ -326,6 +326,7 @@ def execute_task(task, args, output_dated_folder, dataloaders, model, model_conf
 
     elif task == "feature_extract":
         resnet_extractor = Resnet_feature_extractor(layer_index=args['feature_extractor_layer_index'])
+        resnet_extractor.to(device)
         extract_features(device=device, feature_extractor=resnet_extractor,
                          dataloaders=dataloaders, output_folder_name=args['preprocessed_folder_name'])
         # Save generation args with h5 file
