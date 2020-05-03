@@ -367,7 +367,11 @@ def prepare_for_task(args):
     #   Argument & Config parsing
     ####################################
     args, task, flags, paths = get_args_task_flags_paths(args)
-    device = f'cuda:{args["gpu_index"]}' if torch.cuda.is_available() and not args['use_cpu'] else 'cpu'
+    if torch.cuda.is_available() and not args['use_cpu']:
+        device = f'cuda:{args["gpu_index"]}'
+        torch.cuda.set_device(args['gpu_index'])
+    else:
+        device = 'cpu'
 
     if args['random_seed'] is not None:
         set_random_seed(args['random_seed'])
