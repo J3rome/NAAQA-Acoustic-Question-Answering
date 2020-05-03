@@ -32,6 +32,9 @@ class CLEARImage:
     def get_image(self, **kwargs):
         return self.image_loader.get_image(**kwargs)
 
+    def get_padding(self):
+        return self.image_loader.get_padding()
+
 class AbstractImgBuilder(object):
     def __init__(self, img_dir, is_raw, require_process=False):
         self.img_dir = img_dir
@@ -52,6 +55,9 @@ class AbstractImgLoader(object):
         self.img_path = img_path
 
     def get_image(self, **kwargs):
+        pass
+
+    def get_padding(self):
         pass
 
 # TODO : Verify, is this really useful ?
@@ -76,7 +82,6 @@ class RawImageLoader(AbstractImgLoader):
     def __init__(self, img_path):
         AbstractImgLoader.__init__(self, img_path)
 
-
     def get_image(self, return_tensor=True):
         # Our images are saved as RGBA. The A dimension is always 1.
         # We could simply get rid of it instead of converting
@@ -90,10 +95,14 @@ class RawImageLoader(AbstractImgLoader):
         else:
             return img
 
+    def get_padding(self):
+        return None
+
 
 h5_basename="features.h5"
 h5_feature_key="features"
 h5_idx_key="idx2img"
+h5_img_padding_key='img_padding'
 
 class h5FeatureBuilder(AbstractImgBuilder):
     def __init__(self, img_dir, bufferize, is_raw=False):
@@ -156,6 +165,9 @@ class h5FeatureLoader(AbstractImgLoader):
             return torch.tensor(img, dtype=torch.float32)
         else:
             return img
+
+    def get_padding(self):
+        return self.h5file[h5_img_padding_key][self.id]
 
 # Load while loading dataset (requires a lot of memory)
 class h5FeatureBufloader(AbstractImgLoader):

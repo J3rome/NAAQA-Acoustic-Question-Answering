@@ -149,6 +149,7 @@ class CLEAR_dataset(Dataset):
             self.image_cache = {
                 'indexes': set(),
                 'images': {},
+                'padding': {},
                 'size': 0,
                 'max_size': min(max_cache_size, self.nb_scene)        # TODO : Set max cache size according to RAM
             }
@@ -317,36 +318,40 @@ class CLEAR_dataset(Dataset):
                 # Deleting oldest entry (Not guaranteed, pop() set doesn't guarantee order)
                 cache_idx = self.image_cache['indexes'].pop()
                 del self.image_cache['images'][cache_idx]
+                del self.image_cache['padding'][cache_idx]
                 self.image_cache['size'] -= 1
 
             # Load image & Add to cache
             self.image_cache['indexes'].add(scene_id)
-            image = CLEARImage(scene_id,
+            image_loader = CLEARImage(scene_id,
                                image_filename,
                                self.image_builder,
-                               self.set).get_image()
-            self.image_cache['images'][scene_id] = image
+                               self.set)
+            self.image_cache['images'][scene_id] = image_loader.get_image()
+            self.image_cache['padding'][scene_id] = image_loader.get_padding()
             self.image_cache['size'] += 1
 
         if self.synchronized_cache:
             # FIXME : Do we loose the advantages of multiprocessing if we lock on reading ? It basically work as if we only had 1 worker ?
             self.cache_lock.release()
 
-        return self.image_cache['images'][scene_id]
+        return self.image_cache['images'][scene_id], self.image_cache['padding'][scene_id]
 
     def __getitem__(self, idx):
         requested_game = self.get_game(idx)
 
         if self.use_cache:
-            image = self.load_image_from_cache(requested_game['image']['id'], requested_game['image']['filename'])
+            image, padding = self.load_image_from_cache(requested_game['image']['id'], requested_game['image']['filename'])
         else:
             # Reference to H5py file must be shared between workers (when dataloader.num_workers > 0)
             # We create the image here since it will create the img_builder which contain the h5 file ref
             # See See https://discuss.pytorch.org/t/dataloader-when-num-worker-0-there-is-bug/25643/33
-            image = CLEARImage(requested_game['image']['id'],
+            image_loader = CLEARImage(requested_game['image']['id'],
                                requested_game['image']['filename'],
                                self.image_builder,
-                               requested_game['image']['set']).get_image()
+                               requested_game['image']['set'])
+            image = image_loader.get_image()
+            padding = image_loader.get_padding()
 
         game_with_image = {
             'id': requested_game['id'],
@@ -355,6 +360,9 @@ class CLEAR_dataset(Dataset):
             'answer': torch.tensor(requested_game['answer']),
             'scene_id': requested_game['image']['id']
         }
+
+        if padding is not None:
+            game_with_image['image_padding'] = padding
 
         if 'program' in requested_game:
             game_with_image['program'] = requested_game['program']
