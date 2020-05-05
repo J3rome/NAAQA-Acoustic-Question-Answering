@@ -184,7 +184,8 @@ def plot_tsne_per_resblock(vals, question_types, title="T-SNE"):
     return figs
 
 from utils.visualization import get_gradcam_heatmap, merge_gradcam_heatmap_with_image
-def one_game_gradcam(device, model, game, collate_fn, class_idx=None, return_heatmap=True, apply_relu=False):
+def one_game_gradcam(device, model, game, collate_fn, class_idx=None, return_heatmap=True, apply_relu=False,
+                     target_layers=None):
     one_game_batch = collate_fn([game])
 
     # Set up model in eval mode
@@ -195,16 +196,17 @@ def one_game_gradcam(device, model, game, collate_fn, class_idx=None, return_hea
     question = one_game_batch['question'].to(device)
     seq_length = one_game_batch['seq_length'].to(device)
 
-    # FIXME : Should we target directly the conv layer instead of relu ?
-    # FIXME : This is not scalable, if the network architecture change the target layers need to be changed
-    target_layers = {
-        #"stem_conv": model.stem_conv[0],
-        'resblocks[0].conv1': model.resblocks[0].conv1[0],
-        'resblocks[0].conv2': model.resblocks[0].conv2[0],
-        'resblocks[0].film_layer': model.resblocks[0].film_layer[0],
-        'resblocks[0].out': model.resblocks[0],
-        'classif_conv': model.classifier.classif_conv[0]
-    }
+    if target_layers is None:
+        # FIXME : Should we target directly the conv layer instead of relu ?
+        # FIXME : This is not scalable, if the network architecture change the target layers need to be changed
+        target_layers = {
+            #"stem_conv": model.stem_conv[0],
+            'resblocks[0].conv1': model.resblocks[0].conv1[0],
+            'resblocks[0].conv2': model.resblocks[0].conv2[0],
+            'resblocks[0].film_layer': model.resblocks[0].film_layer[0],
+            'resblocks[0].out': model.resblocks[0],
+            'classif_conv': model.classifier.classif_conv[0]
+        }
 
     cam_model = GradCAM(model, target_layers, apply_relu=apply_relu)
 

@@ -25,7 +25,7 @@ def do_custom_question_inference(device, model, dataloader, custom_question, sce
 
 
 def show_gradcam(device, model, dataloader, custom_game, scene_id, guess_id=0, top_preds=None, clear_stats=None,
-                 apply_relu=False):
+                 apply_relu=False, target_layers=None):
 
     if top_preds:
         class_idx = top_preds[guess_id][1]
@@ -33,7 +33,8 @@ def show_gradcam(device, model, dataloader, custom_game, scene_id, guess_id=0, t
         class_idx = None
 
     heatmaps, confidence = one_game_gradcam(device, model, custom_game, dataloader.collate_fn,
-                                            class_idx=class_idx, return_heatmap=True, apply_relu=apply_relu)
+                                            class_idx=class_idx, return_heatmap=True, apply_relu=apply_relu,
+                                            target_layers=target_layers)
 
     #display(get_tagged_scene_table_legend(dataloader, scene_id, colors))
 
