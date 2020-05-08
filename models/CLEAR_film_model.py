@@ -79,20 +79,26 @@ class CLEAR_FiLM_model(nn.Module):
 
                 resblock_in_channels = resblock_out_channels + 2 if config['resblock']['spatial_location'] else 0
 
-        if config['classifier'].get('type', '').lower() == 'conv':
-            # Classification (Via 1x1 conv & GlobalPooling)
-            classifier_class = Conv_classifier
-        else:
-            # Fully connected classifier
-            classifier_class = Fcn_classifier
-
         with Reproductible_Block(initial_random_state, 425):
-            self.classifier = classifier_class(in_channels=resblock_out_channels,
-                                               projection_size=config["classifier"]['projection_size'],
-                                               output_size=nb_answers,
-                                               pooling_type=config['classifier']['global_pool_type'],
-                                               spatial_location_layer=config['classifier']['spatial_location'],
-                                               dropout_drop_prob=dropout_drop_prob)
+            if config['classifier'].get('type', '').lower() == 'conv':
+                # Classification (Via 1x1 conv & GlobalPooling)
+                self.classifier = Conv_classifier(in_channels=resblock_out_channels,
+                                                  projection_size=config["classifier"]['projection_size'],
+                                                  output_size=nb_answers,
+                                                  pooling_type=config['classifier']['global_pool_type'],
+                                                  spatial_location_layer=config['classifier']['spatial_location'],
+                                                  dropout_drop_prob=dropout_drop_prob)
+            else:
+                # Fully connected classifier
+                self.classifier = Fcn_classifier(in_channels=resblock_out_channels,
+                                                 conv_out=config['classifier']['conv_out'],
+                                                 projection_size=config["classifier"]['projection_size'],
+                                                 output_size=nb_answers,
+                                                 pooling_type=config['classifier']['global_pool_type'],
+                                                 spatial_location_layer=config['classifier']['spatial_location'],
+                                                 dropout_drop_prob=dropout_drop_prob)
+
+
 
         # Set back initial seed
         Reproductible_Block.set_random_state(initial_random_state)
