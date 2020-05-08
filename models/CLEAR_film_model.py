@@ -91,8 +91,8 @@ class CLEAR_FiLM_model(nn.Module):
             else:
                 # Fully connected classifier
                 self.classifier = Fcn_classifier(in_channels=resblock_out_channels,
-                                                 conv_out=config['classifier']['conv_out'],
-                                                 projection_size=config["classifier"]['projection_size'],
+                                                 classifier_conv_out=config['classifier']['conv_out'],
+                                                 hidden_layer_size=config["classifier"]['projection_size'],
                                                  output_size=nb_answers,
                                                  pooling_type=config['classifier']['global_pool_type'],
                                                  spatial_location_layer=config['classifier']['spatial_location'],
