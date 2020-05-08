@@ -112,7 +112,7 @@ class Fcn_classifier(nn.Module):
             logits = conv_out.mean(dim=[2, 3])
 
         hidden_out = self.hidden_layer(logits)
-        #hidden_out = self.dropout(hidden_out)
+        hidden_out = self.dropout(hidden_out)
 
         logits = self.logits(hidden_out)
 
