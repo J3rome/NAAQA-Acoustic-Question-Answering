@@ -199,6 +199,19 @@ class PadTensor(object):
         return sample
 
 
+class RemovePadding(object):
+    """
+    When stored in H5 files, images all have the same size since they are padded to the biggest dimensions.
+    If we don't want to use a different/no padding for these images, we first need to remove the padding from the images
+    """
+    def __call__(self, sample):
+        if 'image_padding' in sample and sum(sample['image_padding']) > 0:
+            sample['image'] = sample['image'][:, sample['image_padding'][0]:, sample['image_padding'][1]:]
+            sample['image_padding'] = torch.tensor([0, 0], dtype=torch.int)
+
+        return sample
+
+
 class NormalizeSample(object):
     """Normalize a tensor image with mean and standard deviation.
     Given mean: ``(M1,...,Mn)`` and std: ``(S1,..,Sn)`` for ``n`` channels, this transform

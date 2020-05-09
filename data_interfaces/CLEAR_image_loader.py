@@ -167,7 +167,7 @@ class h5FeatureLoader(AbstractImgLoader):
             return img
 
     def get_padding(self):
-        return self.h5file[h5_img_padding_key][self.id]
+        return torch.tensor(self.h5file[h5_img_padding_key][self.id], dtype=torch.int)
 
 # Load while loading dataset (requires a lot of memory)
 class h5FeatureBufloader(AbstractImgLoader):

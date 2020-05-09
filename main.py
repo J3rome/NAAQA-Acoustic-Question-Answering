@@ -13,7 +13,7 @@ from preprocessing import write_clear_stats_to_file
 from visualization import visualize_gamma_beta, grad_cam_visualization
 from data_interfaces.CLEAR_dataset import CLEAR_dataset, CLEAR_collate_fct
 from data_interfaces.transforms import ImgBetweenZeroOne, PadTensor, NormalizeSample, PadTensorHeight
-from data_interfaces.transforms import ResizeTensorBasedOnMaxWidth
+from data_interfaces.transforms import ResizeTensorBasedOnMaxWidth, RemovePadding
 
 from utils.file import save_model_config, save_json, read_json, create_symlink_to_latest_folder
 from utils.file import create_folders_save_args, fix_best_epoch_symlink_if_necessary, get_clear_stats
@@ -66,6 +66,8 @@ parser.add_argument("--resize_img_width_no_ratio", help="Will resize images to -
                     action='store_true')
 parser.add_argument("--pad_to_largest_image", help="If set, images will be padded to meet the largest image in the set."
                                                    "All input will have the same size.", action='store_true')
+parser.add_argument("--pad_per_batch", help="Images will be padded according to the biggest image in the batch",
+                    action='store_true')
 parser.add_argument("--pad_height", help="If set, the height will be padded to --img_resize_height instead of resized",
                     action='store_true')
 parser.add_argument("--keep_image_range", help="Will NOT scale the image between 0-1 (Reverse --normalize_zero_one)",
@@ -213,6 +215,12 @@ def create_datasets(args, data_path, load_dataset_extra_stats=False):
                               preprocessed_folder_name=args['preprocessed_folder_name'],
                               use_cache=args['enable_image_cache'], max_cache_size=args['max_image_cache_size'])
     }
+
+    if args['input_image_type'] == "raw_h5" and args['pad_per_batch']:
+        remove_padding_transform = RemovePadding()
+        datasets['train'].add_transform(remove_padding_transform)
+        datasets['val'].add_transform(remove_padding_transform)
+        datasets['test'].add_transform(remove_padding_transform)
 
     if args['resize_img'] or args['pad_to_largest_image']:
         # We need the dataset object to retrieve images dims so we have to manually add transforms

@@ -30,6 +30,9 @@ def validate_arguments(args):
     assert not args['continue_training'] or (args['training'] and args['continue_training']), \
         "[ERROR] Must be in --training mode for --continue_training"
 
+    assert sum([args['pad_to_largest_image'], args['pad_per_batch']]) <= 1, \
+        '--pad_to_largest_image and --pad_per_batch can\'t be used together'
+
 
 def create_flags_from_args(task, args):
     flags = {}
