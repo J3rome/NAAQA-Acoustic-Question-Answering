@@ -54,8 +54,10 @@ class Freq_Time_Separated_Extractor(nn.Module):
         self.nb_time_blocks = len(config['time_kernels'])
         self.nb_freq_blocks = len(config['freq_kernels'])
 
+        self.do_fusion = len(config['out']) > self.nb_time_blocks
+
         # TODO : Permit different number of time and freq blocks
-        assert len(config['out']) - 1 == self.nb_time_blocks == self.nb_freq_blocks, "Invalid config"
+        assert self.nb_time_blocks == self.nb_freq_blocks, "Invalid config. Must have same number of time & freq block"
 
         in_channels = input_channels
         iterator = zip(config['out'][:-1], config['time_kernels'], config['time_strides'],
@@ -81,8 +83,9 @@ class Freq_Time_Separated_Extractor(nn.Module):
 
             in_channels = out_channels
 
-        self.fusion_conv = nn.Conv2d(in_channels=in_channels*2, out_channels=self.out_channels, kernel_size=[1, 1],
-                                     stride=[1, 1], bias=False)
+        if self.do_fusion:
+            self.fusion_conv = nn.Conv2d(in_channels=in_channels*2, out_channels=self.out_channels, kernel_size=[1, 1],
+                                         stride=[1, 1], bias=False)
 
     def forward(self, input_image):
         # TODO : Add spatial location maps ?
@@ -98,8 +101,8 @@ class Freq_Time_Separated_Extractor(nn.Module):
 
         out = pad2d_and_cat_tensors([time_out, freq_out], pad_mode='end')
 
-        # FIXME : Might want to let the stem conv do this job ?
-        out = self.fusion_conv(out)
+        if self.do_fusion:
+            out = self.fusion_conv(out)
 
         return out
 
