@@ -212,6 +212,11 @@ def get_experiments(experiment_result_path, prefix=None):
             experiment['optimizer_weight_decay'] = to_float(config['optimizer']['weight_decay'])
             experiment['dropout_drop_prob'] = to_float(config['optimizer']['dropout_drop_prob'])
 
+            if 'conv_out' not in config['classifier'] or experiment['classifier_type'] == 'conv':
+                experiment['classifier_conv_out'] = None
+            else:
+                experiment['classifier_conv_out'] = to_int(config['classifier']['conv_out'])
+
             # Gpu name
             gpu_name_filepath = f"{exp_dated_folder_path}/gpu.json"
             if os.path.exists(gpu_name_filepath):
