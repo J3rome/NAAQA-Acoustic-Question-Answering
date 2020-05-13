@@ -227,21 +227,22 @@ def get_experiments(experiment_result_path, prefix=None):
             experiments.append(experiment)
 
     experiments_df = pd.DataFrame(experiments,
-                                  columns=['prefix', 'nb_sample', 'nb_scene', 'nb_q_per_scene', 'config', 'nb_epoch',
-                                           'nb_epoch_runned', 'stop_accuracy', 'best_val_acc', 'best_val_loss',
-                                           'test_acc', 'test_loss', 'train_acc', 'train_loss', 'stopped_early',
-                                           '0.6_at_epoch', '0.7_at_epoch', '0.8_at_epoch', '0.9_at_epoch',
-                                           'batch_size', 'resnet_features', 'nb_trainable_param', 'test_version',
-                                           'random_seed', 'date', 'total_nb_param', 'nb_non_trainable_param',
-                                           'word_embedding_dim', 'rnn_state_size', 'extractor_type', 'stem_out_chan',
-                                           'nb_resblock', 'resblocks_out_chan', 'classifier_conv_out_chan',
-                                           'classifier_type', 'classifier_global_pool', 'optimizer_type', 'nb_answer',
-                                           'optimizer_lr', 'optimizer_weight_decay', 'dropout_drop_prob',
-                                           'git_revision', 'pad_to_largest', 'resized_height', 'resized_width',
-                                           'all_train_acc', 'all_train_loss', 'all_val_acc', 'all_val_loss',
-                                           'train_time', 'mean_epoch_time', 'gpu_name', 'folder', 'note'
-                                           ]
-                                  )
+                                  columns=list(experiments[0].keys()))
+                                  #columns=['prefix', 'nb_sample', 'nb_scene', 'nb_q_per_scene', 'config', 'nb_epoch',
+                                  #         'nb_epoch_runned', 'stop_accuracy', 'best_val_acc', 'best_val_loss',
+                                  #         'test_acc', 'test_loss', 'train_acc', 'train_loss', 'stopped_early',
+                                  #         '0.6_at_epoch', '0.7_at_epoch', '0.8_at_epoch', '0.9_at_epoch',
+                                  #         'batch_size', 'resnet_features', 'nb_trainable_param', 'test_version',
+                                  #         'random_seed', 'date', 'total_nb_param', 'nb_non_trainable_param',
+                                  #         'word_embedding_dim', 'rnn_state_size', 'extractor_type', 'stem_out_chan',
+                                  #         'nb_resblock', 'resblocks_out_chan', 'classifier_conv_out_chan',
+                                  #         'classifier_type', 'classifier_global_pool', 'optimizer_type', 'nb_answer',
+                                  #         'optimizer_lr', 'optimizer_weight_decay', 'dropout_drop_prob',
+                                  #         'git_revision', 'pad_to_largest', 'resized_height', 'resized_width',
+                                  #         'all_train_acc', 'all_train_loss', 'all_val_acc', 'all_val_loss',
+                                  #         'train_time', 'mean_epoch_time', 'gpu_name', 'folder', 'note'
+                                  #         ]
+                                  #)
     return experiments_df
 
 
