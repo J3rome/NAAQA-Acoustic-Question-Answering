@@ -84,6 +84,7 @@ def get_experiments(experiment_result_path, prefix=None):
             epoch_stats = read_json(f'{exp_dated_folder_path}/stats.json')
 
             experiment['nb_epoch_runned'] = len(epoch_stats)
+            experiment['nb_epoch_trained'] = to_int(epoch_stats[0]['epoch'].split('_')[-1])
             experiment['best_val_acc'] = to_float(epoch_stats[0]['val_acc'])
             experiment['best_val_loss'] = to_float(epoch_stats[0]['val_loss'])
             experiment['train_acc'] = to_float(epoch_stats[0]['train_acc'])
