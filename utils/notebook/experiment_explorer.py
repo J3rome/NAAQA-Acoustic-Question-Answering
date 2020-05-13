@@ -200,6 +200,7 @@ def get_experiments(experiment_result_path, prefix=None):
             experiment['word_embedding_dim'] = to_int(config['question']['word_embedding_dim'])
             experiment['rnn_state_size'] = to_int(config['question']['rnn_state_size'])
             experiment['extractor_type'] = config['image_extractor']['type']
+            experiment['extractor_out_chan'] = to_int(config['image_extractor']['out'][-1])
             experiment['stem_out_chan'] = to_int(config['stem']['conv_out'])
             experiment['nb_resblock'] = len(config['resblock']['conv_out'])
             experiment['resblocks_out_chan'] = to_int(config['resblock']['conv_out'][-1])
