@@ -64,7 +64,7 @@ def get_experiments(experiment_result_path, prefix=None):
                 'folder': exp_folder
             }
 
-            additional_note = arguments['output_name_suffix'].split(f'_{experiment["nb_epoch"]}_epoch')[0].replace(experiment['config'], '')
+            additional_note = arguments['output_name_suffix'].replace(f'_{experiment["nb_epoch"]}_epoch', '').replace(experiment['config'], '').replace(f'_{experiment["random_seed"]}', '').replace(f"_stop_at_{experiment['stop_accuracy']}", '').replace('_resnet', '')
 
             # Trim note
             if len(additional_note) > 0:
