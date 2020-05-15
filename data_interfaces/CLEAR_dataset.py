@@ -61,8 +61,7 @@ class CLEAR_dataset(Dataset):
         else:
             scenes_def = None
 
-        nb_games = len(questions)
-        self.games = multiprocessing.Array(ctypes.c_wchar_p, [""]*nb_games)
+        self.games = {}
         self.games_per_family = collections.defaultdict(list)
         self.scenes = {}
         self.nb_scene = 0
@@ -184,7 +183,7 @@ class CLEAR_dataset(Dataset):
                    transforms=dataset_obj.transforms, max_cache_size=dataset_obj.image_cache['max_size'])
 
     def get_game(self, idx, decode_tokens=False):
-        game = orjson.loads(self.games[idx])
+        game = self.games[idx]
         if not decode_tokens:
             return game
         else:
@@ -194,7 +193,7 @@ class CLEAR_dataset(Dataset):
             return game
 
     def prepare_game(self, game):
-        return orjson.dumps(game).decode('utf-8')    # orjson dumps return a byte string, we need to convert it to string
+        return game
 
     def get_all_image_sizes(self):
         # FIXME : This is broken now that is_raw_img() return True for H5 file.
