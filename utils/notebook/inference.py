@@ -6,7 +6,7 @@ from torchvision.transforms import ToPILImage
 from IPython.core.display import display, Markdown
 
 from data_interfaces.transforms import NormalizeInverse
-from utils.visualization import get_tagged_scene, get_tagged_scene_table_legend
+from utils.visualization import show_tagged_scene, get_tagged_scene_table_legend
 from utils.notebook.generic import notebook_input_prompt
 from runner import custom_game_inference, create_game_for_custom_question
 from visualization import one_game_gradcam
@@ -51,19 +51,26 @@ def show_gradcam(device, model, dataloader, custom_game, scene_id, guess_id=0, t
 
     display(Markdown(title))
 
+    nb_layers = len(heatmaps.keys())
+    nb_layers_per_fig = 1
+
     for i, (layer_name, heatmap) in enumerate(heatmaps.items()):
         # if i == 2:
         #    break
+        fig_idx = i % nb_layers_per_fig
+        if fig_idx == 0:
+            fig, axs = plt.subplots(nb_layers_per_fig, 3)
 
         merged_heatmap = merge_gradcam_heatmap_with_image(heatmap, custom_game['image'])
 
-        fig, axs = plt.subplots(1, 3)
-        axs[0].set_title(f"[{layer_name}]\nHeatmap")
-        axs[0].imshow(ToPILImage()(heatmap))
-        axs[1].set_title("Heatmap Merged\nwith Input Image")
-        axs[1].imshow(ToPILImage()(merged_heatmap))
-        axs[2].set_title("Tagged scene")
-        fig_ax, colors = get_tagged_scene(dataloader.dataset, custom_game, fig_ax=(fig, axs[2]),
+        line_axs = axs#[fig_idx]
+
+        line_axs[0].set_title(f"[{layer_name}]\nHeatmap")
+        line_axs[0].imshow(ToPILImage()(heatmap))
+        line_axs[1].set_title("Heatmap Merged\nwith Input Image")
+        line_axs[1].imshow(ToPILImage()(merged_heatmap))
+        line_axs[2].set_title("Tagged scene")
+        fig_ax, colors = show_tagged_scene(dataloader.dataset, custom_game, scene_image=merged_heatmap, fig_ax=(fig, line_axs[2]),
                                           show_legend=False)
 
     return heatmaps
@@ -76,7 +83,7 @@ def show_game_notebook_input(dataloader, game, clear_stats=None, remove_image_pa
         # We copy the game to avoid modifying the original object
         game = inverse_norm(deepcopy(game))
 
-    (fig, ax), colors = get_tagged_scene(dataloader.dataset, game, fig_title=f"Scene #{game['scene_id']}",
+    (fig, ax), colors = show_tagged_scene(dataloader.dataset, game, fig_title=f"Scene #{game['scene_id']}",
                                          show_legend=False, remove_padding=remove_image_padding)
 
     legend = get_tagged_scene_table_legend(dataloader, game['scene_id'], colors)

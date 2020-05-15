@@ -222,6 +222,9 @@ def one_game_gradcam(device, model, game, collate_fn, class_idx=None, return_hea
 
     saliency_maps, confidence, logit = cam_model(question, seq_length, image, class_idx=class_idx)
 
+    # Clear hooks
+    cam_model.clear_hooks()
+
     images_to_return = {}
 
     for layer_name, saliency_map in saliency_maps.items():
