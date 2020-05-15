@@ -201,6 +201,18 @@ def get_experiments(experiment_result_path, prefix=None):
             experiment['rnn_state_size'] = to_int(config['question']['rnn_state_size'])
             experiment['extractor_type'] = config['image_extractor']['type']
             experiment['extractor_out_chan'] = to_int(config['image_extractor']['out'][-1])
+
+            if experiment['extractor_type'] == 'film_original':
+                experiment['extractor_nb_block'] = len(config['image_extractor']['kernels'])
+                experiment['extractor_projection_size'] = None
+            else:
+                experiment['extractor_nb_block'] = len(config['image_extractor']['freq_kernels'])
+
+                if len(config['image_extractor']['out']) > experiment['extractor_nb_block']:
+                    experiment['extractor_projection_size'] = to_int(config['image_extractor']['out'][-1])
+                else:
+                    experiment['extractor_projection_size'] = None
+
             experiment['stem_out_chan'] = to_int(config['stem']['conv_out'])
             experiment['nb_resblock'] = len(config['resblock']['conv_out'])
             experiment['resblocks_out_chan'] = to_int(config['resblock']['conv_out'][-1])
