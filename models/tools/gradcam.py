@@ -35,6 +35,7 @@ class GradCAM(object):
         self.target_layers = target_layers
         self.reverse_layer_map = {m: k for k, m in target_layers.items()}
 
+        self.hooks = []
         self.gradients = dict()
         self.activations = dict()
         def backward_hook(module, grad_input, grad_output):
@@ -43,14 +44,18 @@ class GradCAM(object):
             self.activations[self.reverse_layer_map[module]] = output
 
         for target_layer in target_layers.values():
-            target_layer.register_forward_hook(forward_hook)
-            target_layer.register_backward_hook(backward_hook)
+            self.hooks.append(target_layer.register_forward_hook(forward_hook))
+            self.hooks.append(target_layer.register_backward_hook(backward_hook))
 
     # TODO : is useful ?
     def saliency_map_size(self, *input_size):
         device = next(self.model.parameters()).device
         self.model(torch.zeros(1, 3, *input_size, device=device))
         return self.activations['value'].shape[2:]
+
+    def clear_hooks(self):
+        for hook in self.hooks:
+            hook.remove()
 
     def forward(self, question, question_lengths, input_image, class_idx=None, pack_sequence=True, retain_graph=False):
         """
