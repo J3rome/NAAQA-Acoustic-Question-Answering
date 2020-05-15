@@ -126,7 +126,7 @@ class CLEAR_dataset(Dataset):
                 self.games_per_family[self.answer_to_family[str(sample['answer']).lower()]].append(question_id)
                 game['program'] = sample['program'] if 'program' in sample else []
 
-            self.games[question_id] = self.prepare_game(game)
+            self.games[question_id] = game
 
             self.answers.append(answer)
             self.answer_counter[answer] += 1
@@ -191,9 +191,6 @@ class CLEAR_dataset(Dataset):
             game['answer'] = self.tokenizer.decode_answer(game['answer'])
 
             return game
-
-    def prepare_game(self, game):
-        return game
 
     def get_all_image_sizes(self):
         # FIXME : This is broken now that is_raw_img() return True for H5 file.
@@ -409,7 +406,7 @@ class CLEAR_dataset(Dataset):
         for game_idx in range(len(self.games)):
             game = self.get_game(game_idx)
             if not id_list[game['image']['id']]:
-                unique_scene_games.append(self.prepare_game(game))
+                unique_scene_games.append(game)
                 id_list[game['image']['id']] = True
 
         self.games = unique_scene_games
