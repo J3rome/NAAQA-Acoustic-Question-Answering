@@ -26,7 +26,7 @@ def save_model_summary(output_folder, model, input_image_torch_shape, device="cp
         f.write(model_summary)
 
 
-def get_scene_image_axis_labels(image_width, image_height, scene_duration, max_freq, tick_ratio=0.2):
+def set_scene_image_axis_labels(ax, image_width, image_height, scene_duration, max_freq, tick_ratio=0.2):
     """
     Return xlabels in seconds and ylabels in Hz
     """
@@ -44,10 +44,54 @@ def get_scene_image_axis_labels(image_width, image_height, scene_duration, max_f
     # By default y axis '0' is at the top instead of bottom when working with imshow
     yticks_labels.reverse()
 
-    return (xticks, xtick_labels), (yticks, yticks_labels)
+    ax.set_xticks(xticks)
+    ax.set_xticklabels(xtick_labels)
+    ax.set_xlabel("Time (seconds)")
+
+    ax.set_yticks(yticks)
+    ax.set_yticklabels(yticks_labels)
+    ax.set_ylabel("Freq (Hz)")
 
 
-def get_tagged_scene(dataset, game_or_game_id, scene_image=None, remove_padding=False, show_legend=True, show_fig=False,
+def get_tagged_scene_annotations(scene, image_dims, scene_duration=None):
+    image_height, image_width = image_dims
+
+    if scene_duration is None:
+        scene_duration = sum([o['duration'] + o['silence_after'] for o in scene['objects']]) + scene['silence_before']
+
+    time_resolution = int(scene_duration / image_width + 0.5)  # Ms/pixel
+
+    annotations = []
+    current_position = int(scene['silence_before'] / time_resolution)
+    for i, sound in enumerate(scene['objects']):
+        sound_duration_in_px = int(sound['duration'] / time_resolution + 0.5)
+        sound_silence_in_px = int(sound['silence_after'] / time_resolution + 0.5)
+
+        annotations.append((current_position, sound_duration_in_px))
+
+        current_position += sound_duration_in_px + sound_silence_in_px
+
+    return annotations
+
+
+def paint_annotation_rect_on_fig(annotations, image_height, ax, opacity=0.7):
+    rgb_colors = []
+    annotation_colormap = plt.cm.get_cmap('hsv', len(annotations))
+
+    for i, (sound_start, sound_width) in enumerate(annotations):
+        annotation_color = annotation_colormap(i)
+
+        annotation_rect = patches.Rectangle((sound_start, 2), width=sound_width,
+                                            height=image_height - 4, fill=False, color=annotation_color,
+                                            linewidth=1.4, alpha=opacity)
+
+        ax.add_patch(annotation_rect)
+        rgb_colors.append(tuple(int(c * 255) for c in annotation_color))
+
+    return rgb_colors
+
+
+def show_tagged_scene(dataset, game_or_game_id, scene_image=None, remove_padding=False, show_legend=True, show_fig=False,
                      fig_title=None, fig_ax=None, sound_sample_rate=22050):
     assert dataset.is_raw_img() or scene_image is not None, 'Image to tag must be provided if not in RAW mode'
 
@@ -75,7 +119,6 @@ def get_tagged_scene(dataset, game_or_game_id, scene_image=None, remove_padding=
     # Retrieve scene informations
     scene = dataset.scenes[game['scene_id']]['definition']
     scene_duration = sum([o['duration'] + o['silence_after'] for o in scene['objects']]) + scene['silence_before']
-    time_resolution = int(scene_duration / image_width + 0.5)  # Ms/pixel
 
     # Create figure
     if fig_ax:
@@ -90,43 +133,13 @@ def get_tagged_scene(dataset, game_or_game_id, scene_image=None, remove_padding=
     ax.imshow(ToPILImage()(image))
 
     # Set axis
-    (xticks, xtick_labels), (yticks, ytick_labels) = get_scene_image_axis_labels(image_width, image_height,
-                                                                                 scene_duration, sound_sample_rate // 2)
-    ax.set_xticks(xticks)
-    ax.set_xticklabels(xtick_labels)
-    ax.set_xlabel("Time (seconds)")
-
-    ax.set_yticks(yticks)
-    ax.set_yticklabels(ytick_labels)
-    ax.set_ylabel("Freq (Hz)")
+    set_scene_image_axis_labels(ax, image_width, image_height, scene_duration, sound_sample_rate // 2)
 
     # Generate annotations
-    annotations = {}
-    rgb_colors = []
-    annotation_colormap = plt.cm.get_cmap('hsv', len(scene['objects']))
+    annotations = get_tagged_scene_annotations(scene, (image_height, image_width), scene_duration)
+    rgb_colors = paint_annotation_rect_on_fig(annotations, image_height, ax)
 
-    current_position = int(scene['silence_before'] / time_resolution)
-    for i, sound in enumerate(scene['objects']):
-        sound_duration_in_px = int(sound['duration']/time_resolution + 0.5)
-        sound_silence_in_px = int(sound['silence_after']/time_resolution + 0.5)
-        annotation_color = annotation_colormap(i)
-        annotation_rect = patches.Rectangle((current_position, 2), width=sound_duration_in_px,
-                                            height=image_height - 4, fill=False, color=annotation_color,
-                                            linewidth=1.4)
-        key = f"{sound['instrument'].capitalize()}/{sound['brightness']}/{sound['loudness']}/{sound['note']}/{sound['id']}"
-        annotations[key] = annotation_rect
-        ax.add_patch(annotation_rect)
-
-        current_position += sound_duration_in_px + sound_silence_in_px
-
-        rgb_colors.append(tuple(int(c*255) for c in annotation_color))
-
-    # TODO : Add correct scale to axis (Freq & time)
-    if show_legend:
-        ax.legend(annotations.values(), annotations.keys(), bbox_to_anchor=(0.5, -0.45), loc='lower center', ncol=2,
-                  prop=font_manager.FontProperties(family='sans-serif', size='small'))
-
-    fig.tight_layout()
+    #fig.tight_layout()
 
     if show_fig:
         plt.show()
