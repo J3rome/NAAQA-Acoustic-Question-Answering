@@ -280,17 +280,18 @@ def create_dataloaders(args, datasets, pin_memory=True):
 
     test_set_batch_size = args['test_set_batch_size'] if args['test_set_batch_size'] else args['batch_size']
 
+    # FIXME : Remove --single_worker option
     return {
         'train': DataLoader(datasets['train'], batch_size=args['batch_size'], shuffle=True,
-                            num_workers=3 if not args['single_worker'] else 1, collate_fn=collate_fct,
+                            num_workers=1 if not args['single_worker'] else 1, collate_fn=collate_fct,
                             pin_memory=pin_memory),
 
         'val': DataLoader(datasets['val'], batch_size=args['batch_size'], shuffle=True,
-                          num_workers=2 if not args['single_worker'] else 1, collate_fn=collate_fct,
+                          num_workers=1 if not args['single_worker'] else 1, collate_fn=collate_fct,
                           pin_memory=pin_memory),
 
         'test': DataLoader(datasets['test'], batch_size=test_set_batch_size, shuffle=False,
-                           num_workers=2 if not args['single_worker'] else 1, collate_fn=collate_fct,
+                           num_workers=1 if not args['single_worker'] else 1, collate_fn=collate_fct,
                            pin_memory=pin_memory)
     }
 
