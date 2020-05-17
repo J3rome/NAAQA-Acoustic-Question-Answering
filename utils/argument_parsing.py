@@ -91,9 +91,12 @@ def update_arguments(args, paths, flags):
     else:
         args['input_image_type'] = "raw"
 
+    args['nb_dataloader_worker'] = 1
+
     if args['input_image_type'] == 'raw':
         # Default values when in RAW mode
         args['normalize_zero_one'] = True
+        args['nb_dataloader_worker'] = 3
 
     args['normalize_zero_one'] = args['normalize_zero_one'] and not args['keep_image_range']
 
