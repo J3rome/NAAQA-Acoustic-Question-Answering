@@ -1,4 +1,4 @@
-from collections import OrderedDict
+from collections import OrderedDict, namedtuple
 
 import torch
 import torch.nn as nn
@@ -45,8 +45,11 @@ class CLEAR_FiLM_model(nn.Module):
             if extractor_type == "film_original":
                 self.image_pipeline = Original_Film_Extractor(config['image_extractor'], input_image_channels)
             elif extractor_type == "resnet":
-                # TODO : Way to use preprocessed from h5
                 self.image_pipeline = Resnet_feature_extractor()
+            elif extractor_type == 'resnet_h5':
+                # Preextracted resnet features mock object
+                mock_image_pipeline = namedtuple('resnet_h5', 'get_out_channels')
+                self.image_pipeline = mock_image_pipeline(get_out_channels=lambda: extractor_config['out'])
             elif extractor_type == "freq_time_separated":
                 self.image_pipeline = Freq_Time_Separated_Extractor(extractor_config, input_image_channels)
             elif extractor_type == "freq_time_interlaced":
@@ -116,7 +119,10 @@ class CLEAR_FiLM_model(nn.Module):
         rnn_hidden_state = self.question_pipeline(question, question_lengths, pack_sequence)
 
         # Image Pipeline
-        conv_out = self.image_pipeline(input_image)
+        if self.config['image_extractor']['type'].lower() != 'resnet_h5':
+            conv_out = self.image_pipeline(input_image)
+        else:
+            conv_out = input_image
 
         if self.config['stem']['spatial_location']:
             conv_out = append_spatial_location(conv_out)
