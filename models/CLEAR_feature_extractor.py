@@ -106,6 +106,9 @@ class Freq_Time_Separated_Extractor_no_pooling(nn.Module):
 
         return out
 
+    def get_out_channels(self):
+        return self.out_channels
+
 
 class Freq_Time_Separated_Extractor(nn.Module):
     def __init__(self, config, input_channels, with_bias=True):
