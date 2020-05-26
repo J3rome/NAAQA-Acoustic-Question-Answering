@@ -4,7 +4,7 @@ import torch
 import torch.nn as nn
 
 from models.CLEAR_nlp import Question_pipeline
-from models.CLEAR_feature_extractor import Original_Film_Extractor, Freq_Time_Pooled_Extractor, Freq_Time_Separated_Extractor, Freq_Time_Interlaced_Extractor
+from models.CLEAR_feature_extractor import Original_Film_Extractor, Freq_Time_Pooled_Extractor, Freq_Time_Separated_Extractor, Freq_Time_Interlaced_Extractor, Freq_Time_Separated_Extractor_no_pooling
 from models.blocks.FiLM_layers import FiLMed_resblock
 from models.blocks.Classifiers import Conv_classifier, Fcn_classifier
 from models.utils import get_trainable_childs
@@ -52,6 +52,8 @@ class CLEAR_FiLM_model(nn.Module):
                 self.image_pipeline = mock_image_pipeline(get_out_channels=lambda: extractor_config['out'])
             elif extractor_type == "freq_time_separated":
                 self.image_pipeline = Freq_Time_Separated_Extractor(extractor_config, input_image_channels)
+            elif extractor_type == "freq_time_separated_no_pooling":
+                self.image_pipeline = Freq_Time_Separated_Extractor_no_pooling(extractor_config, input_image_channels)
             elif extractor_type == "freq_time_interlaced":
                 self.image_pipeline = Freq_Time_Interlaced_Extractor(extractor_config, input_image_channels)
             elif extractor_type == "freq_time_pool":
