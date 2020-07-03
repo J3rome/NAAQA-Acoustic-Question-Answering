@@ -187,10 +187,13 @@ class CLEAR_dataset(Dataset):
         if not decode_tokens:
             return game
         else:
-            game['question'] = self.tokenizer.decode_question(game['question'])
-            game['answer'] = self.tokenizer.decode_answer(game['answer'])
+            new_game = {}
+            for key, val in game.items():
+                new_game[key] = val
+            new_game['question'] = self.tokenizer.decode_question(new_game['question'])
+            new_game['answer'] = str(self.tokenizer.decode_answer(new_game['answer']))
 
-            return game
+            return new_game
 
     def get_all_image_sizes(self):
         # FIXME : This is broken now that is_raw_img() return True for H5 file.
