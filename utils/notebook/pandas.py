@@ -5,17 +5,30 @@ import matplotlib.cm as cm
 import matplotlib.colors as colors
 
 
-def grouped_scatter(dataframe, group_key, x_axis, y_axis, title=None, colormap=cm.viridis, ax=None):
+def grouped_scatter(dataframe, group_key, x_axis, y_axis, title=None, colormap=cm.viridis, ax=None, label_modifier=None,
+                    show_label=True, colorlist=None, additional_params=None):
     group_unique_keys = dataframe[group_key].unique()
 
-    colorlist = {key: colors.rgb2hex(colormap(i)) for key, i in
-                 zip(group_unique_keys, np.linspace(0, 0.9, len(group_unique_keys)))}
+    if colorlist is None:
+        colorlist = {key: colors.rgb2hex(colormap(i)) for key, i in
+                     zip(group_unique_keys, np.linspace(0, 0.9, len(group_unique_keys)))}
 
     if ax is None:
         _, ax = plt.subplots()
 
+    if additional_params is None:
+        additional_params = {}
+
     for key, group in dataframe.groupby(group_key):
-        group.plot.scatter(ax=ax, x=x_axis, y=y_axis, c=colorlist[key], label=key, title=title)
+        if show_label:
+            label = key
+            if label_modifier:
+                label = label_modifier(label)
+        else:
+            label = "_hidden"
+
+        group.plot.scatter(ax=ax, x=x_axis, y=y_axis, c=colorlist[key], label=label, title=title, **additional_params)
+        #group.plot(ax=ax, x=x_axis, y=y_axis, c=colorlist[key], label="_hidden")  # , label=key, title=title)
 
 
 def sub_cols_with_cond_and_create_new_col(df, new_col_name, col_to_sub, cond1, cond2, output_cond):

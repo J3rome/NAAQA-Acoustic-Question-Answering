@@ -10,9 +10,14 @@ from utils.notebook.plot import plot_discrete_hist, plot_hist, plot_2d_matrix
 
 # Results stats helpers
 def load_experiment_predictions(experiment_output_path, epoch_folder='best', set_type='val', reduced_text=False):
-    epoch_folder = format_epoch_folder(epoch_folder)
 
-    epoch_path = f"{experiment_output_path}/{epoch_folder}"
+    if set_type != 'test':
+        epoch_folder = format_epoch_folder(epoch_folder)
+
+        epoch_path = f"{experiment_output_path}/{epoch_folder}"
+    else:
+        epoch_path = experiment_output_path
+
     prediction_filename = f"{set_type}_predictions.json"
 
     predictions = read_json(epoch_path, prediction_filename)

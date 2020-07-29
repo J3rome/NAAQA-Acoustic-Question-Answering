@@ -64,7 +64,7 @@ def get_experiments(experiment_result_path, prefix=None):
                 'folder': exp_folder
             }
 
-            additional_note = arguments['output_name_suffix'].replace(f'_{experiment["nb_epoch"]}_epoch', '').replace(experiment['config'], '').replace(f'_{experiment["random_seed"]}', '').replace(f"_stop_at_{experiment['stop_accuracy']}", '').replace('_resnet', '')
+            additional_note = arguments['output_name_suffix'].replace(f'_{experiment["nb_epoch"]}_epoch', '').replace(experiment['config'], '').replace(f'_{experiment["random_seed"]}', '').replace(f"_stop_at_{experiment['stop_accuracy']}", '').replace('_resnet_extractor', '')
 
             # Trim note
             if len(additional_note) > 0:
@@ -97,6 +97,10 @@ def get_experiments(experiment_result_path, prefix=None):
             experiment['all_val_loss'] = []
             experiment['train_time'] = timedelta(0)
             epoch_times = []
+            experiment['0.6_at_epoch'] = None
+            experiment['0.7_at_epoch'] = None
+            experiment['0.8_at_epoch'] = None
+            experiment['0.9_at_epoch'] = None
 
             for stat in epoch_stats_chronological:
                 experiment['all_train_acc'].append(to_float(stat['train_acc']))
@@ -109,6 +113,18 @@ def get_experiments(experiment_result_path, prefix=None):
                                        microseconds=parsed_time.microsecond)
                 epoch_times.append(epoch_time)
                 experiment['train_time'] += epoch_time
+
+                epoch_idx = to_int(stat['epoch'].split('_')[1])
+                val_acc = to_float(stat['val_acc'])
+
+                if experiment['0.6_at_epoch'] is None and val_acc >= 0.6:
+                    experiment['0.6_at_epoch'] = epoch_idx
+                elif experiment['0.7_at_epoch'] is None and val_acc >= 0.7:
+                    experiment['0.7_at_epoch'] = epoch_idx
+                elif experiment['0.8_at_epoch'] is None and val_acc >= 0.8:
+                    experiment['0.8_at_epoch'] = epoch_idx
+                elif experiment['0.9_at_epoch'] is None and val_acc >= 0.9:
+                    experiment['0.9_at_epoch'] = epoch_idx
 
             experiment['mean_epoch_time'] = np.mean(epoch_times)
 
@@ -123,25 +139,6 @@ def get_experiments(experiment_result_path, prefix=None):
                 experiment['test_version'] = None
                 experiment['test_acc'] = None
                 experiment['test_loss'] = None
-
-            experiment['0.6_at_epoch'] = None
-            experiment['0.7_at_epoch'] = None
-            experiment['0.8_at_epoch'] = None
-            experiment['0.9_at_epoch'] = None
-
-            epochs_stats_reversed = reversed(epoch_stats)
-            for epoch_stat in epochs_stats_reversed:
-                epoch_idx = to_int(epoch_stat['epoch'].split('_')[1])
-                val_acc = to_float(epoch_stat['val_acc'])
-
-                if experiment['0.6_at_epoch'] is None and val_acc >= 0.6:
-                    experiment['0.6_at_epoch'] = epoch_idx
-                elif experiment['0.7_at_epoch'] is None and val_acc >= 0.7:
-                    experiment['0.7_at_epoch'] = epoch_idx
-                elif experiment['0.8_at_epoch'] is None and val_acc >= 0.8:
-                    experiment['0.8_at_epoch'] = epoch_idx
-                elif experiment['0.9_at_epoch'] is None and val_acc >= 0.9:
-                    experiment['0.9_at_epoch'] = epoch_idx
 
             if experiment['nb_epoch_runned'] < experiment['nb_epoch']:
                 # TODO : Check stopped_early.json
@@ -165,8 +162,9 @@ def get_experiments(experiment_result_path, prefix=None):
             if arguments['h5_image_input']:
                 preprocessed_data_path = f"{arguments['data_root_path']}/{arguments['version_name']}/{arguments['preprocessed_folder_name']}"
 
-                if os.path.exists(preprocessed_data_path):
-                    img_arguments = read_json(preprocessed_data_path, 'arguments.json')
+                preprocessed_argument_path = f"{preprocessed_data_path}/arguments.json"
+                if os.path.exists(preprocessed_argument_path):
+                    img_arguments = read_json(preprocessed_argument_path)
 
             experiment['pad_to_largest'] = img_arguments['pad_to_largest_image']
             experiment['resized_height'] = to_int(img_arguments['img_resize_height']) if img_arguments['resize_img'] else None
@@ -200,16 +198,18 @@ def get_experiments(experiment_result_path, prefix=None):
             experiment['word_embedding_dim'] = to_int(config['question']['word_embedding_dim'])
             experiment['rnn_state_size'] = to_int(config['question']['rnn_state_size'])
             experiment['extractor_type'] = config['image_extractor']['type']
-            experiment['extractor_out_chan'] = to_int(config['image_extractor']['out'][-1])
+            experiment['extractor_out_chan'] = to_int(config['image_extractor']['out'][-1]) if type(config['image_extractor']['out']) == list else config['image_extractor']['out']
+            experiment['extractor_filters'] = config['image_extractor']['out']
 
             if experiment['extractor_type'] == 'film_original':
                 experiment['extractor_nb_block'] = len(config['image_extractor']['kernels'])
                 experiment['extractor_projection_size'] = None
-            else:
+            elif not 'resnet' in experiment['extractor_type']:
                 experiment['extractor_nb_block'] = len(config['image_extractor']['freq_kernels'])
 
                 if len(config['image_extractor']['out']) > experiment['extractor_nb_block']:
                     experiment['extractor_projection_size'] = to_int(config['image_extractor']['out'][-1])
+                    experiment['extractor_filters'] = experiment['extractor_filters'][:-1]
                 else:
                     experiment['extractor_projection_size'] = None
 
