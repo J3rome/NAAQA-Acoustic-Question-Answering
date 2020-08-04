@@ -227,8 +227,11 @@ def set_transforms_on_datasets(args, datasets, data_path):
             if 0 < args['resample_audio_to'] < 1:
                 args['resample_audio_to'] = sample_rate * args['resample_audio_to']
 
+            resample_to = int(args['resample_audio_to'])
             transforms_to_add.append(ResampleAudio(original_sample_rate=sample_rate,
-                                                   resample_to=int(args['resample_audio_to'])))
+                                                   resample_to=resample_to))
+
+            sample_rate = resample_to
 
         if args['mel_spectrogram']:
             transforms_to_add.append(GenerateMelSpectrogram(n_fft=args['spectrogram_n_fft'],
