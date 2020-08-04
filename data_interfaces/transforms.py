@@ -2,6 +2,66 @@ import torch
 import torchvision.transforms.functional as vis_F
 import torch.nn.functional as F
 
+import torchaudio
+
+
+class ResampleAudio(object):
+
+    def __init__(self, original_sample_rate, resample_to):
+        self.resample_transform = torchaudio.transforms.Resample(orig_freq=original_sample_rate, new_freq=resample_to)
+
+    def __call__(self, sample):
+        sample['image'] = self.resample_transform(sample['image'])
+
+        return sample
+
+
+class GenerateSpectrogram(object):
+
+    def __init__(self, n_fft, keep_freq_point=None, db_amplitude=True, normalized=True):
+
+        self.spectrogram_transform = torchaudio.transforms.Spectrogram(n_fft=n_fft, normalized=normalized)
+        self.keep_freq_point = keep_freq_point
+        self.amplitude_to_db = torchaudio.transforms.AmplitudeToDB() if db_amplitude else None
+
+    def __call__(self, sample):
+
+        #assert 'audio' in sample, "This transform should be applied to a raw audio signal"
+
+        specgram = self.spectrogram_transform(sample['image'])[0, :, :]
+
+        if self.keep_freq_point:
+            specgram = specgram[:self.keep_freq_point, :]
+
+        if self.amplitude_to_db:
+            specgram = self.amplitude_to_db(specgram)
+
+        sample['image'] = torch.flip(specgram, (0,)).unsqueeze(0)
+
+        return sample
+
+
+class GenerateMelSpectrogram(object):
+
+    def __init__(self, n_fft, n_mels, sample_rate, keep_freq_point=None, normalized=True):
+        self.spectrogram_transform = torchaudio.transforms.Spectrogram(n_fft=n_fft, normalized=normalized)
+        self.mel_scale = torchaudio.transforms.MelScale(sample_rate=sample_rate, n_mels=n_mels)
+
+        self.keep_freq_point = keep_freq_point
+        self.normalized = normalized
+
+    def __call__(self, sample):
+        #assert 'audio' in sample, "This transform should be applied to a raw audio signal"
+
+        specgram = self.spectrogram_transform(sample['audio'])[0, :, :]
+        if self.keep_freq_point:
+            specgram = specgram[:self.keep_freq_point, :]
+
+        specgram = self.mel_scale(specgram)
+
+        sample['image'] = torch.flip(specgram, (0,)).unsqueeze(0)
+
+        return sample
 
 class ImgBetweenZeroOne(object):
     """ Normalize the image between 0 and 1 """
