@@ -450,7 +450,7 @@ class CLEARTokenizer:
             self.end_token = None
 
         #self.padding_answer = self.answer2i["<padding>"]
-        self.unknown_answer = self.answer2i["<unk>"]
+        #self.unknown_answer = self.answer2i["<unk>"]
 
     @staticmethod
     def get_tokenizer_inst():
