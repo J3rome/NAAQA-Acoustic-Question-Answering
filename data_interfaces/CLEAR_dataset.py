@@ -15,6 +15,7 @@ from data_interfaces.CLEAR_image_loader import get_img_builder, CLEARImage
 from utils.file import read_json, get_size_from_image_header
 from utils.generic import get_answer_to_family_map
 from data_interfaces.transforms import ResizeTensorBasedOnMaxWidth, PadTensor
+from data_interfaces.transforms import GenerateMelSpectrogram, GenerateSpectrogram
 
 import multiprocessing
 import ctypes
@@ -45,6 +46,7 @@ class CLEAR_dataset(Dataset):
         self.transforms = transforms if transforms else viz_transforms.Compose([])
         self.input_shape = None
         self.all_image_sizes = None
+        self.sample_rate = None
 
         self.answer_to_family = get_answer_to_family_map('%s/%s' % (self.root_folder_path, 'attributes.json'))
         self.answer_families = list(set(self.answer_to_family.values()))
@@ -203,13 +205,19 @@ class CLEAR_dataset(Dataset):
             return new_game
 
     def get_all_image_sizes(self):
-        # FIXME : This is broken now that is_raw_img() return True for H5 file.
-        assert self.is_raw_img(), 'Config must be set to RAW img in order to retrieve images sizes'
-
         if self.all_image_sizes is None:
-            image_folder = "%s/%s" % (self.image_builder.img_dir, self.set)
-            self.all_image_sizes = {idx: get_size_from_image_header(image_folder, s['filename'])
-                                    for idx, s in self.scenes.items()}
+            if self.input_image_type == 'audio':
+                self.all_image_sizes = {}
+                n_fft, keep_freq_point = self.get_spectrogram_transform_infos()
+                for idx, scene in self.scenes.items():
+                    spectrogram_length = int(scene['definition']['duration']/1000 * self.get_sample_rate() / n_fft + 1)
+                    spectrogram_height = self.get_sample_rate() // 2 + 1 if keep_freq_point is None else keep_freq_point
+
+                    self.all_image_sizes[idx] = (spectrogram_height, spectrogram_length)
+            else:
+                image_folder = "%s/%s" % (self.image_builder.img_dir, self.set)
+                self.all_image_sizes = {idx: get_size_from_image_header(image_folder, s['filename'])
+                                        for idx, s in self.scenes.items()}
 
         return self.all_image_sizes
 
@@ -273,6 +281,15 @@ class CLEAR_dataset(Dataset):
             return self[game_id]
 
         return game_id
+
+    def get_spectrogram_transform_infos(self,):
+        assert self.transforms, "Dataset don't any have transforms"
+
+        for transform in self.transforms.transforms:
+            if type(transform) is GenerateSpectrogram or type(transform) is GenerateMelSpectrogram:
+                return transform.n_fft, transform.keep_freq_point
+
+        assert False, "Could not find a Spectrogram or Mel-Spectrogram transform"
 
     def get_transformed_dims(self, height, width):
         if self.transforms:
@@ -413,11 +430,12 @@ class CLEAR_dataset(Dataset):
     def get_sample_rate(self):
         assert self.input_image_type == 'audio', 'Can only get sample rate when loading audio signal'
 
-        filepath = f"{self.root_folder_path}/audio/{self.set}/{self.get_game(0)['image']['filename']}"
+        if self.sample_rate is None:
+            filepath = f"{self.root_folder_path}/audio/{self.set}/{self.get_game(0)['image']['filename']}"
 
-        audio, sample_rate = torchaudio.load(filepath)
+            audio, self.sample_rate = torchaudio.load(filepath)
 
-        return sample_rate
+        return self.sample_rate
 
     def keep_1_game_per_scene(self):
         id_list = collections.defaultdict(lambda: False)

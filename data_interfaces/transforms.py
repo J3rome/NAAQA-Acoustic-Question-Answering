@@ -19,10 +19,11 @@ class ResampleAudio(object):
 class GenerateSpectrogram(object):
 
     def __init__(self, n_fft, keep_freq_point=None, db_amplitude=True, normalized=True):
-
         self.spectrogram_transform = torchaudio.transforms.Spectrogram(n_fft=n_fft, normalized=normalized)
-        self.keep_freq_point = keep_freq_point
         self.amplitude_to_db = torchaudio.transforms.AmplitudeToDB() if db_amplitude else None
+
+        self.n_fft = n_fft
+        self.keep_freq_point = keep_freq_point
 
     def __call__(self, sample):
 
@@ -47,6 +48,7 @@ class GenerateMelSpectrogram(object):
         self.spectrogram_transform = torchaudio.transforms.Spectrogram(n_fft=n_fft, normalized=normalized)
         self.mel_scale = torchaudio.transforms.MelScale(sample_rate=sample_rate, n_mels=n_mels)
 
+        self.n_fft = n_fft
         self.keep_freq_point = keep_freq_point
         self.normalized = normalized
 
