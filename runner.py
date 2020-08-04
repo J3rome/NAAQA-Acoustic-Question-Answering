@@ -403,8 +403,8 @@ def train_model(device, model, dataloaders, output_folder, criterion, optimizer,
         val_loss, val_acc, val_predictions, val_metrics = process_dataloader(False, device, model,
                                                                                 dataloaders['val'], criterion,
                                                                                 epoch_id=epoch,
-                                                                                tensorboard=tensorboard_per_set,
-                                                                                gamma_beta_path="%s/val_gamma_beta.h5" % epoch_output_folder_path)
+                                                                                tensorboard=tensorboard_per_set)#,
+                                                                                #gamma_beta_path="%s/val_gamma_beta.h5" % epoch_output_folder_path)
         print('\n{} Loss: {:.4f} Acc: {:.4f}'.format('Val', val_loss, val_acc))
 
         stats = save_training_stats(stats_file_path, epoch, train_acc, train_loss, val_acc, val_loss, epoch_train_time)
