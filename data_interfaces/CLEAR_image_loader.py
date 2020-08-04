@@ -2,6 +2,7 @@ import os
 from PIL import Image
 import numpy as np
 import torch
+import torchaudio
 import h5py
 
 # Why doing an image builder/loader?
@@ -99,6 +100,29 @@ class RawImageLoader(AbstractImgLoader):
         return None
 
 
+class RawAudioBuilder(AbstractImgBuilder):
+    def __init__(self, img_dir):
+        AbstractImgBuilder.__init__(self, img_dir, is_raw=True, require_process=True)
+
+    def build(self, image_id, filename, which_set, **kwargs):
+        img_path = os.path.join(self.img_dir, which_set, filename)
+        return RawAudioLoader(img_path)
+
+
+class RawAudioLoader(AbstractImgLoader):
+    def __init__(self, img_path):
+        AbstractImgLoader.__init__(self, img_path)
+
+    def get_image(self, normalize=True):
+        audio, sample_rate = torchaudio.load(self.img_path, normalization=normalize)
+        
+        return audio
+
+    def get_padding(self):
+        return None
+
+
+
 h5_basename="features.h5"
 h5_feature_key="features"
 h5_idx_key="idx2img"
@@ -184,10 +208,8 @@ def get_img_builder(input_image_type, data_dir, preprocessed_folder_name='prepro
 
     input_type = input_image_type
 
-    # FIXME: Figure out why there is the fc8 and fc7 cases with inversed buffersize logic
-    if input_type in ["fc8", "fc7"]:
-        bufferize = bufferize if bufferize is not None else True
-        loader = h5FeatureBuilder(os.path.join(data_dir, preprocessed_folder_name), bufferize=bufferize)
+    if input_type == 'audio':
+        loader = RawAudioBuilder(os.path.join(data_dir, 'audio'))
     elif input_type in ["conv", "raw_h5"]:
 
         # NOTE : When testing multiple dataset configurations, Images and questions are generated in separate folder and
