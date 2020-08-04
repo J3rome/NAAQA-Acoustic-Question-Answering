@@ -18,17 +18,15 @@ class ResampleAudio(object):
 
 class GenerateSpectrogram(object):
 
-    def __init__(self, n_fft, keep_freq_point=None, db_amplitude=True, normalized=True):
-        self.spectrogram_transform = torchaudio.transforms.Spectrogram(n_fft=n_fft, normalized=normalized)
+    def __init__(self, n_fft, keep_freq_point=None, db_amplitude=True, per_spectrogram_normalize=False):
+        self.spectrogram_transform = torchaudio.transforms.Spectrogram(n_fft=n_fft, normalized=True)
         self.amplitude_to_db = torchaudio.transforms.AmplitudeToDB() if db_amplitude else None
 
         self.n_fft = n_fft
         self.keep_freq_point = keep_freq_point
+        self.per_spectrogram_normalize = per_spectrogram_normalize
 
     def __call__(self, sample):
-
-        #assert 'audio' in sample, "This transform should be applied to a raw audio signal"
-
         specgram = self.spectrogram_transform(sample['image'])[0, :, :]
 
         if self.keep_freq_point:
@@ -37,6 +35,10 @@ class GenerateSpectrogram(object):
         if self.amplitude_to_db:
             specgram = self.amplitude_to_db(specgram)
 
+        if self.per_spectrogram_normalize:
+            specgram_min = specgram.min()
+            specgram = (specgram - specgram_min) / (specgram.max() - specgram_min)
+
         sample['image'] = torch.flip(specgram, (0,)).unsqueeze(0)
 
         return sample
@@ -44,22 +46,24 @@ class GenerateSpectrogram(object):
 
 class GenerateMelSpectrogram(object):
 
-    def __init__(self, n_fft, n_mels, sample_rate, keep_freq_point=None, normalized=True):
-        self.spectrogram_transform = torchaudio.transforms.Spectrogram(n_fft=n_fft, normalized=normalized)
+    def __init__(self, n_fft, n_mels, sample_rate, keep_freq_point=None, per_spectrogram_normalize=False):
+        self.spectrogram_transform = torchaudio.transforms.Spectrogram(n_fft=n_fft, normalized=True)
         self.mel_scale = torchaudio.transforms.MelScale(sample_rate=sample_rate, n_mels=n_mels)
 
         self.n_fft = n_fft
         self.keep_freq_point = keep_freq_point
-        self.normalized = normalized
+        self.per_spectrogram_normalize = per_spectrogram_normalize
 
     def __call__(self, sample):
-        #assert 'audio' in sample, "This transform should be applied to a raw audio signal"
-
         specgram = self.spectrogram_transform(sample['audio'])[0, :, :]
         if self.keep_freq_point:
             specgram = specgram[:self.keep_freq_point, :]
 
         specgram = self.mel_scale(specgram)
+
+        if self.per_spectrogram_normalize:
+            specgram_min = specgram.min()
+            specgram = (specgram - specgram_min) / (specgram.max() - specgram_min)
 
         sample['image'] = torch.flip(specgram, (0,)).unsqueeze(0)
 

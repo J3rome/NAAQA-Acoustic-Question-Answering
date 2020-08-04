@@ -62,23 +62,35 @@ def process_gamma_beta(processed_predictions, gamma_vectors_per_resblock, beta_v
     return processed_gamma_beta_vectors
 
 
-def calc_mean_and_std(dataloader, device='cpu'):
-    """Compute the mean and sd in an online fashion
-
-        Var[x] = E[X^2] - E^2[X]
+def calc_dataset_stats(dataloader, device='cpu'):
+    """Compute the mean, std, min, max in an online fashion
     """
     assert dataloader.dataset.is_raw_img(), "Config must be set to RAW img to calculate images stats"
 
     print("Calculating mean and std from dataset")
 
+    input_channel = dataloader.dataset[0]['image'].shape[0]
+
     cnt = 0
-    fst_moment = torch.empty(3, device=device)
-    snd_moment = torch.empty(3, device=device)
+    fst_moment = torch.empty(input_channel, device=device)
+    snd_moment = torch.empty(input_channel, device=device)
+    min_val = torch.tensor(9999999, device=device).float()
+    max_val = torch.tensor(-9999999, device=device).float()
 
     for batched_data in tqdm(dataloader):
         images = batched_data['image'].to(device)
         b, c, h, w = images.shape
         nb_pixels = b * h * w
+
+        batch_max_val = images.max()
+        batch_min_val = images.min()
+
+        if batch_min_val < min_val:
+            min_val = batch_min_val
+
+        if batch_max_val > max_val:
+            max_val = batch_max_val
+
         sum_ = torch.sum(images, dim=[0, 2, 3])
         sum_of_square = torch.sum(images ** 2, dim=[0, 2, 3])
         fst_moment = (cnt * fst_moment + sum_) / (cnt + nb_pixels)
@@ -88,5 +100,5 @@ def calc_mean_and_std(dataloader, device='cpu'):
 
     snd_moment = torch.sqrt(snd_moment - fst_moment ** 2)
 
-    return fst_moment.tolist(), snd_moment.tolist()
+    return fst_moment.tolist(), snd_moment.tolist(), min_val.item(), max_val.item()
 

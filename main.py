@@ -9,7 +9,7 @@ from torchvision import transforms
 from runner import train_model, prepare_model, inference
 from baselines import random_answer_baseline, random_weight_baseline
 from preprocessing import create_dict_from_questions, extract_features, images_to_h5, get_lr_finder_curves
-from preprocessing import write_clear_stats_to_file
+from preprocessing import get_dataset_stats_and_write
 from visualization import visualize_gamma_beta, grad_cam_visualization
 from data_interfaces.CLEAR_dataset import CLEAR_dataset, CLEAR_collate_fct
 from data_interfaces.CLEVR_dataset import CLEVR_dataset
@@ -91,6 +91,9 @@ parser.add_argument("--spectrogram_keep_freq_point", help="Number of frequency p
                     type=int, default=None)
 parser.add_argument("--resample_audio_to", help="Define the new sampling frequency for the audio signal",
                     type=float, default=None)
+parser.add_argument("--per_spectrogram_normalize", help="Will normalize the spectrograms between 0 and 1 according to"
+                                                        "the min & max values of the individual samples",
+                    action='store_true')
 
 # Question Preprocessing parameters
 parser.add_argument("--no_start_end_tokens", help="Constants tokens won't be added to the question "
@@ -236,32 +239,49 @@ def set_transforms_on_datasets(args, datasets, data_path):
         if args['mel_spectrogram']:
             transforms_to_add.append(GenerateMelSpectrogram(n_fft=args['spectrogram_n_fft'],
                                                             n_mels=args['spectrogram_n_mels'],
-                                                            sample_rate=sample_rate))
+                                                            sample_rate=sample_rate,
+                                                            per_spectrogram_normalize=args['per_spectrogram_normalize']))
         else:
             transforms_to_add.append(GenerateSpectrogram(n_fft=args['spectrogram_n_fft'],
-                                                         keep_freq_point=args['spectrogram_keep_freq_point']))
+                                                         keep_freq_point=args['spectrogram_keep_freq_point'],
+                                                         per_spectrogram_normalize=args['per_spectrogram_normalize']))
 
         for dataset in datasets.values():
             for transform in transforms_to_add:
                 dataset.add_transform(transform)
 
+    if args['normalize_zero_one'] or args['normalize_with_clear_stats']:
+        # Retrieve mean, std, min and max values of the dataset
+        stats = get_dataset_stats_and_write(datasets['train'], args['device'], batch_size=args['batch_size'],
+                                            recalculate=False)
+    elif args['normalize_with_imagenet_stats']:
+        stats = get_imagenet_stats()
+
     if args['normalize_zero_one']:
-        transform = ImgBetweenZeroOne()
+        if args['input_image_type'] == 'audio':
+            transform = ImgBetweenZeroOne(min_val=stats['min'], max_val=stats['max'])
+
+            # Normalize the calculated mean and std
+            # When working with images, we have a per channel mean & std
+            input_channels = len(stats['mean'])
+            min_val = torch.tensor([stats['min']] * input_channels)
+            max_val = torch.tensor([stats['max']] * input_channels)
+
+            stats['mean'] = ((torch.tensor(stats['mean']) - min_val) / (max_val - min_val)).tolist()
+            stats['std'] = ((torch.tensor(stats['std']) - min_val) / (max_val - min_val)).tolist()
+        else:
+            transform = ImgBetweenZeroOne()
+
         for dataset in datasets.values():
             dataset.add_transform(transform)
 
-    if args['input_image_type'].startswith('raw'):
-        # TODO : Add data augmentation ?
-        if args['normalize_with_imagenet_stats'] or args['normalize_with_clear_stats']:
-            if args['normalize_with_imagenet_stats']:
-                stats = get_imagenet_stats()
-            else:
-                stats = get_clear_stats(data_path)
+    # TODO : Add data augmentation ?
 
-            transform = NormalizeSample(mean=stats['mean'], std=stats['std'], inplace=True)
+    if args['normalize_with_imagenet_stats'] or args['normalize_with_clear_stats']:
+        transform = NormalizeSample(mean=stats['mean'], std=stats['std'], inplace=True)
 
-            for dataset in datasets.values():
-                dataset.add_transform(transform)
+        for dataset in datasets.values():
+            dataset.add_transform(transform)
 
     if args['input_image_type'] == "raw_h5" and args['pad_per_batch']:
         remove_padding_transform = RemovePadding()
@@ -400,7 +420,7 @@ def execute_task(task, args, output_dated_folder, dataloaders, model, model_conf
                              val_dataloader=dataloaders['val'], loss_criterion=loss_criterion)
 
     elif task == "calc_clear_mean":
-        write_clear_stats_to_file(dataloaders['train'], device)
+        get_dataset_stats_and_write(dataloaders['train'], dataloaders['train'].dataset, device, recalculate=True)
 
     elif task == 'random_answer_baseline':
         random_answer_baseline(dataloaders['train'], output_dated_folder)
@@ -427,6 +447,8 @@ def prepare_for_task(args):
         torch.cuda.set_device(args['gpu_index'])
     else:
         device = 'cpu'
+
+    args['device'] = device
 
     if args['random_seed'] is not None:
         set_random_seed(args['random_seed'])

@@ -5,9 +5,9 @@ from tqdm import tqdm
 from collections import defaultdict
 from random import shuffle
 
-from data_interfaces.CLEAR_dataset import CLEARTokenizer
+from data_interfaces.CLEAR_dataset import CLEARTokenizer, CLEAR_collate_fct, CLEAR_dataset
 from utils.file import create_folder_if_necessary, save_json, read_json
-from utils.processing import calc_mean_and_std
+from utils.processing import calc_dataset_stats
 
 import torch
 import torch.nn as nn
@@ -59,19 +59,34 @@ def get_lr_finder_curves(model, device, train_dataloader, output_dated_folder, n
     return fig, ax
 
 
-def write_clear_stats_to_file(dataloader, device, filename='clear_stats.json'):
-    stats_file_path = f"{dataloader.dataset.root_folder_path}/{filename}"
+def get_dataset_stats_and_write(dataset, device, filename='clear_stats.json', recalculate=False, batch_size=1):
+    stats_file_path = f"{dataset.root_folder_path}/{dataset.preprocessed_folder_name}/{filename}"
 
-    dataloader.dataset.keep_1_game_per_scene()
+    if os.path.exists(stats_file_path) and not recalculate:
+        print(f"Loading CLEAR stats from {stats_file_path}")
+        return read_json(stats_file_path)
 
-    mean, std = calc_mean_and_std(dataloader, device=device)
+    dataset_copy = CLEAR_dataset.from_dataset_object(dataset, dataset.games)
 
-    save_json({
-            'mean': mean,
-            'std': std
-        }, stats_file_path)
+    dataset_copy.keep_1_game_per_scene()
+
+    dataloader = torch.utils.data.DataLoader(dataset_copy, batch_size=batch_size, shuffle=False, num_workers=1,
+                                             collate_fn=CLEAR_collate_fct(padding_token=
+                                                                          dataset_copy.get_padding_token()))
+
+    mean, std, min_val, max_val = calc_dataset_stats(dataloader, device=device)
+
+    stats = {
+        'mean': mean,
+        'std': std,
+        'min': min_val,
+        'max': max_val
+    }
+    save_json(stats, stats_file_path)
 
     print(f"Clear stats written to '{stats_file_path}'")
+
+    return stats
 
 
 # >>> Feature Extraction

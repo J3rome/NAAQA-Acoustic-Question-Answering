@@ -41,6 +41,7 @@ class CLEAR_dataset(Dataset):
 
         self.set = set_type
         self.input_image_type = input_image_type
+        self.preprocessed_folder_name = preprocessed_folder_name
         self.image_builder = get_img_builder(input_image_type, self.root_folder_path,
                                              preprocessed_folder_name=preprocessed_folder_name, bufferize=None)
         self.transforms = transforms if transforms else viz_transforms.Compose([])
@@ -169,8 +170,7 @@ class CLEAR_dataset(Dataset):
 
         if games:
             questions = []
-            for game in games:
-                game = orjson.loads(game)
+            for idx, game in games.items():
                 question = {
                     'question_index': game['id'],
                     'scene_index': game['image']['id'],
