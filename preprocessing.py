@@ -236,9 +236,13 @@ def create_dict_from_questions(dataset, word_min_occurence=1, dict_filename='dic
         word_index += 2
 
     answer2i = {  #'<padding>': 0,        # FIXME : Why would we need padding in the answers ?
-        '<unk>': 0  # FIXME : We have no training example with unkonwn answer. Add Switch to remove unknown answer
+        #'<unk>': 0  # FIXME : We have no training example with unkonwn answer. Add Switch to remove unknown answer
     }
-    answer_index = max(answer2i.values()) + 1
+
+    if len(answer2i) > 0:
+        answer_index = max(answer2i.values()) + 1
+    else:
+        answer_index = 0
 
     answers = [k.lower() for k in dataset.answer_counter.keys()]
     word2occ = defaultdict(int)
@@ -264,28 +268,27 @@ def create_dict_from_questions(dataset, word_min_occurence=1, dict_filename='dic
             word2i[word_occ[0]] = word_index
             word_index += 1
 
+    if force_all_answers:
+        all_answers = read_json(dataset.root_folder_path, 'attributes.json')
+
+        all_answers = [a.lower() for answers in all_answers.values() for a in answers]
+
+        padded_answers = []
+
+        for answer in all_answers:
+            if answer not in answers:
+                answers.append(answer)
+                padded_answers.append(answer)
+
+        print("Padded dict with %d missing answers : " % len(padded_answers))
+        print(padded_answers)
+
     sorted_answers = sorted(answers)
     shuffle(sorted_answers)
     # parse the answers
     for answer in sorted_answers:
         answer2i[answer] = answer_index
         answer_index += 1
-
-    if force_all_answers:
-        all_answers = read_json(dataset.root_folder_path, 'attributes.json')
-
-        all_answers = [a for answers in all_answers.values() for a in answers]
-
-        padded_answers = []
-
-        for answer in all_answers:
-            if answer not in answer2i:
-                answer2i[answer] = answer_index
-                answer_index += 1
-                padded_answers.append(answer)
-
-        print("Padded dict with %d missing answers : " % len(padded_answers))
-        print(padded_answers)
 
     print("Number of words: {}".format(len(word2i)))
     print("Number of answers: {}".format(len(answer2i)))
