@@ -88,6 +88,8 @@ def update_arguments(args, paths, flags):
         args['input_image_type'] = "conv"
     elif args['h5_image_input']:
         args['input_image_type'] = "raw_h5"
+    elif args['audio_input']:
+        args['input_image_type'] = "audio"
     else:
         args['input_image_type'] = "raw"
 
