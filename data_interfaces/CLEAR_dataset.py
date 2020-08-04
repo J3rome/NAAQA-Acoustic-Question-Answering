@@ -117,6 +117,8 @@ class CLEAR_dataset(Dataset):
 
                 if scenes_def:
                     self.scenes[image_id]['definition'] = scenes_def[image_id]
+                    self.scenes[image_id]['definition']['duration'] = scenes_def[image_id]['silence_before'] + \
+                                                                      sum([o['duration'] + o['silence_after'] for o in scenes_def[image_id]['objects']])
 
             game = {
                 'id': question_id,
