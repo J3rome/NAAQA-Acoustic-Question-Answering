@@ -9,6 +9,7 @@ import torch
 from torch.utils.data import Dataset
 import torch.nn.functional as F
 from torchvision import transforms as viz_transforms
+import torchaudio
 
 from data_interfaces.CLEAR_image_loader import get_img_builder, CLEARImage
 from utils.file import read_json, get_size_from_image_header
@@ -41,7 +42,7 @@ class CLEAR_dataset(Dataset):
         self.input_image_type = input_image_type
         self.image_builder = get_img_builder(input_image_type, self.root_folder_path,
                                              preprocessed_folder_name=preprocessed_folder_name, bufferize=None)
-        self.transforms = transforms
+        self.transforms = transforms if transforms else viz_transforms.Compose([])
         self.input_shape = None
         self.all_image_sizes = None
 
@@ -97,7 +98,11 @@ class CLEAR_dataset(Dataset):
                 image_id = int(sample["image_index"])
 
             if "scene_filename" in sample:
-                image_filename = sample["scene_filename"].replace('.wav', ".png")  # The clear dataset specify the filename to the scene wav file
+                if input_image_type == "audio":
+                    replace_to = ".flac"
+                else:
+                    replace_to = ".png"
+                image_filename = sample["scene_filename"].replace('.wav', replace_to)  # The clear dataset specify the filename to the scene wav file
             else:
                 # Backward compatibility with older CLEVR format
                 image_filename = sample["image_filename"].replace('AQA_', 'CLEAR_')
@@ -402,6 +407,15 @@ class CLEAR_dataset(Dataset):
             return self.input_shape[-2:] + [self.input_shape[0]]
 
         return self.input_shape
+
+    def get_sample_rate(self):
+        assert self.input_image_type == 'audio', 'Can only get sample rate when loading audio signal'
+
+        filepath = f"{self.root_folder_path}/audio/{self.set}/{self.get_game(0)['image']['filename']}"
+
+        audio, sample_rate = torchaudio.load(filepath)
+
+        return sample_rate
 
     def keep_1_game_per_scene(self):
         id_list = collections.defaultdict(lambda: False)
