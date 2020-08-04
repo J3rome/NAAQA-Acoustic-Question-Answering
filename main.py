@@ -12,8 +12,10 @@ from preprocessing import create_dict_from_questions, extract_features, images_t
 from preprocessing import write_clear_stats_to_file
 from visualization import visualize_gamma_beta, grad_cam_visualization
 from data_interfaces.CLEAR_dataset import CLEAR_dataset, CLEAR_collate_fct
+from data_interfaces.CLEVR_dataset import CLEVR_dataset
 from data_interfaces.transforms import ImgBetweenZeroOne, PadTensor, NormalizeSample, PadTensorHeight
 from data_interfaces.transforms import ResizeTensorBasedOnMaxWidth, RemovePadding
+from data_interfaces.transforms import GenerateMelSpectrogram, GenerateSpectrogram, ResampleAudio
 
 from utils.file import save_model_config, save_json, read_json, create_symlink_to_latest_folder
 from utils.file import create_folders_save_args, fix_best_epoch_symlink_if_necessary, get_clear_stats
@@ -79,6 +81,16 @@ parser.add_argument("--normalize_with_imagenet_stats", help="Will normalize inpu
                                                        "ImageNet mean & std (Only with RAW input)", action='store_true')
 parser.add_argument("--normalize_with_clear_stats", help="Will normalize input images according to"
                                                          "CLEAR mean & std (Only with RAW input)", action='store_true')
+parser.add_argument("--mel_spectrogram", help="Will create MEL spectrogram when used with --audio_input. "
+                                              "Otherwise regular spectrogram", action='store_true')
+parser.add_argument("--spectrogram_n_fft", help="Define the fft window length when generating spectrogram",
+                    type=int, default=4096)
+parser.add_argument("--spectrogram_n_mels", help="Number of mel filter to use when generating mel-spectrogram",
+                    type=int, default=128)
+parser.add_argument("--spectrogram_keep_freq_point", help="Number of frequency point used generating spectrogram",
+                    type=int, default=None)
+parser.add_argument("--resample_audio_to", help="Define the new sampling frequency for the audio signal",
+                    type=float, default=None)
 
 # Question Preprocessing parameters
 parser.add_argument("--no_start_end_tokens", help="Constants tokens won't be added to the question "
@@ -123,6 +135,8 @@ parser.add_argument("--stop_at_val_acc", type=float, default=None,
                          "Specified in integer percentage (95).")
 
 # Input parameters
+parser.add_argument("--audio_input", help="If set, audio files will be read from the audio folder of the dataset",
+                    action='store_true')
 parser.add_argument("--h5_image_input", help="If set, images will be read from h5 file in preprocessed folder",
                     action='store_true')
 parser.add_argument("--conv_feature_input", help="If set, conv feature will be read from h5 file in preprocessed folder",
@@ -151,33 +165,12 @@ parser.add_argument("--test_set_batch_size", type=int, default=None, help="Use d
 parser.add_argument("--no_model_summary", help="Will hide the model summary", action='store_true')
 parser.add_argument("--tf_weight_path", type=str, help="Specify where to load dumped tensorflow weights "
                                                        "(Used with --tf_weight_transfer)")
-
-
-def get_transforms_from_args(args, data_path):
-    transforms_list = []
-
-    if args['normalize_zero_one']:
-        transforms_list.append(ImgBetweenZeroOne())
-
-    if args['input_image_type'].startswith('raw'):
-
-        # TODO : Add data augmentation ?
-
-        if args['normalize_with_imagenet_stats'] or args['normalize_with_clear_stats']:
-            if args['normalize_with_imagenet_stats']:
-                stats = get_imagenet_stats()
-            else:
-                stats = get_clear_stats(data_path)
-
-            transforms_list.append(NormalizeSample(mean=stats['mean'], std=stats['std'], inplace=True))
-
-    return transforms.Compose(transforms_list)
+parser.add_argument("--clevr_dataset", help="Will load the clevr dataset instead of the CLEAR dataset", action='store_true')
 
 
 # Data loading & preparation
 def create_datasets(args, data_path, load_dataset_extra_stats=False):
     print("Creating Datasets")
-    transforms_to_apply = get_transforms_from_args(args, data_path)
 
     if args['test_dataset_path']:
         if '/' in args['test_dataset_path']:
@@ -194,25 +187,78 @@ def create_datasets(args, data_path, load_dataset_extra_stats=False):
         test_data_root_path = args['data_root_path']
         test_version_name = args['version_name']
 
+    if not args['clevr_dataset']:
+        dataset_class = CLEAR_dataset
+    else:
+        dataset_class = CLEVR_dataset
+
     datasets = {
-        'train': CLEAR_dataset(args['data_root_path'], args['version_name'], args['input_image_type'], 'train',
-                               dict_file_path=args['dict_file_path'], transforms=transforms_to_apply,
-                               tokenize_text=not args['create_dict'], extra_stats=load_dataset_extra_stats,
+        'train': dataset_class(args['data_root_path'], args['version_name'], args['input_image_type'], 'train',
+                               dict_file_path=args['dict_file_path'], tokenize_text=not args['create_dict'],
+                               extra_stats=load_dataset_extra_stats,
                                preprocessed_folder_name=args['preprocessed_folder_name'],
                                use_cache=args['enable_image_cache'], max_cache_size=args['max_image_cache_size']),
 
-        'val': CLEAR_dataset(args['data_root_path'], args['version_name'], args['input_image_type'], 'val',
-                             dict_file_path=args['dict_file_path'], transforms=transforms_to_apply,
-                             tokenize_text=not args['create_dict'], extra_stats=load_dataset_extra_stats,
+        'val': dataset_class(args['data_root_path'], args['version_name'], args['input_image_type'], 'val',
+                             dict_file_path=args['dict_file_path'], tokenize_text=not args['create_dict'],
+                             extra_stats=load_dataset_extra_stats,
                              preprocessed_folder_name=args['preprocessed_folder_name'],
                              use_cache=args['enable_image_cache'], max_cache_size=args['max_image_cache_size']),
 
-        'test': CLEAR_dataset(test_data_root_path, test_version_name, args['input_image_type'], 'test',
-                              dict_file_path=args['dict_file_path'], transforms=transforms_to_apply,
-                              tokenize_text=not args['create_dict'], extra_stats=load_dataset_extra_stats,
+        'test': dataset_class(test_data_root_path, test_version_name, args['input_image_type'], 'test',
+                              dict_file_path=args['dict_file_path'], tokenize_text=not args['create_dict'],
+                              extra_stats=load_dataset_extra_stats,
                               preprocessed_folder_name=args['preprocessed_folder_name'],
                               use_cache=args['enable_image_cache'], max_cache_size=args['max_image_cache_size'])
     }
+
+    datasets = set_transforms_on_datasets(args, datasets, data_path)
+
+    return datasets
+
+
+def set_transforms_on_datasets(args, datasets, data_path):
+
+    if args['input_image_type'] == 'audio':
+        transforms_to_add = []
+        sample_rate = datasets['train'].get_sample_rate()
+
+        if args['resample_audio_to']:
+            if 0 < args['resample_audio_to'] < 1:
+                args['resample_audio_to'] = sample_rate * args['resample_audio_to']
+
+            transforms_to_add.append(ResampleAudio(original_sample_rate=sample_rate,
+                                                   resample_to=int(args['resample_audio_to'])))
+
+        if args['mel_spectrogram']:
+            transforms_to_add.append(GenerateMelSpectrogram(n_fft=args['spectrogram_n_fft'],
+                                                            n_mels=args['spectrogram_n_mels'],
+                                                            sample_rate=sample_rate))
+        else:
+            transforms_to_add.append(GenerateSpectrogram(n_fft=args['spectrogram_n_fft'],
+                                                         keep_freq_point=args['spectrogram_keep_freq_point']))
+
+        for dataset in datasets.values():
+            for transform in transforms_to_add:
+                dataset.add_transform(transform)
+
+    if args['normalize_zero_one']:
+        transform = ImgBetweenZeroOne()
+        for dataset in datasets.values():
+            dataset.add_transform(transform)
+
+    if args['input_image_type'].startswith('raw'):
+        # TODO : Add data augmentation ?
+        if args['normalize_with_imagenet_stats'] or args['normalize_with_clear_stats']:
+            if args['normalize_with_imagenet_stats']:
+                stats = get_imagenet_stats()
+            else:
+                stats = get_clear_stats(data_path)
+
+            transform = NormalizeSample(mean=stats['mean'], std=stats['std'], inplace=True)
+
+            for dataset in datasets.values():
+                dataset.add_transform(transform)
 
     if args['input_image_type'] == "raw_h5" and args['pad_per_batch']:
         remove_padding_transform = RemovePadding()
