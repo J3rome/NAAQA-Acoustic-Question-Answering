@@ -537,7 +537,7 @@ class CLEARTokenizer:
             answer = answer.lower()
 
         if answer not in self.answer2i:
-            return self.answer2i['<unk>']
+            return None
         return self.answer2i[answer]
 
     def decode_answer(self, answer_id):
