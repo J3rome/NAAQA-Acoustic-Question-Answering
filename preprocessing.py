@@ -203,6 +203,8 @@ def images_to_h5(dataloaders, output_folder_name='preprocessed'):
     else:
         create_folder_if_necessary(output_folder_path)
 
+    input_channels = first_dataloader.dataset.get_input_shape()[0]
+
     for set_type, dataloader in dataloaders.items():
         print("Creating H5 file from '%s' set" % set_type)
         output_filepath = '%s/%s_features.h5' % (output_folder_path, set_type)
@@ -210,7 +212,7 @@ def images_to_h5(dataloaders, output_folder_name='preprocessed'):
         # Retrieve min & max dims of images
         max_width_id, height, max_width = dataloader.dataset.get_max_width_image_dims(return_scene_id=True)
 
-        image_dim = [3, height, max_width]
+        image_dim = [input_channels, height, max_width]
 
         # Keep only 1 game per scene (We want to process every image only once)
         dataloader.dataset.keep_1_game_per_scene()
