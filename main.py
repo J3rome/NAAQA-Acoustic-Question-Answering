@@ -199,35 +199,37 @@ def create_datasets(args, data_path, load_dataset_extra_stats=False):
     else:
         dataset_class = CLEVR_dataset
 
+    transforms_device = args['device'] if args['do_transforms_on_gpu'] else None
+
     datasets = {
         'train': dataset_class(args['data_root_path'], args['version_name'], args['input_image_type'], 'train',
                                dict_file_path=args['dict_file_path'], tokenize_text=not args['create_dict'],
                                extra_stats=load_dataset_extra_stats,
                                preprocessed_folder_name=args['preprocessed_folder_name'],
                                use_cache=args['enable_image_cache'], max_cache_size=args['max_image_cache_size'],
-                               do_transforms_on_device=args['device'] if args['do_transforms_on_gpu'] else None),
+                               do_transforms_on_device=transforms_device),
 
         'val': dataset_class(args['data_root_path'], args['version_name'], args['input_image_type'], 'val',
                              dict_file_path=args['dict_file_path'], tokenize_text=not args['create_dict'],
                              extra_stats=load_dataset_extra_stats,
                              preprocessed_folder_name=args['preprocessed_folder_name'],
                              use_cache=args['enable_image_cache'], max_cache_size=args['max_image_cache_size'],
-                             do_transforms_on_device=args['device'] if args['do_transforms_on_gpu'] else None),
+                             do_transforms_on_device=transforms_device),
 
         'test': dataset_class(test_data_root_path, test_version_name, args['input_image_type'], 'val',
                               dict_file_path=args['dict_file_path'], tokenize_text=not args['create_dict'],
                               extra_stats=load_dataset_extra_stats,
                               preprocessed_folder_name=args['preprocessed_folder_name'],
                               use_cache=args['enable_image_cache'], max_cache_size=args['max_image_cache_size'],
-                              do_transforms_on_device=args['device'] if args['do_transforms_on_gpu'] else None)
+                              do_transforms_on_device=transforms_device)
     }
 
-    datasets = set_transforms_on_datasets(args, datasets, data_path)
+    datasets = set_transforms_on_datasets(args, datasets, transforms_device)
 
     return datasets
 
 
-def set_transforms_on_datasets(args, datasets, data_path):
+def set_transforms_on_datasets(args, datasets, transforms_device):
 
     if args['input_image_type'] == 'audio':
         transforms_to_add = []
@@ -247,11 +249,13 @@ def set_transforms_on_datasets(args, datasets, data_path):
             transforms_to_add.append(GenerateMelSpectrogram(n_fft=args['spectrogram_n_fft'],
                                                             n_mels=args['spectrogram_n_mels'],
                                                             sample_rate=sample_rate,
-                                                            per_spectrogram_normalize=args['per_spectrogram_normalize']))
+                                                            per_spectrogram_normalize=args['per_spectrogram_normalize'],
+                                                            device=transforms_device))
         else:
             transforms_to_add.append(GenerateSpectrogram(n_fft=args['spectrogram_n_fft'],
                                                          keep_freq_point=args['spectrogram_keep_freq_point'],
-                                                         per_spectrogram_normalize=args['per_spectrogram_normalize']))
+                                                         per_spectrogram_normalize=args['per_spectrogram_normalize'],
+                                                         device=transforms_device))
 
         for dataset in datasets.values():
             for transform in transforms_to_add:
@@ -348,10 +352,11 @@ def set_transforms_on_datasets(args, datasets, data_path):
     return datasets
 
 
-def create_dataloaders(args, datasets, pin_memory=True):
+def create_dataloaders(args, datasets):
     print("Creating Dataloaders")
     collate_fct = CLEAR_collate_fct(padding_token=datasets['train'].get_padding_token())
 
+    pin_memory = not args['do_transforms_on_gpu']
     test_set_batch_size = args['test_set_batch_size'] if args['test_set_batch_size'] else args['batch_size']
 
     return {
