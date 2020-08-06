@@ -94,6 +94,10 @@ parser.add_argument("--resample_audio_to", help="Define the new sampling frequen
 parser.add_argument("--per_spectrogram_normalize", help="Will normalize the spectrograms between 0 and 1 according to"
                                                         "the min & max values of the individual samples",
                     action='store_true')
+parser.add_argument("--do_transforms_on_gpu", help="Will do all the preprocessing transforms on the gpu. "
+                                                   "This will also result in dataloader.num_worker = 0."
+                                                   "Depending on the task, multiple workers might be better or worse",
+                    action='store_true')
 
 # Question Preprocessing parameters
 parser.add_argument("--no_start_end_tokens", help="Constants tokens won't be added to the question "
@@ -200,19 +204,22 @@ def create_datasets(args, data_path, load_dataset_extra_stats=False):
                                dict_file_path=args['dict_file_path'], tokenize_text=not args['create_dict'],
                                extra_stats=load_dataset_extra_stats,
                                preprocessed_folder_name=args['preprocessed_folder_name'],
-                               use_cache=args['enable_image_cache'], max_cache_size=args['max_image_cache_size']),
+                               use_cache=args['enable_image_cache'], max_cache_size=args['max_image_cache_size'],
+                               do_transforms_on_device=args['device'] if args['do_transforms_on_gpu'] else None),
 
         'val': dataset_class(args['data_root_path'], args['version_name'], args['input_image_type'], 'val',
                              dict_file_path=args['dict_file_path'], tokenize_text=not args['create_dict'],
                              extra_stats=load_dataset_extra_stats,
                              preprocessed_folder_name=args['preprocessed_folder_name'],
-                             use_cache=args['enable_image_cache'], max_cache_size=args['max_image_cache_size']),
+                             use_cache=args['enable_image_cache'], max_cache_size=args['max_image_cache_size'],
+                             do_transforms_on_device=args['device'] if args['do_transforms_on_gpu'] else None),
 
-        'test': dataset_class(test_data_root_path, test_version_name, args['input_image_type'], 'test',
+        'test': dataset_class(test_data_root_path, test_version_name, args['input_image_type'], 'val',
                               dict_file_path=args['dict_file_path'], tokenize_text=not args['create_dict'],
                               extra_stats=load_dataset_extra_stats,
                               preprocessed_folder_name=args['preprocessed_folder_name'],
-                              use_cache=args['enable_image_cache'], max_cache_size=args['max_image_cache_size'])
+                              use_cache=args['enable_image_cache'], max_cache_size=args['max_image_cache_size'],
+                              do_transforms_on_device=args['device'] if args['do_transforms_on_gpu'] else None)
     }
 
     datasets = set_transforms_on_datasets(args, datasets, data_path)

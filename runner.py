@@ -178,9 +178,13 @@ def process_dataloader(is_training, device, model, dataloader, criterion=None, o
     all_questions = []
     nb_written = 0
 
+    images_already_on_gpu = dataloader.dataset.do_transforms_on_device and dataloader.dataset.do_transforms_on_device.startswith('cuda')
+
     for batch_idx, batch in enumerate(tqdm(dataloader)):
-        #mem_trace.report('Batch %d/%d - Epoch %d' % (i, dataloader.batch_size, epoch))
-        images = batch['image'].to(device, non_blocking=True)
+        if not images_already_on_gpu:
+            images = batch['image'].to(device, non_blocking=True)
+        else:
+            images = batch['images']
         questions = batch['question'].to(device)
         answers = batch['answer'].to(device)
         seq_lengths = batch['seq_length'].to(device)

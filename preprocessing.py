@@ -221,12 +221,14 @@ def images_to_h5(dataloaders, output_folder_name='preprocessed'):
 
         with h5py.File(output_filepath, 'w') as f:
             # FIXME : Change dataset name ?
-            # FIXME : We loose padding informations when saving in h5 file
             h5_dataset = f.create_dataset('features', shape=[nb_games] + image_dim, dtype=np.float32)
             h5_idx2img = f.create_dataset('idx2img', shape=[nb_games], dtype=np.int32)
             h5_img_padding = f.create_dataset('img_padding', shape=[nb_games, 2], dtype=np.int32)
             h5_idx = 0
             for batch in tqdm(dataloader):
+                if batch['image'].device != 'cpu':
+                    batch['image'] = batch['image'].cpu()
+
                 h5_dataset[h5_idx: h5_idx + batch_size] = batch['image']
                 h5_img_padding[h5_idx: h5_idx + batch_size] = batch['image_padding']
 
@@ -234,6 +236,7 @@ def images_to_h5(dataloaders, output_folder_name='preprocessed'):
                     h5_idx2img[h5_idx + i] = scene_id
 
                 h5_idx += batch_size
+
         print("Images extracted successfully to '%s'" % output_filepath)
 
 

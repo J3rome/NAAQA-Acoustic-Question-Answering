@@ -18,8 +18,9 @@ class ResampleAudio(object):
 
 class GenerateSpectrogram(object):
 
-    def __init__(self, n_fft, keep_freq_point=None, db_amplitude=True, per_spectrogram_normalize=False):
-        self.spectrogram_transform = torchaudio.transforms.Spectrogram(n_fft=n_fft, normalized=True)
+    def __init__(self, n_fft, keep_freq_point=None, db_amplitude=True, per_spectrogram_normalize=False, device='cpu'):
+        self.spectrogram_transform = torchaudio.transforms.Spectrogram(n_fft=n_fft, normalized=True,
+                                                                       wkwargs={'device': device})  # Device for the hanning window function
         self.amplitude_to_db = torchaudio.transforms.AmplitudeToDB() if db_amplitude else None
 
         self.n_fft = n_fft
@@ -46,8 +47,9 @@ class GenerateSpectrogram(object):
 
 class GenerateMelSpectrogram(object):
 
-    def __init__(self, n_fft, n_mels, sample_rate, keep_freq_point=None, per_spectrogram_normalize=False):
-        self.spectrogram_transform = torchaudio.transforms.Spectrogram(n_fft=n_fft, normalized=True)
+    def __init__(self, n_fft, n_mels, sample_rate, keep_freq_point=None, per_spectrogram_normalize=False, device='cpu'):
+        self.spectrogram_transform = torchaudio.transforms.Spectrogram(n_fft=n_fft, normalized=True,
+                                                                       wkwargs={'device': device})  # Device for the hanning window function
         self.mel_scale = torchaudio.transforms.MelScale(sample_rate=sample_rate, n_mels=n_mels)
 
         self.n_fft = n_fft

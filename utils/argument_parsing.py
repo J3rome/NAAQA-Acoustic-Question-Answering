@@ -99,6 +99,9 @@ def update_arguments(args, paths, flags):
         # Default values when in RAW mode
         args['nb_dataloader_worker'] = 3
 
+    if args['do_transforms_on_gpu']:
+        args['nb_dataloader_worker'] = 0
+
     args['normalize_zero_one'] = args['normalize_zero_one'] and not args['keep_image_range']
 
     # Make sure we are not normalizing beforce calculating mean and std

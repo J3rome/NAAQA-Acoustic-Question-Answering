@@ -28,10 +28,11 @@ class CLEAR_dataset(Dataset):
 
     def __init__(self, folder, version_name, input_image_type, set_type, questions=None, transforms=None,
                  dict_file_path=None, preprocessed_folder_name="preprocessed", tokenize_text=True, extra_stats=False,
-                 use_cache=True, synchronized_cache=False, max_cache_size=5000):
+                 use_cache=True, synchronized_cache=False, max_cache_size=5000, do_transforms_on_device=None):
 
         self.root_folder_path = "%s/%s" % (folder, version_name)
         self.version_name = version_name
+        self.do_transforms_on_device = do_transforms_on_device
 
         if tokenize_text and dict_file_path is not None:
             self.tokenizer = CLEARTokenizer(dict_file_path)
@@ -379,6 +380,9 @@ class CLEAR_dataset(Dataset):
                                requested_game['image']['set'])
             image = image_loader.get_image()
             padding = image_loader.get_padding()
+
+        if self.do_transforms_on_device:
+            image = image.to(self.do_transforms_on_device)
 
         game_with_image = {
             'id': requested_game['id'],
