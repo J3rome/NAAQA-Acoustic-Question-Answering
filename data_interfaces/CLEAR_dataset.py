@@ -191,7 +191,9 @@ class CLEAR_dataset(Dataset):
                    questions=questions, dict_file_path=dataset_obj.tokenizer.dictionary_file,
                    transforms=dataset_obj.transforms, max_cache_size=dataset_obj.image_cache['max_size'])
 
-    def get_game(self, idx, decode_tokens=False):
+    def get_game(self, idx=None, decode_tokens=False):
+        if idx is None:
+            idx = next(iter(self.games.keys()))
         game = self.games[idx]
         if not decode_tokens:
             return game
@@ -419,7 +421,8 @@ class CLEAR_dataset(Dataset):
         if self.input_shape is None:
             # NOTE : The width might vary (Since we use the shape of the first example).
             #        To retrieve size of all images use self.get_all_image_sizes()
-            self.input_shape = self[0]['image'].shape
+            first_idx = next(iter(self.games.keys()))
+            self.input_shape = self[first_idx]['image'].shape
 
         # Regular images : H x W x C
         # Torch images : C x H x W
@@ -433,7 +436,7 @@ class CLEAR_dataset(Dataset):
         assert self.input_image_type == 'audio', 'Can only get sample rate when loading audio signal'
 
         if self.sample_rate is None:
-            filepath = f"{self.root_folder_path}/audio/{self.set}/{self.get_game(0)['image']['filename']}"
+            filepath = f"{self.root_folder_path}/audio/{self.set}/{self.get_game()['image']['filename']}"
 
             audio, self.sample_rate = torchaudio.load(filepath)
 
@@ -442,7 +445,7 @@ class CLEAR_dataset(Dataset):
     def keep_1_game_per_scene(self):
         id_list = collections.defaultdict(lambda: False)
         unique_scene_games = []
-        for game_idx in range(len(self.games)):
+        for game_idx in self.games.keys():
             game = self.get_game(game_idx)
             if not id_list[game['image']['id']]:
                 unique_scene_games.append(game)

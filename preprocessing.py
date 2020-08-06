@@ -269,7 +269,7 @@ def create_dict_from_questions(dataset, word_min_occurence=1, dict_filename='dic
     forbidden_tokens = []
 
     # Tokenize questions
-    for i in range(len(games)):
+    for i in dataset.games.keys():
         game = dataset.get_game(i)
         input_tokens = [t.lower() for t in tokenizer.tokenize(game['question'])]
         for tok in input_tokens:
