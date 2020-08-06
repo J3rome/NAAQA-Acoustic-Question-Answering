@@ -28,7 +28,7 @@ class CLEAR_dataset(Dataset):
 
     def __init__(self, folder, version_name, input_image_type, set_type, questions=None, transforms=None,
                  dict_file_path=None, preprocessed_folder_name="preprocessed", tokenize_text=True, extra_stats=False,
-                 use_cache=True, synchronized_cache=False, max_cache_size=5000, do_transforms_on_device=None):
+                 use_cache=False, synchronized_cache=False, max_cache_size=5000, do_transforms_on_device=None):
 
         self.root_folder_path = "%s/%s" % (folder, version_name)
         self.version_name = version_name
