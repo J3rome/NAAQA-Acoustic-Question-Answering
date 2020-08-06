@@ -243,8 +243,6 @@ def images_to_h5(dataloaders, output_folder_name='preprocessed'):
 # >>> Dictionary Creation (For word tokenization)
 def create_dict_from_questions(dataset, word_min_occurence=1, dict_filename='dict.json', force_all_answers=False,
                                output_folder_name='preprocessed', start_end_tokens=True):
-    games = dataset.games
-
     word2i = {'<padding>': 0,
               '<unk>': 1
               }
