@@ -190,7 +190,8 @@ class CLEAR_dataset(Dataset):
         return cls(folder_path, version_name=dataset_obj.version_name,
                    input_image_type=dataset_obj.input_image_type, set_type=dataset_obj.set,
                    questions=questions, dict_file_path=dataset_obj.tokenizer.dictionary_file,
-                   transforms=dataset_obj.transforms, max_cache_size=dataset_obj.image_cache['max_size'])
+                   transforms=dataset_obj.transforms, max_cache_size=dataset_obj.image_cache['max_size'],
+                   do_transforms_on_device=dataset_obj.do_transforms_on_device)
 
     def get_game(self, idx=None, decode_tokens=False):
         if idx is None:
