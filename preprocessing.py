@@ -59,7 +59,8 @@ def get_lr_finder_curves(model, device, train_dataloader, output_dated_folder, n
     return fig, ax
 
 
-def get_dataset_stats_and_write(dataset, device, filename='clear_stats.json', recalculate=False, batch_size=1):
+def get_dataset_stats_and_write(dataset, device, filename='clear_stats.json', recalculate=False, batch_size=1,
+                                nb_dataloader_worker=0):
     stats_file_path = f"{dataset.root_folder_path}/{dataset.preprocessed_folder_name}/{filename}"
 
     if os.path.exists(stats_file_path) and not recalculate:
@@ -70,7 +71,7 @@ def get_dataset_stats_and_write(dataset, device, filename='clear_stats.json', re
 
     dataset_copy.keep_1_game_per_scene()
 
-    dataloader = torch.utils.data.DataLoader(dataset_copy, batch_size=batch_size, shuffle=False, num_workers=1,
+    dataloader = torch.utils.data.DataLoader(dataset_copy, batch_size=batch_size, shuffle=False, num_workers=nb_dataloader_worker,
                                              collate_fn=CLEAR_collate_fct(padding_token=
                                                                           dataset_copy.get_padding_token()))
 
