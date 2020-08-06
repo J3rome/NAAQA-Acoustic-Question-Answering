@@ -403,7 +403,6 @@ class CLEAR_dataset(Dataset):
             game_with_image = self.transforms(game_with_image)
 
         if 'image_padding' not in game_with_image:
-            # FIXME: We loose padding information when loading from h5
             game_with_image['image_padding'] = torch.tensor([0, 0], dtype=torch.int)
 
         return game_with_image
