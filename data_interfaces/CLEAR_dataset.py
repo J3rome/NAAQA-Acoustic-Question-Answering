@@ -346,6 +346,8 @@ class CLEAR_dataset(Dataset):
 
             # Load image & Add to cache
             self.image_cache['indexes'].add(scene_id)
+
+            #self.image_builder.build(scene_id, filename=image_filename, which_set=self.set).get_image()
             image_loader = CLEARImage(scene_id,
                                image_filename,
                                self.image_builder,
