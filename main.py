@@ -85,6 +85,8 @@ parser.add_argument("--mel_spectrogram", help="Will create MEL spectrogram when 
                                               "Otherwise regular spectrogram", action='store_true')
 parser.add_argument("--spectrogram_n_fft", help="Define the fft window length when generating spectrogram",
                     type=int, default=4096)
+parser.add_argument("--spectrogram_hop_length", help="Define the fft hop length when generating spectrogram",
+                    type=int, default=None)
 parser.add_argument("--spectrogram_n_mels", help="Number of mel filter to use when generating mel-spectrogram",
                     type=int, default=128)
 parser.add_argument("--spectrogram_keep_freq_point", help="Number of frequency point used generating spectrogram",
@@ -251,11 +253,13 @@ def set_transforms_on_datasets(args, datasets, transforms_device):
         if args['mel_spectrogram']:
             transforms_to_add.append(GenerateMelSpectrogram(n_fft=args['spectrogram_n_fft'],
                                                             n_mels=args['spectrogram_n_mels'],
+                                                            hop_length=args['spectrogram_hop_length'],
                                                             sample_rate=sample_rate,
                                                             per_spectrogram_normalize=args['per_spectrogram_normalize'],
                                                             device=transforms_device))
         else:
             transforms_to_add.append(GenerateSpectrogram(n_fft=args['spectrogram_n_fft'],
+                                                         hop_length=args['spectrogram_hop_length'],
                                                          keep_freq_point=args['spectrogram_keep_freq_point'],
                                                          per_spectrogram_normalize=args['per_spectrogram_normalize'],
                                                          device=transforms_device))
