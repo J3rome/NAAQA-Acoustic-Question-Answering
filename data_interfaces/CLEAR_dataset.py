@@ -50,6 +50,10 @@ class CLEAR_dataset(Dataset):
         self.all_image_sizes = None
         self.sample_rate = None
 
+        preprocessed_folder_path = "%s/%s" % (self.root_folder_path, self.preprocessed_folder_name)
+        if not os.path.exists(preprocessed_folder_path):
+            os.mkdir(preprocessed_folder_path)
+
         self.answer_to_family = get_answer_to_family_map('%s/%s' % (self.root_folder_path, 'attributes.json'))
         self.answer_families = list(set(self.answer_to_family.values()))
 
