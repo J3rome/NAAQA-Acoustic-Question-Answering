@@ -173,6 +173,9 @@ parser.add_argument("--no_model_summary", help="Will hide the model summary", ac
 parser.add_argument("--tf_weight_path", type=str, help="Specify where to load dumped tensorflow weights "
                                                        "(Used with --tf_weight_transfer)")
 parser.add_argument("--clevr_dataset", help="Will load the clevr dataset instead of the CLEAR dataset", action='store_true')
+parser.add_argument("--force_mean_recalculate", help="Will recalculate & update the stats.json file event if the "
+                                                     "file already exists",
+                    action='store_true')
 
 
 # Data loading & preparation
@@ -264,7 +267,8 @@ def set_transforms_on_datasets(args, datasets, transforms_device):
     if args['normalize_zero_one'] or args['normalize_with_clear_stats']:
         # Retrieve mean, std, min and max values of the dataset
         stats = get_dataset_stats_and_write(datasets['train'], args['device'], batch_size=args['batch_size'],
-                                            nb_dataloader_worker=args['nb_dataloader_worker'], recalculate=False)
+                                            nb_dataloader_worker=args['nb_dataloader_worker'],
+                                            recalculate=args['force_mean_recalculate'])
     elif args['normalize_with_imagenet_stats']:
         stats = get_imagenet_stats()
 
@@ -432,8 +436,9 @@ def execute_task(task, args, output_dated_folder, dataloaders, model, model_conf
                              val_dataloader=dataloaders['val'], loss_criterion=loss_criterion)
 
     elif task == "calc_clear_mean":
-        get_dataset_stats_and_write(dataloaders['train'], dataloaders['train'].dataset, device,
-                                    nb_dataloader_worker=args['nb_dataloader_worker'], recalculate=True)
+        get_dataset_stats_and_write(dataloaders['train'].dataset, device, batch_size=args['batch_size'],
+                                    nb_dataloader_worker=args['nb_dataloader_worker'],
+                                    recalculate=args['force_mean_recalculate'])
 
     elif task == 'random_answer_baseline':
         random_answer_baseline(dataloaders['train'], output_dated_folder)
