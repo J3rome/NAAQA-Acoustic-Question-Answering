@@ -146,8 +146,6 @@ def extract_features(device, feature_extractor, dataloaders, output_folder_name=
         nb_games = len(dataloader.dataset)
 
         with h5py.File(output_filepath, 'w') as f:
-            # FIXME : Find a way to have variable size. MaxShape is not the answer
-            #         We can use --pad_to_largest image, save a dataset of padding and remove padding when retrieving <<-- This won't work, the output shape is different after passing throught the feature extractor. Padding at this level will have a big impact
             h5_dataset = f.create_dataset('features', shape=[nb_games] + feature_extractor_output_shape, dtype=np.float32)
             h5_idx2img = f.create_dataset('idx2img', shape=[nb_games], dtype=np.int32)
             h5_img_padding = f.create_dataset('img_padding', shape=[nb_games, 2], dtype=np.int32)
