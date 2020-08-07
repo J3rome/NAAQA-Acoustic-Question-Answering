@@ -57,7 +57,7 @@ class GenerateMelSpectrogram(object):
         self.per_spectrogram_normalize = per_spectrogram_normalize
 
     def __call__(self, sample):
-        specgram = self.spectrogram_transform(sample['audio'])[0, :, :]
+        specgram = self.spectrogram_transform(sample['image'])[0, :, :]
         if self.keep_freq_point:
             specgram = specgram[:self.keep_freq_point, :]
 
