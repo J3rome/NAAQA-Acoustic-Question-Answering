@@ -217,10 +217,17 @@ class CLEAR_dataset(Dataset):
         if self.all_image_sizes is None:
             if self.input_image_type == 'audio':
                 self.all_image_sizes = {}
-                n_fft, hop_length, keep_freq_point = self.get_spectrogram_transform_infos()
+                n_fft, hop_length, keep_freq_point, n_mels = self.get_spectrogram_transform_infos()
+                sample_rate = self.get_sample_rate()
                 for idx, scene in self.scenes.items():
-                    spectrogram_length = int(scene['definition']['duration']/1000 * self.get_sample_rate() / hop_length + 1)
-                    spectrogram_height = self.get_sample_rate() // 2 + 1 if keep_freq_point is None else keep_freq_point
+                    spectrogram_length = int(scene['definition']['duration']/1000 * sample_rate / hop_length + 1)
+
+                    if n_mels :
+                        spectrogram_height = n_mels
+                    elif keep_freq_point:
+                        spectrogram_height = keep_freq_point
+                    else:
+                        spectrogram_height = sample_rate // n_fft + 1
 
                     self.all_image_sizes[idx] = (spectrogram_height, spectrogram_length)
             else:
@@ -295,8 +302,10 @@ class CLEAR_dataset(Dataset):
         assert self.transforms, "Dataset don't any have transforms"
 
         for transform in self.transforms.transforms:
-            if type(transform) is GenerateSpectrogram or type(transform) is GenerateMelSpectrogram:
-                return transform.n_fft, transform.hop_length, transform.keep_freq_point
+            if type(transform) is GenerateSpectrogram:
+                return transform.n_fft, transform.hop_length, transform.keep_freq_point, None
+            elif type(transform) is GenerateMelSpectrogram:
+                return transform.n_fft, transform.hop_length, transform.keep_freq_point, transform.n_mels
 
         assert False, "Could not find a Spectrogram or Mel-Spectrogram transform"
 

@@ -55,6 +55,7 @@ class GenerateMelSpectrogram(object):
         self.mel_scale = torchaudio.transforms.MelScale(sample_rate=sample_rate, n_mels=n_mels)
 
         self.n_fft = n_fft
+        self.n_mels = n_mels
         self.hop_length = self.spectrogram_transform.hop_length
         self.keep_freq_point = keep_freq_point
         self.per_spectrogram_normalize = per_spectrogram_normalize
