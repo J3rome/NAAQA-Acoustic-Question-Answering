@@ -134,6 +134,8 @@ parser.add_argument("--perf_over_determinist", help="Will let torch use nondeter
 parser.add_argument("--f1_score", help="Use f1 score in loss calculation", action='store_true')
 parser.add_argument("--cyclical_lr", help="Will use cyclical learning rate (Bounds in config.json)",
                     action='store_true')
+parser.add_argument("--reduce_lr_on_plateau", help="Will reduce the learning rate when on plateau",
+                    action='store_true')
 parser.add_argument("--enable_image_cache", help="Will enable image loading cache (In RAM)", action='store_true')
 parser.add_argument("--max_image_cache_size", type=int, default=5000,
                     help="Max number of images that can be stored in cache")

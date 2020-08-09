@@ -7,7 +7,7 @@ import subprocess
 from tqdm import tqdm
 import torch
 import torch.nn as nn
-from torch.optim.lr_scheduler import CyclicLR
+from torch.optim.lr_scheduler import CyclicLR, ReduceLROnPlateau
 from torch.utils.data import DataLoader
 
 from models.CLEAR_film_model import CLEAR_FiLM_model
@@ -86,6 +86,12 @@ def prepare_model(args, flags, paths, dataloaders, device, model_config, input_i
                              step_size_up=cycle_step // 2,
                              base_momentum=base_momentum,
                              max_momentum=max_momentum)
+
+    if args['reduce_lr_on_plateau']:
+        patience = film_model.early_stopping['stop_threshold']//2 - 1 if film_model.early_stopping else 3
+
+        scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.1, patience=patience, threshold=0.0005,
+                                      threshold_mode='rel', cooldown=0, min_lr=0, verbose=True)
 
     if flags['restore_model_weights']:
         print(f"Restoring model weights from '{args['film_model_weight_path']}'")
@@ -216,7 +222,7 @@ def process_dataloader(is_training, device, model, dataloader, criterion=None, o
                 optimizer.step()
                 batch_lrs.append(optimizer.param_groups[0]['lr'])
 
-                if scheduler:
+                if scheduler and type(scheduler) != ReduceLROnPlateau:
                     scheduler.step()
 
         batch_processed_predictions = process_predictions(dataloader.dataset, preds.tolist(), answers.tolist(),
@@ -408,6 +414,10 @@ def train_model(device, model, dataloaders, output_folder, criterion, optimizer,
                                                                                 epoch_id=epoch,
                                                                                 tensorboard=tensorboard_per_set)#,
                                                                                 #gamma_beta_path="%s/val_gamma_beta.h5" % epoch_output_folder_path)
+
+        if scheduler and type(scheduler) == ReduceLROnPlateau:
+            scheduler.step(val_loss)
+
         print('\n{} Loss: {:.4f} Acc: {:.4f}'.format('Val', val_loss, val_acc))
 
         stats = save_training_stats(stats_file_path, epoch, train_acc, train_loss, val_acc, val_loss, epoch_train_time)
