@@ -220,14 +220,16 @@ class CLEAR_dataset(Dataset):
                 n_fft, hop_length, keep_freq_point, n_mels = self.get_spectrogram_transform_infos()
                 sample_rate = self.get_sample_rate()
                 for idx, scene in self.scenes.items():
-                    spectrogram_length = int(scene['definition']['duration']/1000 * sample_rate / hop_length + 1)
+
+                    duration_sec = scene['definition']['duration'] / 1000
+                    spectrogram_length = int((sample_rate*duration_sec - n_fft) / hop_length + 1)
 
                     if n_mels :
                         spectrogram_height = n_mels
                     elif keep_freq_point:
                         spectrogram_height = keep_freq_point
                     else:
-                        spectrogram_height = sample_rate // n_fft + 1
+                        spectrogram_height = n_fft // 2
 
                     self.all_image_sizes[idx] = (spectrogram_height, spectrogram_length)
             else:
