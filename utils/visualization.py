@@ -92,7 +92,7 @@ def paint_annotation_rect_on_fig(annotations, image_height, ax, opacity=0.7):
 
 
 def show_tagged_scene(dataset, game_or_game_id, scene_image=None, remove_padding=False, show_legend=True, show_fig=False,
-                     fig_title=None, fig_ax=None, sound_sample_rate=22050):
+                     fig_title=None, fig_ax=None, sound_sample_rate=24000):
     assert dataset.is_raw_img() or scene_image is not None, 'Image to tag must be provided if not in RAW mode'
 
     if type(game_or_game_id) == int:
