@@ -3,6 +3,7 @@ import torchvision.transforms.functional as vis_F
 import torch.nn.functional as F
 
 import torchaudio
+import torchaudio.functional as audio_F
 
 
 class ResampleAudio(object):
@@ -52,12 +53,14 @@ class GenerateMelSpectrogram(object):
                  per_spectrogram_normalize=False, device='cpu'):
         self.spectrogram_transform = torchaudio.transforms.Spectrogram(n_fft=n_fft, hop_length=hop_length,
                                                                        normalized=True, wkwargs={'device': device})  # Device for the hanning window function
-        self.mel_scale = torchaudio.transforms.MelScale(sample_rate=sample_rate, n_mels=n_mels)
+        self.mel_scale = MelScale(sample_rate=sample_rate, n_mels=n_mels)
 
         self.n_fft = n_fft
         self.n_mels = n_mels
         self.hop_length = self.spectrogram_transform.hop_length
         self.keep_freq_point = keep_freq_point
+        if keep_freq_point:
+            print(f"[WARNING] - Be careful, we are using only the {keep_freq_point} fft point before going on the mel scale")
         self.per_spectrogram_normalize = per_spectrogram_normalize
 
     def __call__(self, sample):
@@ -74,6 +77,75 @@ class GenerateMelSpectrogram(object):
         sample['image'] = torch.flip(specgram, (0,)).unsqueeze(0)
 
         return sample
+
+
+# Taken from torchaudio 1.5.0 to fix a bug when the input is on GPU
+class MelScale(torch.nn.Module):
+    r"""Turn a normal STFT into a mel frequency STFT, using a conversion
+    matrix.  This uses triangular filter banks.
+
+    User can control which device the filter bank (`fb`) is (e.g. fb.to(spec_f.device)).
+
+    Args:
+        n_mels (int, optional): Number of mel filterbanks. (Default: ``128``)
+        sample_rate (int, optional): Sample rate of audio signal. (Default: ``16000``)
+        f_min (float, optional): Minimum frequency. (Default: ``0.``)
+        f_max (float or None, optional): Maximum frequency. (Default: ``sample_rate // 2``)
+        n_stft (int, optional): Number of bins in STFT. Calculated from first input
+            if None is given.  See ``n_fft`` in :class:`Spectrogram`. (Default: ``None``)
+    """
+    __constants__ = ['n_mels', 'sample_rate', 'f_min', 'f_max']
+
+    def __init__(self,
+                 n_mels = 128,
+                 sample_rate = 16000,
+                 f_min = 0.,
+                 f_max = None,
+                 n_stft = None):
+        super(MelScale, self).__init__()
+        self.n_mels = n_mels
+        self.sample_rate = sample_rate
+        self.f_max = f_max if f_max is not None else float(sample_rate // 2)
+        self.f_min = f_min
+
+        assert f_min <= self.f_max, 'Require f_min: %f < f_max: %f' % (f_min, self.f_max)
+
+        fb = torch.empty(0) if n_stft is None else audio_F.create_fb_matrix(
+            n_stft, self.f_min, self.f_max, self.n_mels, self.sample_rate)
+        self.register_buffer('fb', fb)
+
+    def forward(self, specgram: torch.Tensor) -> torch.Tensor:
+        r"""
+        Args:
+            specgram (Tensor): A spectrogram STFT of dimension (..., freq, time).
+
+        Returns:
+            Tensor: Mel frequency spectrogram of size (..., ``n_mels``, time).
+        """
+        # Send internal variable on device if needed
+        if self.fb.device != specgram.device:
+            print("To Device")
+            self.fb = self.fb.to(specgram.device)
+
+        # pack batch
+        shape = specgram.size()
+        specgram = specgram.view(-1, shape[-2], shape[-1])
+
+        if self.fb.numel() == 0:
+            tmp_fb = audio_F.create_fb_matrix(specgram.size(1), self.f_min, self.f_max, self.n_mels, self.sample_rate)
+            # Attributes cannot be reassigned outside __init__ so workaround
+            self.fb.resize_(tmp_fb.size())
+            self.fb.copy_(tmp_fb)
+
+        # (channel, frequency, time).transpose(...) dot (frequency, n_mels)
+        # -> (channel, time, n_mels).transpose(...)
+        mel_specgram = torch.matmul(specgram.transpose(1, 2), self.fb).transpose(1, 2)
+
+        # unpack batch
+        mel_specgram = mel_specgram.view(shape[:-2] + mel_specgram.shape[-2:])
+
+        return mel_specgram
+
 
 class ImgBetweenZeroOne(object):
     """ Normalize the image between 0 and 1 """
