@@ -363,6 +363,7 @@ def train_model(device, model, dataloaders, output_folder, criterion, optimizer,
     stats_file_path = "%s/stats.json" % output_folder
     removed_epoch = []
 
+    best_epoch_symlink_path = '%s/best' % output_folder
 
     # Preload images
     for set_type, dataloader in dataloaders.items():
@@ -473,7 +474,6 @@ def train_model(device, model, dataloaders, output_folder, criterion, optimizer,
         print("Best Epoch is {} with Loss: {} Acc: {}".format(best_epoch['epoch'],
                                                               best_epoch['val_loss'],
                                                               best_epoch['val_acc']))
-        best_epoch_symlink_path = '%s/best' % output_folder
 
         # TODO : Only create link if best_epoch is different than current link
         subprocess.run("ln -snf %s %s" % (best_epoch['epoch'], best_epoch_symlink_path), shell=True)
