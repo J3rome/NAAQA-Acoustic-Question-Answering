@@ -10,6 +10,7 @@ class ResampleAudio(object):
 
     def __init__(self, original_sample_rate, resample_to):
         self.resample_transform = torchaudio.transforms.Resample(orig_freq=original_sample_rate, new_freq=resample_to)
+        self.resample_to = resample_to
 
     def __call__(self, sample):
         sample['image'] = self.resample_transform(sample['image'])

@@ -15,7 +15,7 @@ from data_interfaces.CLEAR_image_loader import get_img_builder, CLEARImage
 from utils.file import read_json, get_size_from_image_header
 from utils.generic import get_answer_to_family_map
 from data_interfaces.transforms import ResizeTensorBasedOnMaxWidth, PadTensor
-from data_interfaces.transforms import GenerateMelSpectrogram, GenerateSpectrogram
+from data_interfaces.transforms import GenerateMelSpectrogram, GenerateSpectrogram, ResampleAudio
 
 import multiprocessing
 import ctypes
@@ -222,7 +222,7 @@ class CLEAR_dataset(Dataset):
                 for idx, scene in self.scenes.items():
 
                     duration_sec = scene['definition']['duration'] / 1000
-                    spectrogram_length = int((sample_rate*duration_sec - n_fft) / hop_length + 1)
+                    spectrogram_length = int(sample_rate*duration_sec - n_fft) // hop_length + 1
 
                     if n_mels :
                         spectrogram_height = n_mels
@@ -459,6 +459,10 @@ class CLEAR_dataset(Dataset):
             filepath = f"{self.root_folder_path}/audio/{self.set}/{self.get_game()['image']['filename']}"
 
             audio, self.sample_rate = torchaudio.load(filepath)
+
+            for transform in self.transforms.transforms:
+                if type(transform) is ResampleAudio:
+                    self.sample_rate = transform.resample_to
 
         return self.sample_rate
 

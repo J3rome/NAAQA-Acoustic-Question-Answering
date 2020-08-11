@@ -251,6 +251,9 @@ def set_transforms_on_datasets(args, datasets, transforms_device):
                                                    resample_to=resample_to))
 
             sample_rate = resample_to
+            # When calling dataset.get_sample_rate(), the sample rate value get cached.
+            # We override the cache with the new sample rate.
+            datasets['train'].sample_rate = resample_to
 
         if args['mel_spectrogram']:
             transforms_to_add.append(GenerateMelSpectrogram(n_fft=args['spectrogram_n_fft'],
