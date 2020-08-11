@@ -7,12 +7,13 @@ import subprocess
 from tqdm import tqdm
 import torch
 import torch.nn as nn
-from torch.optim.lr_scheduler import CyclicLR, ReduceLROnPlateau
+from torch.optim.lr_scheduler import CyclicLR
 from torch.utils.data import DataLoader
 
 from models.CLEAR_film_model import CLEAR_FiLM_model
 from data_interfaces.CLEAR_dataset import CLEAR_dataset
 from models.metrics import calc_f1_score
+from models.LR_scheduler import ReduceLROnPlateau
 from utils.generic import save_batch_metrics, sort_stats, save_training_stats, chain_load_experiment_stats
 from utils.generic import optimizer_load_state_dict
 from utils.random import get_random_state, set_random_state
@@ -89,8 +90,9 @@ def prepare_model(args, flags, paths, dataloaders, device, model_config, input_i
 
     if args['reduce_lr_on_plateau']:
         patience = film_model.early_stopping['stop_threshold']//2 - 1 if film_model.early_stopping else 3
+        min_step = film_model.early_stopping['min_step'] if film_model.early_stopping else 0.0005
 
-        scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.1, patience=patience, threshold=0.0005,
+        scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.1, patience=patience, threshold=min_step,
                                       threshold_mode='rel', cooldown=0, min_lr=0, verbose=True)
 
     if flags['restore_model_weights']:
@@ -415,10 +417,16 @@ def train_model(device, model, dataloaders, output_folder, criterion, optimizer,
                                                                                 tensorboard=tensorboard_per_set)#,
                                                                                 #gamma_beta_path="%s/val_gamma_beta.h5" % epoch_output_folder_path)
 
-        if scheduler and type(scheduler) == ReduceLROnPlateau:
-            scheduler.step(val_loss)
-
         print('\n{} Loss: {:.4f} Acc: {:.4f}'.format('Val', val_loss, val_acc))
+
+        if scheduler and type(scheduler) == ReduceLROnPlateau:
+            reduced_lr = scheduler.step(val_loss)
+
+            if reduced_lr:
+                # The learning rate was reduced, reload the last best weights and restart from there with a lower LR
+                print("Learning rate has been reduced. Reloading last best weights and starting from there")
+                checkpoint = torch.load(f"{best_epoch_symlink_path}/model.pt.tar", map_location=device)
+                model.load_state_dict(checkpoint['model_state_dict'], strict=False)
 
         stats = save_training_stats(stats_file_path, epoch, train_acc, train_loss, val_acc, val_loss, epoch_train_time)
         save_batch_metrics(epoch, train_metrics, val_metrics, output_folder, filename="batch_metrics.json")
