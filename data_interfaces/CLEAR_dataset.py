@@ -222,7 +222,7 @@ class CLEAR_dataset(Dataset):
                 for idx, scene in self.scenes.items():
 
                     duration_sec = scene['definition']['duration'] / 1000
-                    spectrogram_length = int(sample_rate*duration_sec - n_fft) // hop_length + 1
+                    spectrogram_length = int(sample_rate*duration_sec / hop_length + 1)
 
                     if n_mels :
                         spectrogram_height = n_mels
