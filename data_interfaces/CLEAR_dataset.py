@@ -468,12 +468,14 @@ class CLEAR_dataset(Dataset):
 
     def keep_1_game_per_scene(self):
         id_list = collections.defaultdict(lambda: False)
-        unique_scene_games = []
+        unique_scene_games = {}
+        new_idx = 0
         for game_idx in self.games.keys():
             game = self.get_game(game_idx)
             if not id_list[game['image']['id']]:
-                unique_scene_games.append(game)
+                unique_scene_games[new_idx] = game
                 id_list[game['image']['id']] = True
+                new_idx += 1
 
         self.games = unique_scene_games
 
