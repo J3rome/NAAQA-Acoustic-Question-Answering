@@ -140,6 +140,7 @@ class CLEAR_dataset(Dataset):
             if extra_stats:
                 self.games_per_family[self.answer_to_family[str(sample['answer']).lower()]].append(question_id)
                 game['program'] = sample['program'] if 'program' in sample else []
+                game['template_index'] = sample['template_index']
 
             self.games[question_id] = game
 
