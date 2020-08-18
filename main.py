@@ -23,7 +23,7 @@ from utils.random import set_random_seed, get_random_state, set_random_state
 from utils.visualization import save_model_summary, save_graph_to_tensorboard
 from utils.argument_parsing import get_args_task_flags_paths, get_feature_extractor_config_from_args
 from utils.logging import create_tensorboard_writers, close_tensorboard_writers
-from utils.generic import get_imagenet_stats
+from utils.generic import get_imagenet_stats, set_dimensions_to_power_of_two
 
 from models.Resnet_feature_extractor import Resnet_feature_extractor
 from models.tools.TF_weight_transfer import tf_weight_transfer
@@ -68,6 +68,8 @@ parser.add_argument("--resize_img_width_no_ratio", help="Will resize images to -
                     action='store_true')
 parser.add_argument("--pad_to_largest_image", help="If set, images will be padded to meet the largest image in the set."
                                                    "All input will have the same size.", action='store_true')
+parser.add_argument("--pad_to_power_of_2", help="If set, images will be padded so that the dimensions are power of 2",
+                    action='store_true')
 parser.add_argument("--pad_per_batch", help="Images will be padded according to the biggest image in the batch",
                     action='store_true')
 parser.add_argument("--pad_height", help="If set, the height will be padded to --img_resize_height instead of resized",
@@ -318,6 +320,11 @@ def set_transforms_on_datasets(args, datasets, transforms_device):
         max_train_img_dims = datasets['train'].get_max_width_image_dims()
         max_val_img_dims = datasets['val'].get_max_width_image_dims()
         max_test_img_dims = datasets['test'].get_max_width_image_dims()
+
+        if args['pad_to_power_of_2']:
+            max_train_img_dims = set_dimensions_to_power_of_two(max_train_img_dims)
+            max_val_img_dims = set_dimensions_to_power_of_two(max_val_img_dims)
+            max_test_img_dims = set_dimensions_to_power_of_two(max_test_img_dims)
 
         if args['resize_img']:
             resize_height = args['img_resize_height']

@@ -166,6 +166,17 @@ def get_answer_to_family_map(attributes_filepath, to_lowercase=True, reduced_tex
     return answer_to_family
 
 
+def get_next_power_of_2(x):
+    return 1 << (x-1).bit_length()
+
+
+def set_dimensions_to_power_of_two(dims):
+    h = get_next_power_of_2(dims[0])
+    w = get_next_power_of_2(dims[1])
+
+    return h, w
+
+
 def get_imagenet_stats():
     return {"mean": [0.485, 0.456, 0.406], "std": [0.229, 0.224, 0.225]}
 
