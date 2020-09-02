@@ -9,8 +9,8 @@ from utils.notebook.plot import plot_2d_matrix, plot_discrete_hist, plot_hist
 # Scene analysis
 def scene_object_per_position(scenes, attribute='instrument', max_scene_length=None, attribute_processing=None):
     if max_scene_length is None:
-        # Assume fixed scenes. We could also rerieve the max scene length
-        max_scene_length = len(scenes[0]['definition']['objects'])
+        max_scene_length = max(scenes, key=lambda x: len(x['definition']['objects']))
+        max_scene_length = len(max_scene_length['definition']['objects'])
 
     positions = defaultdict(lambda: [0] * max_scene_length)
     for scene in scenes:
