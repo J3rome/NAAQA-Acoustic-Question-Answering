@@ -39,13 +39,14 @@ def get_experiments(experiment_result_path, prefix=None):
 
             if 'best' not in os.listdir(exp_dated_folder_path):
                 # Failed experiment. Was stopped before first epoch could be saved
+                print(f"Failed experiment -- {exp_dated_folder_path}")
                 continue
 
             # Load arguments
             arguments = read_json(f"{exp_dated_folder_path}/arguments.json")
 
             # Retrieve Prefix, nb_scene and nb_question_per_scene from version name
-            matches = re.match('(.*)_(\d+)k_(\d+)_inst_1024_win_50_overlap', arguments['version_name'])
+            matches = re.match('(.*)_(\d+)k_(\d+)_(.*)', arguments['version_name'])
 
             if not matches:
                 continue
@@ -165,6 +166,20 @@ def get_experiments(experiment_result_path, prefix=None):
                 preprocessed_argument_path = f"{preprocessed_data_path}/arguments.json"
                 if os.path.exists(preprocessed_argument_path):
                     img_arguments = read_json(preprocessed_argument_path)
+
+
+            experiment['n_fft'] = img_arguments['spectrogram_n_fft'] if 'spectrogram_n_fft' in img_arguments else None
+
+            experiment['hop_length'] = img_arguments['spectrogram_hop_length'] if 'spectrogram_hop_length' in img_arguments else None
+
+            experiment['keep_freq_point'] = img_arguments['spectrogram_keep_freq_point'] if 'spectrogram_keep_freq_point' in img_arguments else None
+
+            experiment['n_mels'] = img_arguments['spectrogram_n_mels'] if 'mel_spectrogram' in img_arguments and 'spectrogram_n_mels' in img_arguments and img_arguments['mel_spectrogram'] else None
+
+            experiment['resample_audio'] = img_arguments['resample_audio_to'] if 'resample_audio_to' in img_arguments else None
+
+            experiment['norm_zero_one'] = img_arguments['normalize_zero_one']
+            experiment['norm_clear_stats'] = img_arguments['normalize_with_clear_stats']
 
             experiment['pad_to_largest'] = img_arguments['pad_to_largest_image']
             experiment['resized_height'] = to_int(img_arguments['img_resize_height']) if img_arguments['resize_img'] else None
