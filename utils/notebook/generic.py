@@ -5,7 +5,7 @@ from IPython.core.display import display, HTML
 
 
 def full_width_notebook():
-    html_str = "<style>.container { width:99% !important; }\n"
+    html_str = "<style>.container { width:99% !important; margin-left:auto !important; margin-right:auto !important; }\n"
     html_str += "div.cell.selected { border-left-width: 1px !important; }\n"
     html_str += "div.output_scroll { resize: vertical !important }</style>"
     display(HTML(html_str))
