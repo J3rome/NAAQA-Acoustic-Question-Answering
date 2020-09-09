@@ -219,7 +219,7 @@ def get_experiments(experiment_result_path, prefix=None):
             experiment['extractor_out_chan'] = to_int(config['image_extractor']['out'][-1]) if type(config['image_extractor']['out']) == list else config['image_extractor']['out']
             experiment['extractor_filters'] = config['image_extractor']['out']
 
-            if experiment['extractor_type'] == 'film_original':
+            if experiment['extractor_type'] in ['film_original', 'conv']:
                 experiment['extractor_nb_block'] = len(config['image_extractor']['kernels'])
                 experiment['extractor_projection_size'] = None
             elif not 'resnet' in experiment['extractor_type']:
