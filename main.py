@@ -528,7 +528,7 @@ def prepare_for_task(args):
                                                                          film_model_config, input_image_torch_shape,
                                                                          feature_extractor_config)
 
-        if flags['create_output_folder'] and flags['instantiate_model']:
+        if flags['create_output_folder']:
             save_model_config(args, paths, film_model_config)
             save_model_summary(paths['output_dated_folder'], film_model, input_image_torch_shape, device,
                                print_output=not args['no_model_summary'])
