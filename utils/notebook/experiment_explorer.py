@@ -53,6 +53,9 @@ def get_experiments(experiment_result_path, prefix=None):
 
             matches = matches.groups()
 
+            # A random id might be appended to the experiment folder when uploaded to drive, remove it
+            date_folder = re.sub(r'-\d+$', '', date_folder)
+
             experiment = {
                 'prefix': matches[0],
                 'nb_scene': to_int(matches[1]) * 1000,
@@ -65,7 +68,7 @@ def get_experiments(experiment_result_path, prefix=None):
                 'folder': exp_folder
             }
 
-            additional_note = arguments['output_name_suffix'].replace(f'_{experiment["nb_epoch"]}_epoch', '').replace(experiment['config'], '').replace(f'_{experiment["random_seed"]}', '').replace(f"_stop_at_{experiment['stop_accuracy']}", '').replace('_resnet_extractor', '')
+            additional_note = arguments['output_name_suffix'].replace(f'_{experiment["nb_epoch"]}_epoch', '').replace(experiment['config'], '').replace(f'_{experiment["random_seed"]}', '').replace(f"_stop_at_{experiment['stop_accuracy']}", '').replace('_resnet_extractor', '').replace('config_', '')
 
             # Trim note
             if len(additional_note) > 0:
