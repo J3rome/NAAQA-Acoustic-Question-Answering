@@ -1,5 +1,6 @@
 import argparse
 from datetime import datetime
+import os
 
 import torch
 from torch.utils.data import DataLoader
@@ -536,6 +537,13 @@ def prepare_for_task(args):
             tensorboard = create_tensorboard_writers(args, paths)
             if args['tensorboard_save_graph']:
                 save_graph_to_tensorboard(film_model, tensorboard, input_image_torch_shape)
+
+    if flags['create_output_folder'] and 'h5' in args['input_image_type']:
+        preprocessed_argument_path = f"{next(iter(datasets)).root_folder_path}/{args['preprocessed_folder_name']}/arguments.json"
+
+        if os.path.exists(preprocessed_argument_path):
+            preprocessed_arguments = read_json(preprocessed_argument_path)
+            save_json(preprocessed_arguments, f"{paths['output_dated_folder']}/preprocessed_arguments.json")
 
     # Set back the random state
     set_random_state(initial_random_state)      # FIXME : This is redundant, we already reset random state after initialising the model. Actions after model initialization doesn't seem to affect random state

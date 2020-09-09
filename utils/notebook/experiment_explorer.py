@@ -5,7 +5,7 @@ import re
 import pandas as pd
 import numpy as np
 
-from utils.file import read_json
+from utils.file import read_json, save_json
 
 
 def to_float(string):
@@ -164,12 +164,19 @@ def get_experiments(experiment_result_path, prefix=None):
             img_arguments = arguments
 
             if arguments['h5_image_input']:
-                preprocessed_data_path = f"{arguments['data_root_path']}/{arguments['version_name']}/{arguments['preprocessed_folder_name']}"
+                local_preprocessed_arguments = f"{exp_dated_folder_path}/preprocessed_arguments.json"
+                preprocessed_argument_path = f"{arguments['data_root_path']}/{arguments['version_name']}/{arguments['preprocessed_folder_name']}/arguments.json"
 
-                preprocessed_argument_path = f"{preprocessed_data_path}/arguments.json"
-                if os.path.exists(preprocessed_argument_path):
+                if os.path.exists(local_preprocessed_arguments):
+                    # Preprocessed arguments stored in the results folder
+                    img_arguments = read_json(local_preprocessed_arguments)
+                elif os.path.exists(preprocessed_argument_path):
+                    # Preprocessed arguments stored in the data folder
                     img_arguments = read_json(preprocessed_argument_path)
 
+                    save_json(img_arguments, local_preprocessed_arguments)
+                #else:
+                    #print(f"Was unable to retrieve preprocessing arguments for version {arguments['version_name']}")
 
             experiment['n_fft'] = img_arguments['spectrogram_n_fft'] if 'spectrogram_n_fft' in img_arguments else None
 
