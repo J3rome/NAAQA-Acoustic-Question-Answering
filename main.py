@@ -539,7 +539,7 @@ def prepare_for_task(args):
                 save_graph_to_tensorboard(film_model, tensorboard, input_image_torch_shape)
 
     if flags['create_output_folder'] and 'h5' in args['input_image_type']:
-        preprocessed_argument_path = f"{next(iter(datasets)).root_folder_path}/{args['preprocessed_folder_name']}/arguments.json"
+        preprocessed_argument_path = f"{next(iter(datasets.values())).root_folder_path}/{args['preprocessed_folder_name']}/arguments.json"
 
         if os.path.exists(preprocessed_argument_path):
             preprocessed_arguments = read_json(preprocessed_argument_path)
