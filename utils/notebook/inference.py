@@ -76,7 +76,8 @@ def show_gradcam(device, model, dataloader, custom_game, scene_id, guess_id=0, t
     return heatmaps
 
 
-def show_game_notebook_input(dataloader, game, clear_stats=None, remove_image_padding=False, sound_player=True):
+def show_game_notebook_input(dataloader, game, clear_stats=None, remove_image_padding=False, sound_player=True,
+                             max_frequency=24000, fill_rect=False):
     if clear_stats:
         inverse_norm = NormalizeInverse(clear_stats['mean'],
                                         clear_stats['std'])
@@ -87,8 +88,9 @@ def show_game_notebook_input(dataloader, game, clear_stats=None, remove_image_pa
         path = f"./{dataloader.dataset.root_folder_path}/audio/train/CLEAR_{dataloader.dataset.set}_{game['scene_id']:06d}.flac"
         display(Audio(path))
 
-    (fig, ax), colors = show_tagged_scene(dataloader.dataset, game, fig_title=f"Scene #{game['scene_id']}",
-                                         show_legend=False, remove_padding=remove_image_padding)
+    (fig, ax), colors = show_tagged_scene(dataloader.dataset, game, max_frequency=max_frequency,
+                                          fig_title=f"Scene #{game['scene_id']}", show_legend=False,
+                                          remove_padding=remove_image_padding, fill_rect=fill_rect)
 
     legend = get_tagged_scene_table_legend(dataloader, game['scene_id'], colors)
     display(legend)

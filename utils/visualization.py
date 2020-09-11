@@ -74,16 +74,16 @@ def get_tagged_scene_annotations(scene, image_dims, scene_duration=None):
     return annotations
 
 
-def paint_annotation_rect_on_fig(annotations, image_height, ax, opacity=0.7):
+def paint_annotation_rect_on_fig(annotations, image_height, ax, opacity=0.3, fill_rect=False):
     rgb_colors = []
     annotation_colormap = plt.cm.get_cmap('hsv', len(annotations))
 
     for i, (sound_start, sound_width) in enumerate(annotations):
-        annotation_color = annotation_colormap(i)
+        annotation_color = list(annotation_colormap(i))
 
         annotation_rect = patches.Rectangle((sound_start, 2), width=sound_width,
-                                            height=image_height - 4, fill=False, color=annotation_color,
-                                            linewidth=1.4, alpha=opacity)
+                                            height=image_height - 4, fill=fill_rect, color=annotation_color[:-1] + [opacity], ec=annotation_color,
+                                            linewidth=1.5)
 
         ax.add_patch(annotation_rect)
         rgb_colors.append(tuple(int(c * 255) for c in annotation_color))
@@ -92,7 +92,7 @@ def paint_annotation_rect_on_fig(annotations, image_height, ax, opacity=0.7):
 
 
 def show_tagged_scene(dataset, game_or_game_id, scene_image=None, remove_padding=False, show_legend=True, show_fig=False,
-                     fig_title=None, fig_ax=None, sound_sample_rate=24000):
+                     fig_title=None, fig_ax=None, max_frequency=24000, colormap='jet', fill_rect=False):
     assert dataset.is_raw_img() or scene_image is not None, 'Image to tag must be provided if not in RAW mode'
 
     if type(game_or_game_id) == int:
@@ -133,11 +133,11 @@ def show_tagged_scene(dataset, game_or_game_id, scene_image=None, remove_padding
     ax.imshow(ToPILImage()(image))
 
     # Set axis
-    set_scene_image_axis_labels(ax, image_width, image_height, scene_duration, sound_sample_rate // 2)
+    set_scene_image_axis_labels(ax, image_width, image_height, scene_duration, max_frequency)
 
     # Generate annotations
     annotations = get_tagged_scene_annotations(scene, (image_height, image_width), scene_duration)
-    rgb_colors = paint_annotation_rect_on_fig(annotations, image_height, ax)
+    rgb_colors = paint_annotation_rect_on_fig(annotations, image_height, ax, fill_rect=fill_rect)
 
     #fig.tight_layout()
 
