@@ -93,7 +93,7 @@ def update_arguments(args, paths, flags):
     else:
         args['input_image_type'] = "raw"
 
-    args['nb_dataloader_worker'] = 1
+    args['nb_dataloader_worker'] = 2
 
     if args['input_image_type'] == 'raw':
         # Default values when in RAW mode
