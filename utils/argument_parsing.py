@@ -9,7 +9,7 @@ def get_args_task_flags_paths(args):
     task = get_task_from_args(args)
     paths = get_paths_from_args(task, args)
     flags = create_flags_from_args(task, args)
-    update_arguments(args, paths, flags)
+    update_arguments(args, task, paths, flags)
 
     return args, task, flags, paths
 
@@ -83,12 +83,12 @@ def get_task_from_args(args):
     assert False, "Arguments don't specify task"
 
 
-def update_arguments(args, paths, flags):
+def update_arguments(args, task, paths, flags):
     if args['conv_feature_input']:
         args['input_image_type'] = "conv"
     elif args['h5_image_input']:
         args['input_image_type'] = "raw_h5"
-    elif args['audio_input']:
+    elif args['audio_input'] or (task.startswith('notebook') and 'audio' in args['version_name']):
         args['input_image_type'] = "audio"
     else:
         args['input_image_type'] = "raw"
