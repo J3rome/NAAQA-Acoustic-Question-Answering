@@ -1,9 +1,9 @@
 from copy import deepcopy
 
 import matplotlib.pyplot as plt
-import torch
 from torchvision.transforms import ToPILImage
 from IPython.core.display import display, Markdown
+from IPython.display import Audio
 
 from data_interfaces.transforms import NormalizeInverse
 from utils.visualization import show_tagged_scene, get_tagged_scene_table_legend
@@ -76,12 +76,16 @@ def show_gradcam(device, model, dataloader, custom_game, scene_id, guess_id=0, t
     return heatmaps
 
 
-def show_game_notebook_input(dataloader, game, clear_stats=None, remove_image_padding=False):
+def show_game_notebook_input(dataloader, game, clear_stats=None, remove_image_padding=False, sound_player=True):
     if clear_stats:
         inverse_norm = NormalizeInverse(clear_stats['mean'],
                                         clear_stats['std'])
         # We copy the game to avoid modifying the original object
         game = inverse_norm(deepcopy(game))
+
+    if sound_player:
+        path = f"./{dataloader.dataset.root_folder_path}/audio/train/CLEAR_{dataloader.dataset.set}_{game['scene_id']:06d}.flac"
+        display(Audio(path))
 
     (fig, ax), colors = show_tagged_scene(dataloader.dataset, game, fig_title=f"Scene #{game['scene_id']}",
                                          show_legend=False, remove_padding=remove_image_padding)
