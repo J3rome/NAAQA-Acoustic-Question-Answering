@@ -164,6 +164,7 @@ def get_experiments(experiment_result_path, prefix=None):
             img_arguments = arguments
 
             if arguments['h5_image_input']:
+                # Copy preprocessed arguments if not in results
                 local_preprocessed_arguments = f"{exp_dated_folder_path}/preprocessed_arguments.json"
                 preprocessed_argument_path = f"{arguments['data_root_path']}/{arguments['version_name']}/{arguments['preprocessed_folder_name']}/arguments.json"
 
@@ -177,6 +178,17 @@ def get_experiments(experiment_result_path, prefix=None):
                     save_json(img_arguments, local_preprocessed_arguments)
                 #else:
                     #print(f"Was unable to retrieve preprocessing arguments for version {arguments['version_name']}")
+
+                # Copy preprocessed data stats (mean, std, min, max) if not in results
+                local_preprocesses_stats = f"{exp_dated_folder_path}/preprocessed_data_stats.json"
+                preprocessed_stats_path = f"{arguments['data_root_path']}/{arguments['version_name']}/{arguments['preprocessed_folder_name']}/clear_stats.json"
+
+                if not os.path.exists(local_preprocesses_stats) and os.path.exists(preprocessed_stats_path):
+                    preprocessed_stats = read_json(preprocessed_stats_path)
+
+                    save_json(preprocessed_stats, local_preprocesses_stats)
+                #else:
+                    #print(f"Was unable to retrieve dataset statistics for {arguments['version_name']} -- {arguments['preprocessed_folder_name']}")
 
             experiment['n_fft'] = img_arguments['spectrogram_n_fft'] if 'spectrogram_n_fft' in img_arguments else None
 
