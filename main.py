@@ -539,11 +539,18 @@ def prepare_for_task(args):
                 save_graph_to_tensorboard(film_model, tensorboard, input_image_torch_shape)
 
     if flags['create_output_folder'] and 'h5' in args['input_image_type']:
-        preprocessed_argument_path = f"{next(iter(datasets.values())).root_folder_path}/{args['preprocessed_folder_name']}/arguments.json"
+        # Copy preprocessing arguments and more to the result folder
+        preprocessed_folder_path = f"{next(iter(datasets.values())).root_folder_path}/{args['preprocessed_folder_name']}"
+        preprocessed_argument_path = f"{preprocessed_folder_path}/arguments.json"
+        preprocessed_data_stats_path = f"{preprocessed_folder_path}/preprocessed_data_stats.json"
 
         if os.path.exists(preprocessed_argument_path):
             preprocessed_arguments = read_json(preprocessed_argument_path)
             save_json(preprocessed_arguments, f"{paths['output_dated_folder']}/preprocessed_arguments.json")
+
+        if os.path.exists(preprocessed_data_stats_path):
+            preprocessed_arguments = read_json(preprocessed_data_stats_path)
+            save_json(preprocessed_arguments, f"{paths['output_dated_folder']}/preprocessed_data_stats.json")
 
     # Set back the random state
     set_random_state(initial_random_state)      # FIXME : This is redundant, we already reset random state after initialising the model. Actions after model initialization doesn't seem to affect random state
