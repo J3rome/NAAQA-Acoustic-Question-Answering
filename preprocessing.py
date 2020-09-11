@@ -59,13 +59,14 @@ def get_lr_finder_curves(model, device, train_dataloader, output_dated_folder, n
     return fig, ax
 
 
-def get_dataset_stats_and_write(dataset, device, filename='clear_stats.json', recalculate=False, batch_size=1,
+def get_dataset_stats_and_write(dataset, device, stats_filepath=None, recalculate=False, batch_size=1,
                                 nb_dataloader_worker=0):
-    stats_file_path = f"{dataset.root_folder_path}/{dataset.preprocessed_folder_name}/{filename}"
+    if stats_filepath is None:
+        stats_filepath = f"{dataset.root_folder_path}/{dataset.preprocessed_folder_name}/clear_stats.json"
 
-    if os.path.exists(stats_file_path) and not recalculate:
-        print(f"Loading CLEAR stats from {stats_file_path}")
-        return read_json(stats_file_path)
+    if os.path.exists(stats_filepath) and not recalculate:
+        print(f"Loading CLEAR stats from {stats_filepath}")
+        return read_json(stats_filepath)
 
     dataset_copy = CLEAR_dataset.from_dataset_object(dataset, dataset.games)
 
@@ -83,9 +84,9 @@ def get_dataset_stats_and_write(dataset, device, filename='clear_stats.json', re
         'min': min_val,
         'max': max_val
     }
-    save_json(stats, stats_file_path)
+    save_json(stats, stats_filepath)
 
-    print(f"Clear stats written to '{stats_file_path}'")
+    print(f"Clear stats written to '{stats_filepath}'")
 
     return stats
 
