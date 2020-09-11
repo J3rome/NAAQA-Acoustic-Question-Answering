@@ -19,7 +19,7 @@ from data_interfaces.transforms import ResizeTensorBasedOnMaxWidth, RemovePaddin
 from data_interfaces.transforms import GenerateMelSpectrogram, GenerateSpectrogram, ResampleAudio
 
 from utils.file import save_model_config, save_json, read_json, create_symlink_to_latest_folder
-from utils.file import create_folders_save_args, fix_best_epoch_symlink_if_necessary, get_clear_stats
+from utils.file import create_folders_save_args, fix_best_epoch_symlink_if_necessary
 from utils.random import set_random_seed, get_random_state, set_random_state
 from utils.visualization import save_model_summary, save_graph_to_tensorboard
 from utils.argument_parsing import get_args_task_flags_paths, get_feature_extractor_config_from_args
@@ -84,6 +84,10 @@ parser.add_argument("--normalize_with_imagenet_stats", help="Will normalize inpu
                                                        "ImageNet mean & std (Only with RAW input)", action='store_true')
 parser.add_argument("--normalize_with_clear_stats", help="Will normalize input images according to"
                                                          "CLEAR mean & std (Only with RAW input)", action='store_true')
+parser.add_argument("--clear_stats_file_path", help="Path to clear stats file (Used for normalisation). "
+                                                    "Default value will look up in preprocessed folder",
+                    type=str, default=None)
+
 parser.add_argument("--mel_spectrogram", help="Will create MEL spectrogram when used with --audio_input. "
                                               "Otherwise regular spectrogram", action='store_true')
 parser.add_argument("--spectrogram_n_fft", help="Define the fft window length when generating spectrogram",
@@ -278,7 +282,8 @@ def set_transforms_on_datasets(args, datasets, transforms_device):
 
     if args['normalize_zero_one'] or args['normalize_with_clear_stats']:
         # Retrieve mean, std, min and max values of the dataset
-        stats = get_dataset_stats_and_write(datasets['train'], args['device'], batch_size=args['batch_size'],
+        stats = get_dataset_stats_and_write(datasets['train'], args['device'], stats_filepath=args['clear_stats_file_path'],
+                                            batch_size=args['batch_size'],
                                             nb_dataloader_worker=args['nb_dataloader_worker'],
                                             recalculate=args['force_mean_recalculate'])
     elif args['normalize_with_imagenet_stats']:
