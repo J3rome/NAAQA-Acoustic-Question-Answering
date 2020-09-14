@@ -230,7 +230,7 @@ class CLEAR_dataset(Dataset):
                     elif keep_freq_point:
                         spectrogram_height = keep_freq_point
                     else:
-                        spectrogram_height = n_fft // 2
+                        spectrogram_height = n_fft // 2 + 1
 
                     self.all_image_sizes[idx] = (spectrogram_height, spectrogram_length)
             else:
