@@ -329,8 +329,8 @@ class PadTensor(object):
         self.output_shape = output_shape
 
     def __call__(self, sample):
-        width_to_pad = self.output_shape[1] - sample['image'].shape[2]
-        height_to_pad = self.output_shape[0] - sample['image'].shape[1]
+        width_to_pad = max(self.output_shape[1] - sample['image'].shape[2], 0)
+        height_to_pad = max(self.output_shape[0] - sample['image'].shape[1], 0)
 
         if width_to_pad + height_to_pad > 0:
             sample['image'] = F.pad(sample['image'], [0, width_to_pad, 0, height_to_pad])
