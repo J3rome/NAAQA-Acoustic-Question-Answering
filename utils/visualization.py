@@ -92,7 +92,8 @@ def paint_annotation_rect_on_fig(annotations, image_height, ax, opacity=0.3, fil
 
 
 def show_tagged_scene(dataset, game_or_game_id, scene_image=None, remove_padding=False, show_legend=True, show_fig=False,
-                     fig_title=None, fig_ax=None, max_frequency=24000, colormap='jet', fill_rect=False):
+                     fig_title=None, fig_ax=None, max_frequency=24000, colormap='jet', fill_rect=False,
+                      show_colorbar=True):
     assert dataset.is_raw_img() or scene_image is not None, 'Image to tag must be provided if not in RAW mode'
 
     if type(game_or_game_id) == int:
@@ -138,6 +139,9 @@ def show_tagged_scene(dataset, game_or_game_id, scene_image=None, remove_padding
     # Generate annotations
     annotations = get_tagged_scene_annotations(scene, (image_height, image_width), scene_duration)
     rgb_colors = paint_annotation_rect_on_fig(annotations, image_height, ax, fill_rect=fill_rect)
+
+    if show_colorbar:
+        fig.colorbar(im)
 
     #fig.tight_layout()
 
