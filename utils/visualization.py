@@ -131,7 +131,14 @@ def show_tagged_scene(dataset, game_or_game_id, scene_image=None, remove_padding
         #fig.suptitle(fig_title)
         ax.set_title(fig_title)
 
-    ax.imshow(ToPILImage()(image))
+    image = image.permute(1, 2, 0)
+
+    if image.shape[-1] == 1:
+        image = image.squeeze(-1)
+    elif image.shape[-1] != 3:
+        assert False, "Image must have either 1 or 3 channels"
+
+    im = ax.imshow(image)
 
     # Set axis
     set_scene_image_axis_labels(ax, image_width, image_height, scene_duration, max_frequency)
