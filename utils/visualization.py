@@ -220,7 +220,7 @@ def save_graph_to_tensorboard(model, tensorboard, input_image_torch_shape):
                    torch.ones(2, *input_image_torch_shape, dtype=torch.float)]
     tensorboard['writers']['train'].add_graph(model, dummy_input)
 
-import cv2
+
 def get_gradcam_heatmap(mask):
     # Remove unnecessary dimensions
     while len(mask.shape) > 2:
@@ -229,7 +229,7 @@ def get_gradcam_heatmap(mask):
     mask = mask.detach().cpu().numpy()
 
     heatmap = (mask * 255).astype(np.uint8)
-    heatmap = cv2.applyColorMap(heatmap, cv2.COLORMAP_JET)
+    heatmap = plt.cm.jet(heatmap)       # FIXME : Is this working ? replaced opencv2 .apply_colormap()
     heatmap = torch.from_numpy(heatmap).permute(2, 0, 1).float().div(255)
     b, g, r = heatmap.split(1)
     heatmap = torch.cat([r, g, b])
