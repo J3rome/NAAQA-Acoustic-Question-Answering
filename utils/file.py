@@ -9,10 +9,22 @@ import h5py
 # At read time, we don't care about speed but since we read huge files, we prioritize smaller memory footprint
 # At writing time, speed is important since we write often (Every epoch)
 import json
-import orjson
+import ujson
 
 
 def save_json(results, output_folder, filename=None, indented=True, sort_keys=False):
+    if filename is None:
+        # First parameter is full path
+        path = output_folder
+    else:
+        path = '%s/%s' % (output_folder, filename)
+
+    with open(path, 'w') as f:
+        ujson.dump(results, f, sort_keys=sort_keys, indent=2 if indented else None, escape_forward_slashes=False)
+
+
+def save_json_orjson(results, output_folder, filename=None, indented=True, sort_keys=False):
+    import orjson
     if filename is None:
         # First parameter is full path
         path = output_folder
