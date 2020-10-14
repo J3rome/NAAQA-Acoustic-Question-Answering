@@ -18,6 +18,19 @@ def to_int(string):
     return int(string) if string else None
 
 
+def get_max_freq(exp):
+    if exp['input_type'] == 'audio':
+        sample_rate = exp['resample_audio'] if exp['resample_audio'] else 48000   # Acoustic scenes are sampled at 48kHz
+
+        max_freq = sample_rate // 2
+        if exp['keep_freq_point']:
+            max_freq = max_freq / (exp['n_fft'] // 2) * exp['keep_freq_point']
+
+        return max_freq
+
+    return None
+
+
 def get_experiments(experiment_result_path, prefix=None):
     experiments = []
 
@@ -201,6 +214,8 @@ def get_experiments(experiment_result_path, prefix=None):
             experiment['n_mels'] = img_arguments['spectrogram_n_mels'] if 'mel_spectrogram' in img_arguments and 'spectrogram_n_mels' in img_arguments and img_arguments['mel_spectrogram'] else None
 
             experiment['resample_audio'] = img_arguments['resample_audio_to'] if 'resample_audio_to' in img_arguments else None
+
+            experiment['max_freq'] = get_max_freq(experiment)
 
             experiment['norm_zero_one'] = img_arguments['normalize_zero_one']
             experiment['norm_clear_stats'] = img_arguments['normalize_with_clear_stats']
