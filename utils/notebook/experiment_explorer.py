@@ -190,6 +190,8 @@ def get_experiments(experiment_result_path, prefix=None):
                 #else:
                     #print(f"Was unable to retrieve dataset statistics for {arguments['version_name']} -- {arguments['preprocessed_folder_name']}")
 
+            experiment['input_type'] = img_arguments['input_image_type']
+
             experiment['n_fft'] = img_arguments['spectrogram_n_fft'] if 'spectrogram_n_fft' in img_arguments else None
 
             experiment['hop_length'] = img_arguments['spectrogram_hop_length'] if 'spectrogram_hop_length' in img_arguments else None
