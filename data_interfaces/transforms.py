@@ -5,6 +5,8 @@ import torch.nn.functional as F
 import torchaudio
 import torchaudio.functional as audio_F
 
+import matplotlib.pyplot as plt
+
 
 class ResampleAudio(object):
 
@@ -146,6 +148,28 @@ class MelScale(torch.nn.Module):
         mel_specgram = mel_specgram.view(shape[:-2] + mel_specgram.shape[-2:])
 
         return mel_specgram
+
+
+class ApplyColormapToSpectrogram(object):
+    """
+    Will use matplotlib colormap to convert 1 Channel image (Spectrogram) to 3 Channels RGB images (Colored spectrogram)
+    This transform assume the format C x H x W
+    """
+
+    def __init__(self, cmap="Blues"):
+        self.cmap = plt.get_cmap(cmap)
+
+    def __call__(self, sample):
+        img = sample['image'].squeeze(0)
+
+        original_device = img.device
+
+        if 'cuda' in original_device.type:
+            img = img.cpu()
+
+        sample['image'] = torch.tensor(self.cmap(img, alpha=None)[:, :, :3], device=original_device)
+
+        return sample
 
 
 class ImgBetweenZeroOne(object):

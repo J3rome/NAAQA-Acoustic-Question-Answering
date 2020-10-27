@@ -15,7 +15,7 @@ from visualization import visualize_gamma_beta, grad_cam_visualization
 from data_interfaces.CLEAR_dataset import CLEAR_dataset, CLEAR_collate_fct
 #from data_interfaces.CLEVR_dataset import CLEVR_dataset    # FIXME : This is temporarly disabled
 from data_interfaces.transforms import ImgBetweenZeroOne, PadTensor, NormalizeSample, PadTensorHeight
-from data_interfaces.transforms import ResizeTensorBasedOnMaxWidth, RemovePadding
+from data_interfaces.transforms import ResizeTensorBasedOnMaxWidth, RemovePadding, ApplyColormapToSpectrogram
 from data_interfaces.transforms import GenerateMelSpectrogram, GenerateSpectrogram, ResampleAudio
 
 from utils.file import save_model_config, save_json, read_json, create_symlink_to_latest_folder
@@ -98,6 +98,9 @@ parser.add_argument("--spectrogram_n_mels", help="Number of mel filter to use wh
                     type=int, default=128)
 parser.add_argument("--spectrogram_keep_freq_point", help="Number of frequency point used generating spectrogram",
                     type=int, default=None)
+parser.add_argument("--spectrogram_rgb", help="Spectrograms will be converted to 3 channels RGB images "
+                                              "(colormap on spectrogram)", action='store_true')
+
 parser.add_argument("--resample_audio_to", help="Define the new sampling frequency for the audio signal",
                     type=float, default=None)
 parser.add_argument("--per_spectrogram_normalize", help="Will normalize the spectrograms between 0 and 1 according to"
@@ -282,7 +285,7 @@ def set_transforms_on_datasets(args, datasets, transforms_device):
             for transform in transforms_to_add:
                 dataset.add_transform(transform)
 
-    if args['normalize_zero_one'] or args['normalize_with_clear_stats']:
+    if args['normalize_zero_one'] or args['normalize_with_clear_stats'] or args['spectrogram_rgb']:
         # Retrieve mean, std, min and max values of the dataset
         stats = get_dataset_stats_and_write(datasets['train'], args['device'], stats_filepath=args['clear_stats_file_path'],
                                             batch_size=args['batch_size'],
@@ -291,7 +294,7 @@ def set_transforms_on_datasets(args, datasets, transforms_device):
     elif args['normalize_with_imagenet_stats']:
         stats = get_imagenet_stats()
 
-    if args['normalize_zero_one']:
+    if args['normalize_zero_one'] or args['spectrogram_rgb']:
         if args['input_image_type'] == 'audio':
             transform = ImgBetweenZeroOne(min_val=stats['min'], max_val=stats['max'])
 
@@ -308,6 +311,20 @@ def set_transforms_on_datasets(args, datasets, transforms_device):
 
         for dataset in datasets.values():
             dataset.add_transform(transform)
+
+    if args['spectrogram_rgb']:
+        # Input need to be between 0 and 1. The output will also be between 0 and 1
+        transform = ApplyColormapToSpectrogram(cmap='Blues')
+        for dataset in datasets.values():
+            dataset.add_transform(transform)
+
+        if args['normalize_with_imagenet_stats'] or args['normalize_with_clear_stats']:
+            # Recalculate dataset stats with RGB values if the stats are needed for other transforms
+            stats = get_dataset_stats_and_write(datasets['train'], args['device'],
+                                                stats_filepath=args['clear_stats_file_path'],
+                                                batch_size=args['batch_size'],
+                                                nb_dataloader_worker=args['nb_dataloader_worker'],
+                                                recalculate=True)
 
     # TODO : Add data augmentation ?
 
