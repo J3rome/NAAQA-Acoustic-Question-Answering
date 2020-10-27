@@ -23,7 +23,7 @@ def get_max_freq(exp):
         sample_rate = exp['resample_audio'] if exp['resample_audio'] else 48000   # Acoustic scenes are sampled at 48kHz
 
         max_freq = sample_rate // 2
-        if exp['keep_freq_point']:
+        if exp['keep_freq_point'] and exp['keep_freq_point'] != exp['n_fft']:
             max_freq = max_freq / (exp['n_fft'] // 2) * exp['keep_freq_point']
 
         return max_freq
