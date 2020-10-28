@@ -60,7 +60,7 @@ def create_flags_from_args(task, args):
 def get_paths_from_args(task, args):
     paths = {}
 
-    paths['output_name'] = get_output_name(args)
+    paths["output_name"] = args['version_name'] + "_" + args['output_name_suffix'] if args['output_name_suffix'] else args['version_name']
     paths["data_path"] = "%s/%s" % (args['data_root_path'], args['version_name'])
     paths["output_task_folder"] = "%s/%s" % (args['output_root_path'], task)
     paths["output_experiment_folder"] = "%s/%s" % (paths["output_task_folder"], paths["output_name"])
@@ -137,37 +137,6 @@ def update_arguments(args, task, paths, flags):
 
     # By default the start_epoch should is 0. Will only be modified if loading from checkpoint
     args["start_epoch"] = 0
-
-
-def get_output_name(args):
-    output_name = args['version_name']
-
-    if 'audio' in args['version_name']:
-        # Include preprocessing attributes in output_name
-        if args['resample_audio_to']:
-            output_name += f"_resample_{args['resample_audio_to']}"
-
-        output_name += f"_win_{args['spectrogram_n_fft']}_hop_{args['spectrogram_hop_length']}"
-
-        if args['spectrogram_keep_freq_point']:
-            output_name += f"_keep_{args['spectrogram_keep_freq_point']}"
-
-        if args['mel_spectrogram']:
-            output_name += f"_mels_{args['spectrogram_n_mels']}"
-
-        if args['spectrogram_rgb']:
-            output_name += "_RGB"
-
-        if args['normalize_zero_one']:
-            output_name += f"_norm_zero_one"
-
-        if args['normalize_with_clear_stats']:
-            output_name += f"_norm_clear_stats"
-
-    if args['output_name_suffix']:
-        output_name += f"_{args['output_name_suffix']}"
-
-    return output_name
 
 
 def get_feature_extractor_config_from_args(args):
