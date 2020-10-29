@@ -167,7 +167,7 @@ class ApplyColormapToSpectrogram(object):
         if 'cuda' in original_device.type:
             img = img.cpu()
 
-        sample['image'] = torch.tensor(self.cmap(img, alpha=None)[:, :, :3], device=original_device)
+        sample['image'] = torch.tensor(self.cmap(img, alpha=None)[:, :, :3], device=original_device).permute(2, 0, 1)
 
         return sample
 
