@@ -1,6 +1,7 @@
 import os
 from datetime import datetime, timedelta
 import re
+from copy import deepcopy
 
 import pandas as pd
 import numpy as np
@@ -292,24 +293,48 @@ def get_experiments(experiment_result_path, prefix=None):
 
             experiments.append(experiment)
 
-    experiments_df = pd.DataFrame(experiments,
-                                  columns=list(experiments[0].keys()))
-                                  #columns=['prefix', 'nb_sample', 'nb_scene', 'nb_q_per_scene', 'config', 'nb_epoch',
-                                  #         'nb_epoch_runned', 'stop_accuracy', 'best_val_acc', 'best_val_loss',
-                                  #         'test_acc', 'test_loss', 'train_acc', 'train_loss', 'stopped_early',
-                                  #         '0.6_at_epoch', '0.7_at_epoch', '0.8_at_epoch', '0.9_at_epoch',
-                                  #         'batch_size', 'resnet_features', 'nb_trainable_param', 'test_version',
-                                  #         'random_seed', 'date', 'total_nb_param', 'nb_non_trainable_param',
-                                  #         'word_embedding_dim', 'rnn_state_size', 'extractor_type', 'stem_out_chan',
-                                  #         'nb_resblock', 'resblocks_out_chan', 'classifier_conv_out_chan',
-                                  #         'classifier_type', 'classifier_global_pool', 'optimizer_type', 'nb_answer',
-                                  #         'optimizer_lr', 'optimizer_weight_decay', 'dropout_drop_prob',
-                                  #         'git_revision', 'pad_to_largest', 'resized_height', 'resized_width',
-                                  #         'all_train_acc', 'all_train_loss', 'all_val_acc', 'all_val_loss',
-                                  #         'train_time', 'mean_epoch_time', 'gpu_name', 'folder', 'note'
-                                  #         ]
-                                  #)
+    experiments_df = pd.DataFrame(experiments, columns=list(experiments[0].keys()))
+
+    # Round number params to the closest thousand to facilitate comparison
+    experiments_df['nb_trainable_param_round'] = experiments_df['nb_trainable_param'].apply(lambda x: x // 1000 * 1000)
+
     return experiments_df
+
+
+
+def get_format_dicts():
+    format_dict = {
+        'total_nb_param': "{:,d}".format,
+        'nb_non_trainable_param': "{:,d}".format,
+        'nb_trainable_param': "{:,d}".format,
+        'nb_trainable_param_round': "~ {:,d}".format,
+        'nb_sample': "{:,d}".format,
+        'nb_scene': "{:,d}".format,
+        'rnn_state_size': "{:,d}".format,
+        'optimizer_lr': "{:.2e}".format,
+        'optimizer_weight_decay': "{:.2e}".format,
+        'best_val_acc': lambda x: "{:.2f}%".format(x * 100) if not pd.isnull(x) else None,
+        'train_acc': lambda x: "{:.2f}%".format(x * 100) if not pd.isnull(x) else None,
+        'test_acc': lambda x: "{:.2f}%".format(x * 100) if not pd.isnull(x) else None,
+        '0.6_at_epoch': lambda x: x if not pd.isnull(x) and x != 0 else None,
+        '0.7_at_epoch': lambda x: x if not pd.isnull(x) and x != 0 else None,
+        '0.8_at_epoch': lambda x: x if not pd.isnull(x) and x != 0 else None,
+        '0.9_at_epoch': lambda x: x if not pd.isnull(x) and x != 0 else None
+    }
+
+    latex_format_dict = deepcopy(format_dict)
+    latex_format_dict['nb_sample'] = lambda x: "{:d}k".format(x // 1000)
+    latex_format_dict['nb_scene'] = lambda x: "{:d}k".format(x // 1000)
+    latex_format_dict['best_val_acc'] = lambda x: "{:.2f}".format(x * 100) if not pd.isnull(x) else None
+    latex_format_dict['train_acc'] = lambda x: "{:.2f}".format(x * 100) if not pd.isnull(x) else None
+    latex_format_dict['test_acc'] = lambda x: "{:.2f}".format(x * 100) if not pd.isnull(x) else None
+    latex_format_dict['classifier_type'] = lambda x: 'Fcn' if x == 'fcn' else 'Conv-Avg'
+    latex_format_dict['classifier_conv_out'] = lambda x: '{:d}'.format(int(x)) if not pd.isnull(x) else "--"
+    latex_format_dict['classifier_projection_out'] = lambda x: '{:d}'.format(int(x)) if not pd.isnull(x) else "--"
+    latex_format_dict['extractor_projection_size'] = lambda x: '{:d}'.format(int(x)) if not pd.isnull(x) else "--"
+    latex_format_dict['extractor_filters'] = lambda x: str(x)[1:-1]  # Remove the '[' and ']' of str(array)
+
+    return format_dict, latex_format_dict
 
 
 def get_nb_param_from_summary(summary_filepath):
