@@ -284,8 +284,16 @@ def set_transforms_on_datasets(args, datasets, transforms_device):
                 dataset.add_transform(transform)
 
     if args['normalize_zero_one'] or args['normalize_with_clear_stats'] or args['spectrogram_rgb']:
+
+        filepath = args['clear_stats_file_path']
+
+        if args['spectrogram_rgb']:
+            # Since we calculate the
+            filepath = filepath.replace('.json', '_before_RGB.json')
+
         # Retrieve mean, std, min and max values of the dataset
-        stats = get_dataset_stats_and_write(datasets['train'], args['device'], stats_filepath=args['clear_stats_file_path'],
+        stats = get_dataset_stats_and_write(datasets['train'], args['device'],
+                                            stats_filepath=filepath,
                                             batch_size=args['batch_size'],
                                             nb_dataloader_worker=args['nb_dataloader_worker'],
                                             recalculate=args['force_mean_recalculate'])
@@ -322,7 +330,7 @@ def set_transforms_on_datasets(args, datasets, transforms_device):
                                                 stats_filepath=args['clear_stats_file_path'],
                                                 batch_size=args['batch_size'],
                                                 nb_dataloader_worker=args['nb_dataloader_worker'],
-                                                recalculate=True)
+                                                recalculate=args['force_mean_recalculate'])
 
     # TODO : Add data augmentation ?
 
