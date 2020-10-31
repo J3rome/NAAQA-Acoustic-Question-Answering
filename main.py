@@ -38,7 +38,6 @@ parser.add_argument("--inference", help="FiLM model inference", action='store_tr
 parser.add_argument("--visualize_grad_cam", help="Class Activation Maps - GradCAM", action='store_true')
 parser.add_argument("--visualize_gamma_beta", help="FiLM model parameters visualization (T-SNE)", action='store_true')
 parser.add_argument("--prepare_images", help="Save images in h5 file for faster retrieving", action='store_true')
-parser.add_argument("--feature_extract", help="Feature Pre-Extraction", action='store_true')
 parser.add_argument("--create_dict", help="Create word dictionary (for tokenization)", action='store_true')
 parser.add_argument("--random_answer_baseline", help="Spit out a random answer for each question", action='store_true')
 parser.add_argument("--random_weight_baseline", help="Use randomly initialised Neural Network to answer the question",
@@ -48,14 +47,13 @@ parser.add_argument("--notebook_data_analysis", help="Will prepare dataloaders f
                                                      "(Should not be run via main.py)", action='store_true')
 parser.add_argument("--notebook_model_inference", help="Will prepare dataloaders & model for inference in notebook"
                                                      "(Should not be run via main.py)", action='store_true')
-parser.add_argument("--calc_clear_mean", help="Will calculate the mean and std of the dataset and write it in a json at"
-                                              "the root of the dataset", action='store_true')
 
 parser.add_argument("--tf_weight_transfer", help="Will create a pytorch checkpoint from dumped tensorflow weights."
                                                  "path to the weights are specified by --tf_weight_path",
                     action='store_true')
 
 # Image Preprocessing
+parser.add_argument("--resnet_feature_extractor", help="Will use resnet as a feature extractor", action='store_true')
 parser.add_argument("--img_resize_height", type=int, default=224,
                     help="Specify the height to which the image will be resized")
 parser.add_argument("--img_resize_width", type=int, default=224,
@@ -450,17 +448,15 @@ def execute_task(task, args, output_dated_folder, dataloaders, model, model_conf
                                    start_end_tokens=not args['no_start_end_tokens'])
 
     elif task == "prepare_images":
-        images_to_h5(dataloaders=dataloaders, output_folder_name=args['preprocessed_folder_name'])
+        if args['resnet_feature_extractor']:
+            resnet_extractor = Resnet_feature_extractor(layer_index=args['feature_extractor_layer_index'])
+            resnet_extractor.to(device)
+        else:
+            resnet_extractor = None
 
-        # Save generation args with h5 file
-        save_json(args, f"{dataloaders['train'].dataset.root_folder_path}/{args['preprocessed_folder_name']}",
-                  filename="arguments.json")
+        images_to_h5(device=device, dataloaders=dataloaders, output_folder_name=args['preprocessed_folder_name'],
+                     feature_extractor=resnet_extractor)
 
-    elif task == "feature_extract":
-        resnet_extractor = Resnet_feature_extractor(layer_index=args['feature_extractor_layer_index'])
-        resnet_extractor.to(device)
-        extract_features(device=device, feature_extractor=resnet_extractor,
-                         dataloaders=dataloaders, output_folder_name=args['preprocessed_folder_name'])
         # Save generation args with h5 file
         save_json(args, f"{dataloaders['train'].dataset.root_folder_path}/{args['preprocessed_folder_name']}",
                   filename="arguments.json")
@@ -475,11 +471,6 @@ def execute_task(task, args, output_dated_folder, dataloaders, model, model_conf
     elif task == "lr_finder":
         get_lr_finder_curves(model, device, dataloaders['train'], output_dated_folder, args['nb_epoch'], optimizer,
                              val_dataloader=dataloaders['val'], loss_criterion=loss_criterion)
-
-    elif task == "calc_clear_mean":
-        get_dataset_stats_and_write(dataloaders['train'].dataset, device, batch_size=args['batch_size'],
-                                    nb_dataloader_worker=args['nb_dataloader_worker'],
-                                    recalculate=args['force_mean_recalculate'])
 
     elif task == 'random_answer_baseline':
         random_answer_baseline(dataloaders['train'], output_dated_folder)

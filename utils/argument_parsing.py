@@ -15,16 +15,16 @@ def get_args_task_flags_paths(args):
 
 
 def validate_arguments(args):
-    mutually_exclusive_params = [args['training'], args['inference'], args['feature_extract'], args['create_dict'],
+    mutually_exclusive_params = [args['training'], args['inference'], args['create_dict'],
                                  args['visualize_gamma_beta'], args['visualize_grad_cam'], args['lr_finder'],
-                                 args['calc_clear_mean'], args['random_answer_baseline'],
-                                 args['random_weight_baseline'], args['prepare_images'], args['notebook_data_analysis'],
-                                 args['notebook_model_inference'], args['tf_weight_transfer']]
+                                 args['random_answer_baseline'], args['random_weight_baseline'], args['prepare_images'],
+                                 args['notebook_data_analysis'], args['notebook_model_inference'],
+                                 args['tf_weight_transfer']]
 
     assert sum(mutually_exclusive_params) == 1, \
         "[ERROR] Can only do one task at a time " \
-        "(--training, --inference, --visualize_gamma_beta, --create_dict, --feature_extract --visualize_grad_cam " \
-        "--prepare_images, --lr_finder, --calc_clear_mean, --random_answer_baseline, " \
+        "(--training, --inference, --visualize_gamma_beta, --create_dict, --visualize_grad_cam " \
+        "--prepare_images, --lr_finder, --random_answer_baseline, " \
         "--random_weight_baseline, --notebook_data_analysis, --notebook_model_inference)"
 
     assert not args['continue_training'] or (args['training'] and args['continue_training']), \
@@ -72,8 +72,8 @@ def get_paths_from_args(task, args):
 
 
 def get_task_from_args(args):
-    tasks = ['training', 'inference', 'visualize_gamma_beta', 'visualize_grad_cam', 'feature_extract', 'prepare_images',
-             'create_dict', 'lr_finder', 'calc_clear_mean', 'random_weight_baseline',
+    tasks = ['training', 'inference', 'visualize_gamma_beta', 'visualize_grad_cam', 'prepare_images',
+             'create_dict', 'lr_finder', 'random_weight_baseline',
              'random_answer_baseline', 'notebook_data_analysis', 'notebook_model_inference', 'tf_weight_transfer']
 
     for task in tasks:
@@ -104,11 +104,6 @@ def update_arguments(args, task, paths, flags):
 
     args['normalize_zero_one'] = args['normalize_zero_one'] and not args['keep_image_range']
 
-    # Make sure we are not normalizing beforce calculating mean and std
-    if args['calc_clear_mean']:
-        args['normalize_with_imagenet_stats'] = False
-        args['normalize_with_clear_stats'] = False
-
     args['dict_folder'] = args['preprocessed_folder_name'] if args['dict_folder'] is None else args['dict_folder']
     if args['dict_file_path'] is None:
         args['dict_file_path'] = "%s/%s/dict.json" % (paths["data_path"], args['dict_folder'])
@@ -134,6 +129,8 @@ def update_arguments(args, task, paths, flags):
             symlink_value = os.readlink(base_path)
             clean_base_path = base_path[:-(len(args['film_model_weight_path']) + 1)]
             args['film_model_weight_path'] = '%s/%s/%s' % (clean_base_path, symlink_value, suffix)
+
+    args['clear_stats_file_path'] = f"{args['data_root_path']}/{args['version_name']}/{args['preprocessed_folder_name']}/clear_stats.json"
 
     # By default the start_epoch should is 0. Will only be modified if loading from checkpoint
     args["start_epoch"] = 0

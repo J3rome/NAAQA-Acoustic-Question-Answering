@@ -167,7 +167,7 @@ def extract_features(device, feature_extractor, dataloaders, output_folder_name=
         print("Features extracted succesfully to '%s'" % output_filepath)
 
 
-def images_to_h5(dataloaders, output_folder_name='preprocessed'):
+def images_to_h5(device, dataloaders, output_folder_name='preprocessed', feature_extractor=None):
     dataloaders_first_key = list(dataloaders.keys())[0]
     first_dataloader = dataloaders[dataloaders_first_key]
 
@@ -203,7 +203,12 @@ def images_to_h5(dataloaders, output_folder_name='preprocessed'):
     else:
         create_folder_if_necessary(output_folder_path)
 
-    input_channels = first_dataloader.dataset.get_input_shape()[0]
+    if feature_extractor:
+        # Set feature extractor to eval mode
+        feature_extractor.to(device)
+        feature_extractor.eval()
+    else:
+        input_channels = first_dataloader.dataset.get_input_shape()[0]
 
     for set_type, dataloader in dataloaders.items():
         print("Creating H5 file from '%s' set" % set_type)
@@ -212,7 +217,12 @@ def images_to_h5(dataloaders, output_folder_name='preprocessed'):
         # Retrieve min & max dims of images
         max_width_id, height, max_width = dataloader.dataset.get_max_width_image_dims(return_scene_id=True)
 
-        image_dim = [input_channels, height, max_width]
+        if feature_extractor:
+            game_id = dataloader.dataset.get_random_game_for_scene(max_width_id)
+            max_width_img = dataloader.dataset[game_id]['image'].unsqueeze(0).to(device)
+            image_dim = feature_extractor.get_output_shape(max_width_img, channel_first=True)
+        else:
+            image_dim = [input_channels, height, max_width]
 
         # Keep only 1 game per scene (We want to process every image only once)
         dataloader.dataset.keep_1_game_per_scene()
@@ -226,10 +236,18 @@ def images_to_h5(dataloaders, output_folder_name='preprocessed'):
             h5_img_padding = f.create_dataset('img_padding', shape=[nb_games, 2], dtype=np.int32)
             h5_idx = 0
             for batch in tqdm(dataloader):
-                if batch['image'].device != 'cpu':
-                    batch['image'] = batch['image'].cpu()
+                features = batch['image']
+                if feature_extractor:
+                    features.to(device)
+                    with torch.set_grad_enabled(False):
+                        features = feature_extractor(features)
 
-                h5_dataset[h5_idx: h5_idx + batch_size] = batch['image']
+                if features.device != 'cpu':
+                    features = features.detach().cpu()
+
+                h5_dataset[h5_idx: h5_idx + batch_size] = features
+
+                # FIXME : Padding is not good when using resnet
                 h5_img_padding[h5_idx: h5_idx + batch_size] = batch['image_padding']
 
                 for i, scene_id in enumerate(batch['scene_id']):
