@@ -544,6 +544,10 @@ def prepare_for_task(args):
         if flags["force_sgd_optimizer"]:
             film_model_config['optimizer']['type'] = 'sgd'
 
+        if args['resnet_feature_extractor']:
+            # FIXME : This prevent running resnet extraction online (Without first extracting the features in a h5 file)
+            film_model_config['image_extractor']['type'] = "resnet_h5"
+
         input_image_torch_shape = datasets['train'].get_input_shape(channel_first=True)  # Torch size have Channel as first dimension
         feature_extractor_config = get_feature_extractor_config_from_args(args)
 
