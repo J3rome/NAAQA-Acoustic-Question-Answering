@@ -31,7 +31,10 @@ def validate_arguments(args):
         "[ERROR] Must be in --training mode for --continue_training"
 
     assert sum([args['pad_to_largest_image'], args['pad_per_batch']]) <= 1, \
-        '--pad_to_largest_image and --pad_per_batch can\'t be used together'
+        '[ERROR] --pad_to_largest_image and --pad_per_batch can\'t be used together'
+
+    assert sum([args['normalize_with_imagenet_stats'], args['normalize_with_clear_stats']]) <= 1, \
+        '[ERROR] --normalize_with_imagenet_stats and --normalize_with_clear_stats can\'t be used together'
 
 
 def create_flags_from_args(task, args):
