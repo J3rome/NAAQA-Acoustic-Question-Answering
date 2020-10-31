@@ -547,6 +547,7 @@ def prepare_for_task(args):
         if args['resnet_feature_extractor']:
             # FIXME : This prevent running resnet extraction online (Without first extracting the features in a h5 file)
             film_model_config['image_extractor']['type'] = "resnet_h5"
+            film_model_config['image_extractor']['out'] = 1024      # FIXME : Hardcoded...
 
         input_image_torch_shape = datasets['train'].get_input_shape(channel_first=True)  # Torch size have Channel as first dimension
         feature_extractor_config = get_feature_extractor_config_from_args(args)
