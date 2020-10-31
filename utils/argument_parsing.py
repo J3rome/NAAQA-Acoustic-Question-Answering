@@ -99,6 +99,9 @@ def update_arguments(args, task, paths, flags):
         # Default values when in RAW mode
         args['nb_dataloader_worker'] = 3
 
+    if args['spectrogram_rgb'] or args['resnet_feature_extractor']:
+        args['nb_dataloader_worker'] = 4
+
     if args['do_transforms_on_gpu']:
         args['nb_dataloader_worker'] = 0
 
