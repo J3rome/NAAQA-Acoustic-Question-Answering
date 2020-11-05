@@ -60,7 +60,7 @@ class CLEAR_FiLM_model(nn.Module):
                 self.image_pipeline = Freq_Time_Pooled_Extractor(input_image_channels, config['stem']['conv_out'])
 
         with Reproductible_Block(initial_random_state, 42):
-            stem_conv_in = self.image_pipeline.get_out_channels() + 2 if config['stem']['spatial_location'] else 0
+            stem_conv_in = self.image_pipeline.get_out_channels() + (2 if config['stem']['spatial_location'] else 0)
             self.stem_conv = nn.Sequential(OrderedDict([
                 ('conv', Conv2d_padded(in_channels= stem_conv_in,
                                        out_channels=config['stem']['conv_out'], kernel_size=[3, 3],
@@ -71,7 +71,7 @@ class CLEAR_FiLM_model(nn.Module):
 
         # Question and Image Fusion
         with Reproductible_Block(initial_random_state, 4242):
-            resblock_in_channels = config['stem']['conv_out'] + 2 if config['resblock']['spatial_location'] else 0
+            resblock_in_channels = config['stem']['conv_out'] + (2 if config['resblock']['spatial_location'] else 0)
             self.resblocks = nn.ModuleList()
             for resblock_out_channels in config['resblock']['conv_out']:
                 self.resblocks.append(FiLMed_resblock(in_channels=resblock_in_channels,
@@ -82,7 +82,7 @@ class CLEAR_FiLM_model(nn.Module):
                                                       dropout_drop_prob=dropout_drop_prob,
                                                       film_layer_transformation=film_layer_transformation))
 
-                resblock_in_channels = resblock_out_channels + 2 if config['resblock']['spatial_location'] else 0
+                resblock_in_channels = resblock_out_channels + (2 if config['resblock']['spatial_location'] else 0)
 
         with Reproductible_Block(initial_random_state, 425):
             if config['classifier'].get('type', '').lower() == 'conv':
