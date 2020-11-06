@@ -215,6 +215,7 @@ def get_experiments(experiment_result_path, prefix=None):
             experiment['n_mels'] = img_arguments['spectrogram_n_mels'] if 'mel_spectrogram' in img_arguments and 'spectrogram_n_mels' in img_arguments and img_arguments['mel_spectrogram'] else None
 
             experiment['resample_audio'] = img_arguments['resample_audio_to'] if 'resample_audio_to' in img_arguments else None
+            experiment['spectrogram_rgb'] = img_arguments['spectrogram_rgb'] if 'spectrogram_rgb' in img_arguments else None
 
             experiment['max_freq'] = get_max_freq(experiment)
 
