@@ -350,7 +350,7 @@ class Image_pipeline(nn.Module):
             conv_out = self.feature_extractor(conv_out)
 
         if self.config['stem']['spatial_location']:
-            conv_out = append_spatial_location(conv_out)
+            conv_out = append_spatial_location(conv_out, axis=self.config['stem']['spatial_location'])
 
         # FIXME : Move the stem logic inside our own feature extractor
         # FIXME : Probably need to be resnet style, otherwise we'll get vanishing gradients
@@ -360,7 +360,7 @@ class Image_pipeline(nn.Module):
         conv_out = self.max_pool_in_freq(conv_out)
 
         if self.config['stem']['spatial_location']:
-            conv_out = append_spatial_location(conv_out)
+            conv_out = append_spatial_location(conv_out, axis=self.config['stem']['spatial_location'])
 
         conv_out = self.stem_conv2(conv_out)
         conv_out = self.max_pool_in_time(conv_out)
@@ -380,7 +380,7 @@ class Separable_conv_image_pipeline(nn.Module):
 
         self.config = config
 
-        spatial_location_extra_channels = 2 if config['stem']['spatial_location'] else 0
+        spatial_location_extra_channels = len(config['stem']['spatial_location'])
 
         self.feature_extractor = None
 

@@ -130,7 +130,7 @@ class FiLMed_resblock(nn.Module):
 
     def forward(self, input_features, rnn_state, spatial_location):
         if spatial_location:
-            input_features = append_spatial_location(input_features)
+            input_features = append_spatial_location(input_features, axis=spatial_location)
 
         conv1_out = self.conv1(input_features)
         #conv1_out = self.dropout(conv1_out)

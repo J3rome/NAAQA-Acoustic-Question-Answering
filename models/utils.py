@@ -51,17 +51,28 @@ class Conv2d_padded(nn.Conv2d):
         )
 
 
-def append_spatial_location(features, start=-1, end=1):
+def append_spatial_location(features, start=-1, end=1, axis=None):
+    if axis is None:
+        axis = [0, 1]
+    elif len(axis) == 0:
+        return features
 
-    batch_size, _, width, height = features.size()
+    batch_size, _, height, width = features.size()
     device = features.device
 
-    x_coords = torch.linspace(start, end, steps=height, device=device).unsqueeze(0).expand(width, height).unsqueeze(0)
-    x_coords = x_coords.unsqueeze(0).expand(batch_size, -1, width, height)
-    y_coords = torch.linspace(start, end, steps=width, device=device).unsqueeze(1).expand(width, height).unsqueeze(0)
-    y_coords = y_coords.unsqueeze(0).expand(batch_size, -1, -1, -1)
+    to_concat = [features]
 
-    return torch.cat([features, x_coords, y_coords], 1)
+    if 0 in axis:
+        linmatrix = torch.linspace(start, end, steps=height, device=device).unsqueeze(1).expand(height, width)
+        linmatrix = linmatrix.unsqueeze(0).unsqueeze(0).expand(batch_size, 1, height, width)
+        to_concat.append(linmatrix)
+
+    if 1 in axis:
+        linmatrix = torch.linspace(start, end, steps=width, device=device).unsqueeze(0).expand(height, width)
+        linmatrix = linmatrix.unsqueeze(0).unsqueeze(0).expand(batch_size, 1, height, width)
+        to_concat.append(linmatrix)
+
+    return torch.cat(to_concat, 1)
 
 
 def pad2d_and_cat_tensors(tensors, pad_mode="end"):

@@ -5,7 +5,7 @@ import torch.nn as nn
 from models.utils import Conv2d_padded, append_spatial_location
 
 class Conv_classifier(nn.Module):
-    def __init__(self, in_channels, output_size, pooling_type, projection_size=None, spatial_location_layer=True, dropout_drop_prob=0):
+    def __init__(self, in_channels, output_size, pooling_type, projection_size=None, spatial_location_layer=list(), dropout_drop_prob=0):
         super(Conv_classifier, self).__init__()
 
         # Used for text summary
@@ -15,7 +15,7 @@ class Conv_classifier(nn.Module):
         self.spatial_location_layer = spatial_location_layer
         self.projection_size = projection_size
 
-        in_channels = in_channels + (2 if spatial_location_layer else 0)
+        in_channels = in_channels + len(spatial_location_layer)
         # Classification (Via 1x1 conv & GlobalPooling)
 
         if projection_size:
@@ -41,7 +41,7 @@ class Conv_classifier(nn.Module):
 
     def forward(self, input_features):
         if self.spatial_location_layer:
-            input_features = append_spatial_location(input_features)
+            input_features = append_spatial_location(input_features, axis=self.spatial_location_layer)
 
         out = input_features
         if self.projection_size:
@@ -71,7 +71,7 @@ class Fcn_classifier(nn.Module):
         self.spatial_location_layer = spatial_location_layer
         self.classifier_conv_out = classifier_conv_out
 
-        in_channels += 2 if spatial_location_layer else 0
+        in_channels += len(spatial_location_layer)
 
         if classifier_conv_out:
             self.classif_conv = nn.Sequential(OrderedDict([
@@ -98,7 +98,7 @@ class Fcn_classifier(nn.Module):
 
     def forward(self, input_features):
         if self.spatial_location_layer:
-            input_features = append_spatial_location(input_features)
+            input_features = append_spatial_location(input_features, axis=self.spatial_location_layer)
 
         conv_out = input_features
 
