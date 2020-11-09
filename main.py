@@ -545,10 +545,9 @@ def prepare_for_task(args):
             film_model_config['optimizer']['type'] = 'sgd'
 
         # Patch for individual spatial location feature maps (Backward compatibility)
-        if isinstance(film_model_config['stem']['spatial_location'], bool):
-            film_model_config['stem']['spatial_location'] = [0, 1] if film_model_config['stem']['spatial_location'] else []
-            film_model_config['classifier']['spatial_location'] = [0, 1] if film_model_config['classifier']['spatial_location'] else []
-            film_model_config['resblock']['spatial_location'] = [0, 1] if film_model_config['resblock']['spatial_location'] else []
+        for block in ['stem', 'resblock', 'classifier']:
+            if isinstance(film_model_config[block]['spatial_location'], bool):
+                film_model_config[block]['spatial_location'] = [0, 1] if film_model_config[block]['spatial_location'] else []
 
         if args['resnet_feature_extractor']:
             # FIXME : This prevent running resnet extraction online (Without first extracting the features in a h5 file)
