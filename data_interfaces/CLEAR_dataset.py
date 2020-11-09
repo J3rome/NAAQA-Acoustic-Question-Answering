@@ -27,11 +27,16 @@ class CLEAR_dataset(Dataset):
 
     def __init__(self, folder, version_name, input_image_type, set_type, questions=None, transforms=None,
                  dict_file_path=None, preprocessed_folder_name="preprocessed", tokenize_text=True, extra_stats=False,
-                 use_cache=False, synchronized_cache=False, max_cache_size=5000, do_transforms_on_device=None):
+                 use_cache=False, synchronized_cache=False, max_cache_size=5000, do_transforms_on_device=None,
+                 empty_text_input=False, empty_image_input=False):
 
         self.root_folder_path = "%s/%s" % (folder, version_name)
         self.version_name = version_name
         self.do_transforms_on_device = do_transforms_on_device
+
+        # Used for single modality test
+        self.empty_text_input = empty_text_input
+        self.empty_image_input = empty_image_input
 
         if tokenize_text and dict_file_path is not None:
             self.tokenizer = CLEARTokenizer(dict_file_path)
@@ -82,7 +87,12 @@ class CLEAR_dataset(Dataset):
             # Adding 0 ensure that a new object is created.. Kinda ugly hack but it works
             # (copy.deepcopy not working with atomic types)
             question_id = int(sample["question_index"]) + 0
-            question = self.tokenizer.encode_question(sample["question"]) if tokenize_text else sample['question']
+
+            if not self.empty_text_input:
+                question = self.tokenizer.encode_question(sample["question"]) if tokenize_text else sample['question']
+            else:
+                # Replacing text by ones so that the network will try to guess an answer based on the scene
+                question = [1] * random.randint(5, 20)
 
             if tokenize_text:
                 # Remove the <start> and <end> tokens from the count
@@ -387,7 +397,7 @@ class CLEAR_dataset(Dataset):
 
         if self.use_cache:
             image, padding = self.load_image_from_cache(requested_game['image']['id'], requested_game['image']['filename'])
-        else:
+        elif not self.empty_image_input:
             # Reference to H5py file must be shared between workers (when dataloader.num_workers > 0)
             # We create the image here since it will create the img_builder which contain the h5 file ref
             # See See https://discuss.pytorch.org/t/dataloader-when-num-worker-0-there-is-bug/25643/33
@@ -397,6 +407,9 @@ class CLEAR_dataset(Dataset):
                                requested_game['image']['set'])
             image = image_loader.get_image()
             padding = image_loader.get_padding()
+        else:
+            image = torch.ones((1, 256, random.randint(260, 418)))  # FIXME : Hardcoded values..
+            padding = None
 
         if self.do_transforms_on_device:
             image = image.to(self.do_transforms_on_device)

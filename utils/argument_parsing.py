@@ -36,6 +36,9 @@ def validate_arguments(args):
     assert sum([args['normalize_with_imagenet_stats'], args['normalize_with_clear_stats']]) <= 1, \
         '[ERROR] --normalize_with_imagenet_stats and --normalize_with_clear_stats can\'t be used together'
 
+    assert sum([args['only_text_modality'], args['only_audio_modality']]) <= 1, \
+        '[ERROR] --only_text_modality and --only_audio_modality can\'t be used together'
+
 
 def create_flags_from_args(task, args):
     flags = {}

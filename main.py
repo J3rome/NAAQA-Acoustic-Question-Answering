@@ -188,6 +188,10 @@ parser.add_argument("--clevr_dataset", help="Will load the clevr dataset instead
 parser.add_argument("--force_mean_recalculate", help="Will recalculate & update the stats.json file event if the "
                                                      "file already exists",
                     action='store_true')
+parser.add_argument("--only_text_modality", help="Will use only the text modality to solve the task "
+                                                 "(Spectrograms are set to 1)", action='store_true')
+parser.add_argument("--only_audio_modality", help="Will use only the audio modality to solve the task "
+                                                  "(Text tokens are set to 1)", action='store_true')
 
 
 # Data loading & preparation
@@ -224,21 +228,27 @@ def create_datasets(args, data_path, load_dataset_extra_stats=False):
                                extra_stats=load_dataset_extra_stats,
                                preprocessed_folder_name=args['preprocessed_folder_name'],
                                use_cache=args['enable_image_cache'], max_cache_size=args['max_image_cache_size'],
-                               do_transforms_on_device=transforms_device),
+                               do_transforms_on_device=transforms_device,
+                               empty_text_input=args['only_audio_modality'],
+                               empty_image_input=args['only_text_modality']),
 
         'val': dataset_class(args['data_root_path'], args['version_name'], args['input_image_type'], 'val',
                              dict_file_path=args['dict_file_path'], tokenize_text=not args['create_dict'],
                              extra_stats=load_dataset_extra_stats,
                              preprocessed_folder_name=args['preprocessed_folder_name'],
                              use_cache=args['enable_image_cache'], max_cache_size=args['max_image_cache_size'],
-                             do_transforms_on_device=transforms_device),
+                             do_transforms_on_device=transforms_device,
+                             empty_text_input=args['only_audio_modality'],
+                             empty_image_input=args['only_text_modality']),
 
         'test': dataset_class(test_data_root_path, test_version_name, args['input_image_type'], 'val',
                               dict_file_path=args['dict_file_path'], tokenize_text=not args['create_dict'],
                               extra_stats=load_dataset_extra_stats,
                               preprocessed_folder_name=args['preprocessed_folder_name'],
                               use_cache=args['enable_image_cache'], max_cache_size=args['max_image_cache_size'],
-                              do_transforms_on_device=transforms_device)
+                              do_transforms_on_device=transforms_device,
+                              empty_text_input=args['only_audio_modality'],
+                              empty_image_input=args['only_text_modality'])
     }
 
     datasets = set_transforms_on_datasets(args, datasets, transforms_device)
@@ -345,6 +355,16 @@ def set_transforms_on_datasets(args, datasets, transforms_device):
         datasets['train'].add_transform(remove_padding_transform)
         datasets['val'].add_transform(remove_padding_transform)
         datasets['test'].add_transform(remove_padding_transform)
+
+    if args['only_text_modality']:
+        # Making sure that all dummy spectrograms are padded up to (256, 418)
+        # Hardcoded values... BAD.. this is just to test a specific usecase (only one modality presented to the model)
+        for dataset in datasets.values():
+                dataset.add_transform(PadTensor((256, 418)))
+
+        # Prevent further padding/resizing
+        args['pad_to_largest_image'] = False
+        args['resize_img'] = False
 
     if args['resize_img'] or args['pad_to_largest_image']:
         # We need the dataset object to retrieve images dims so we have to manually add transforms
