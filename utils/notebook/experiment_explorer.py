@@ -32,7 +32,7 @@ def get_max_freq(exp):
     return None
 
 
-def get_experiments(experiment_result_path, prefix=None):
+def get_experiments(experiment_result_path, exp_prefix=None):
     experiments = []
 
     for exp_folder in os.listdir(experiment_result_path):
@@ -41,7 +41,7 @@ def get_experiments(experiment_result_path, prefix=None):
         if not os.path.isdir(exp_folder_path):
             continue
 
-        if prefix and prefix not in exp_folder:
+        if exp_prefix and exp_prefix not in exp_folder:
             continue
 
         for date_folder in os.listdir(exp_folder_path):
@@ -173,7 +173,7 @@ def get_experiments(experiment_result_path, prefix=None):
             experiment['total_nb_param'], experiment['nb_trainable_param'], experiment['nb_non_trainable_param'] = get_nb_param_from_summary(f'{exp_dated_folder_path}/model_summary.txt')
 
             experiment['batch_size'] = arguments['batch_size']
-            experiment['resnet_features'] = arguments['conv_feature_input']
+            experiment['preprocessed_folder_name'] = arguments['preprocessed_folder_name']
 
             img_arguments = arguments
 
@@ -205,22 +205,21 @@ def get_experiments(experiment_result_path, prefix=None):
                     #print(f"Was unable to retrieve dataset statistics for {arguments['version_name']} -- {arguments['preprocessed_folder_name']}")
 
             experiment['input_type'] = img_arguments['input_image_type']
-
-            experiment['n_fft'] = img_arguments['spectrogram_n_fft'] if 'spectrogram_n_fft' in img_arguments else None
-
-            experiment['hop_length'] = img_arguments['spectrogram_hop_length'] if 'spectrogram_hop_length' in img_arguments else None
-
-            experiment['keep_freq_point'] = img_arguments['spectrogram_keep_freq_point'] if 'spectrogram_keep_freq_point' in img_arguments else None
-
-            experiment['n_mels'] = img_arguments['spectrogram_n_mels'] if 'mel_spectrogram' in img_arguments and 'spectrogram_n_mels' in img_arguments and img_arguments['mel_spectrogram'] else None
-
-            experiment['resample_audio'] = img_arguments['resample_audio_to'] if 'resample_audio_to' in img_arguments else None
             experiment['spectrogram_rgb'] = img_arguments['spectrogram_rgb'] if 'spectrogram_rgb' in img_arguments else None
-
+            experiment['n_fft'] = img_arguments['spectrogram_n_fft'] if 'spectrogram_n_fft' in img_arguments else None
+            experiment['hop_length'] = img_arguments['spectrogram_hop_length'] if 'spectrogram_hop_length' in img_arguments else None
+            experiment['keep_freq_point'] = img_arguments['spectrogram_keep_freq_point'] if 'spectrogram_keep_freq_point' in img_arguments else None
+            experiment['n_mels'] = img_arguments['spectrogram_n_mels'] if 'mel_spectrogram' in img_arguments and 'spectrogram_n_mels' in img_arguments and img_arguments['mel_spectrogram'] else None
+            experiment['resample_audio'] = img_arguments['resample_audio_to'] if 'resample_audio_to' in img_arguments else None
             experiment['max_freq'] = get_max_freq(experiment)
 
+            if experiment['input_type'] == 'audio':
+                experiment['input_type'] = 'RGB' if experiment['spectrogram_rgb'] else '1D'
+
             experiment['norm_zero_one'] = img_arguments['normalize_zero_one']
+            experiment['norm_zero_one_again'] = arguments['normalize_zero_one']
             experiment['norm_clear_stats'] = img_arguments['normalize_with_clear_stats']
+            experiment['norm_imagenet_stats'] = img_arguments['normalize_with_imagenet_stats']
 
             experiment['pad_to_largest'] = img_arguments['pad_to_largest_image']
             experiment['resized_height'] = to_int(img_arguments['img_resize_height']) if img_arguments['resize_img'] else None
@@ -251,16 +250,48 @@ def get_experiments(experiment_result_path, prefix=None):
 
             config = read_json(config_filepath)
 
+            experiment['stem_spatial_location'] = config['stem']['spatial_location']
+            experiment['resblock_spatial_location'] = config['resblock']['spatial_location']
+            experiment['classifier_spatial_location'] = config['classifier']['spatial_location']
+
+            for prefix in ['stem', 'resblock', 'classifier']:
+                key = f'{prefix}_spatial_location'
+                if isinstance(experiment[key], bool):
+                    experiment[key] = [0, 1] if experiment[key] else []
+
+                nb_dim = len(experiment[key])
+                if nb_dim == 0:
+                    experiment[key] = 'None'
+                elif nb_dim == 2:
+                    experiment[key] = 'Both'
+                else:
+                    # nb_dim == 1
+                    experiment[key] = 'Time' if experiment[key][0] == 1 else 'Freq'
+
             experiment['word_embedding_dim'] = to_int(config['question']['word_embedding_dim'])
             experiment['rnn_state_size'] = to_int(config['question']['rnn_state_size'])
+
             experiment['extractor_type'] = config['image_extractor']['type']
+
+            if 'resnet_feature_extractor' in arguments and arguments['resnet_feature_extractor']:
+                experiment['extractor_type'] = 'resnet'
+
+            if experiment['extractor_type'] == 'film_original':
+                experiment['extractor_type'] = 'ConvLearned'
+            elif 'separated' in experiment['extractor_type']:
+                experiment['extractor_type'] = 'Parallel'
+            elif 'interlaced' in experiment['extractor_type']:
+                experiment['extractor_type'] = 'interleaved'
+            else:
+                experiment['extractor_type'] = experiment['extractor_type'].capitalize()
+
             experiment['extractor_out_chan'] = to_int(config['image_extractor']['out'][-1]) if type(config['image_extractor']['out']) == list else config['image_extractor']['out']
             experiment['extractor_filters'] = config['image_extractor']['out']
 
-            if experiment['extractor_type'] in ['film_original', 'conv']:
+            if experiment['extractor_type'] in ['ConvLearned', 'Conv']:
                 experiment['extractor_nb_block'] = len(config['image_extractor']['kernels'])
                 experiment['extractor_projection_size'] = None
-            elif not 'resnet' in experiment['extractor_type']:
+            elif not 'Resnet' in experiment['extractor_type']:
                 experiment['extractor_nb_block'] = len(config['image_extractor']['freq_kernels'])
 
                 if len(config['image_extractor']['out']) > experiment['extractor_nb_block']:
