@@ -111,7 +111,9 @@ ENV/
 /data
 /out/
 /output
+/output_synced
 /activate-venv
+/activate_venv
 /*.json
 /*beholder
 /*.npy
@@ -119,3 +121,5 @@ ENV/
 *.tar.gz
 *.png
 *.txt
+*.bak
+/to_clean
