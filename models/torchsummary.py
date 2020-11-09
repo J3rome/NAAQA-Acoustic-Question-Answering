@@ -79,7 +79,7 @@ def summary(model, input_infos, batch_size=-1, device="cpu", print_output=True):
         h.remove()
 
     to_print = []
-    line_new = "{:>20} {:>35} {:>30} {:>15}".format("Layer (type)", "Input Shape", "Output Shape", "Param #")
+    line_new = "{:<40} {:>35} {:>35} {:>15}".format("Layer (type)", "Input Shape", "Output Shape", "Param #")
     nb_char_per_line = len(line_new)
     to_print.append("-" * nb_char_per_line)
     to_print.append(line_new)
@@ -88,9 +88,14 @@ def summary(model, input_infos, batch_size=-1, device="cpu", print_output=True):
     total_output = 0
     trainable_params = 0
     for layer in summary:
+        layer_title = ""
+        for level in range(summary[layer]['level']):
+            layer_title += ">> "
+
+        layer_title += layer.split('-')[0]
         # input_shape, output_shape, trainable, nb_params
-        line_new = "{:>20} {:>35} {:>30} {:>15}".format(
-            layer,
+        line_new = "{:<40} {:>35} {:>35} {:>15}".format(
+            layer_title,
             str(summary[layer]["input_shape"]),
             str(summary[layer]["output_shape"]),
             "{0:,}".format(summary[layer]["nb_params"]),
