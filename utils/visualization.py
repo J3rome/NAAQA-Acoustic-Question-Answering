@@ -107,6 +107,9 @@ def show_tagged_scene(dataset, game_or_game_id, scene_image=None, remove_padding
     else:
         image = game['image']
 
+    if isinstance(image, torch.Tensor) and 'cuda' in str(image.device):
+        image = image.cpu()
+
     image_padding = game['image_padding'].tolist()
     image_height, image_width = image.shape[1:]
 
