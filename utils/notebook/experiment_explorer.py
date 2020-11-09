@@ -126,7 +126,7 @@ def get_experiments(experiment_result_path, exp_prefix=None):
                 experiment['all_val_acc'].append(to_float(stat['val_acc']))
                 experiment['all_val_loss'].append(to_float(stat['val_loss']))
 
-                parsed_time = datetime.strptime(stat['train_time'], "%H:%M:%S.%f")
+                parsed_time = datetime.strptime(stat['train_time'].split('day, ')[-1], "%H:%M:%S.%f")
                 epoch_time = timedelta(hours=parsed_time.hour, minutes=parsed_time.minute, seconds=parsed_time.second,
                                        microseconds=parsed_time.microsecond)
                 epoch_times.append(epoch_time)
