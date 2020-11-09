@@ -89,8 +89,6 @@ def summary(model, input_infos, batch_size=-1, device="cpu", print_output=True):
     trainable_params = 0
     for layer in summary:
         layer_title = ""
-        for level in range(summary[layer]['level']):
-            layer_title += ">> "
 
         layer_title += layer.split('-')[0]
         # input_shape, output_shape, trainable, nb_params

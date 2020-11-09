@@ -90,9 +90,7 @@ def get_task_from_args(args):
 
 
 def update_arguments(args, task, paths, flags):
-    if args['conv_feature_input']:
-        args['input_image_type'] = "conv"
-    elif args['h5_image_input']:
+    if args['h5_image_input']:
         args['input_image_type'] = "raw_h5"
     elif args['audio_input'] or (task.startswith('notebook') and 'audio' in args['version_name']):
         args['input_image_type'] = "audio"

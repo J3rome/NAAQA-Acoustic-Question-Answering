@@ -158,8 +158,6 @@ parser.add_argument("--audio_input", help="If set, audio files will be read from
                     action='store_true')
 parser.add_argument("--h5_image_input", help="If set, images will be read from h5 file in preprocessed folder",
                     action='store_true')
-parser.add_argument("--conv_feature_input", help="If set, conv feature will be read from h5 file in preprocessed folder",
-                    action='store_true')
 parser.add_argument("--data_root_path", type=str, default='data', help="Directory with data")
 parser.add_argument("--version_name", type=str, help="Name of the dataset version")
 parser.add_argument("--test_dataset_path", type=str, default=None, help="Path to the test dataset (Optional)")
