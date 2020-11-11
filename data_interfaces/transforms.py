@@ -217,7 +217,7 @@ class ResizeTensorBasedOnHeight(object):
         # Images tensor are in format C x H x W
         output_width = self.get_output_width(sample['image'].shape[1], sample['image'].shape[2])
 
-        if output_width + self.output_height != sample['image'].shape[2] + sample['image'].shape[1]:
+        if (self.output_height, output_width) != sample['image'].shape[1:]:
             sample['image'] = F.interpolate(sample['image'].unsqueeze(0), size=(self.output_height, output_width),
                                             mode='bilinear', align_corners=False).squeeze(0)
 
@@ -254,8 +254,7 @@ class ResizeTensorBasedOnWidth(object):
     def __call__(self, sample):
         output_height, output_width = self.get_resized_dim(sample['image'].shape[1], sample['image'].shape[2])
 
-
-        if output_height + output_width != sample['image'].shape[1] + sample['image'].shape[2]:
+        if (output_height, output_width) != sample['image'].shape[1:]
             sample['image'] = F.interpolate(sample['image'].unsqueeze(0), size=(output_height, output_width),
                                             mode='bilinear', align_corners=False).squeeze(0)
 
@@ -283,7 +282,7 @@ class ResizeTensorBasedOnMaxWidth(object):
     def __call__(self, sample):
         output_height, output_width = self.get_resized_dim(sample['image'].shape[1], sample['image'].shape[2])
 
-        if output_height + output_width != sample['image'].shape[1] + sample['image'].shape[2]:
+        if (output_height, output_width) != sample['image'].shape[1:]:
             sample['image'] = F.interpolate(sample['image'].unsqueeze(0), size=(output_height, output_width),
                                             mode='bilinear', align_corners=False).squeeze(0)
 
@@ -308,7 +307,7 @@ class ResizeImgBasedOnHeight(object):
     def __call__(self, sample):
         output_width = int(self.output_height * sample['image'].width / sample['image'].height)
 
-        if output_width + self.output_height != sample['image'].width + sample['image'].height:
+        if (output_width, self.output_height) != (sample['image'].width, sample['image'].height):
             sample['image'] = vis_F.resize(sample['image'], (self.output_height, output_width))
 
         return sample
@@ -322,7 +321,7 @@ class ResizeImgBasedOnWidth(object):
     def __call__(self, sample):
         output_height = int(self.output_width * sample['image'].height / sample['image'].width)
 
-        if output_height + self.output_width != sample['image'].height + sample['image'].width:
+        if (output_height, self.output_width) != (sample['image'].height, sample['image'].width):
             sample['image'] = vis_F.resize(sample['image'], (output_height, self.output_width))
 
         return sample
