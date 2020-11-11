@@ -254,7 +254,7 @@ class ResizeTensorBasedOnWidth(object):
     def __call__(self, sample):
         output_height, output_width = self.get_resized_dim(sample['image'].shape[1], sample['image'].shape[2])
 
-        if (output_height, output_width) != sample['image'].shape[1:]
+        if (output_height, output_width) != sample['image'].shape[1:]:
             sample['image'] = F.interpolate(sample['image'].unsqueeze(0), size=(output_height, output_width),
                                             mode='bilinear', align_corners=False).squeeze(0)
 
