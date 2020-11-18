@@ -328,7 +328,7 @@ def set_transforms_on_datasets(args, datasets, transforms_device):
 
     if args['spectrogram_rgb']:
         # Input need to be between 0 and 1. The output will also be between 0 and 1
-        transform = ApplyColormapToSpectrogram(cmap='Blues')
+        transform = ApplyColormapToSpectrogram(cmap='viridis')
         for dataset in datasets.values():
             dataset.add_transform(transform)
 

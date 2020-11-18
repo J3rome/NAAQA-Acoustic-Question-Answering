@@ -156,7 +156,7 @@ class ApplyColormapToSpectrogram(object):
     This transform assume the format C x H x W
     """
 
-    def __init__(self, cmap="Blues"):
+    def __init__(self, cmap="viridis"):
         self.cmap = plt.get_cmap(cmap)
 
     def __call__(self, sample):
