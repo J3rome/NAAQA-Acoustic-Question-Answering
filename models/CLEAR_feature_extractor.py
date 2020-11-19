@@ -29,7 +29,7 @@ class Original_Film_Extractor(nn.Module):
 
             in_channels = out_chan
 
-    def forward(self, input_image):
+    def forward(self, input_image, spatial_location):
         out = input_image
 
         for conv in self.convs:
@@ -87,7 +87,7 @@ class Freq_Time_Separated_Extractor_no_pooling(nn.Module):
             self.fusion_conv = nn.Conv2d(in_channels=in_channels*2, out_channels=self.out_channels, kernel_size=[1, 1],
                                          stride=[1, 1], bias=False)
 
-    def forward(self, input_image):
+    def forward(self, input_image, spatial_location):
         # TODO : Add spatial location maps ?
         time_out = input_image
         freq_out = input_image
@@ -156,17 +156,17 @@ class Freq_Time_Separated_Extractor(nn.Module):
             self.fusion_conv = nn.Conv2d(in_channels=in_channels*2, out_channels=self.out_channels, kernel_size=[1, 1],
                                          stride=[1, 1], bias=False)
 
-    def forward(self, input_image):
-        # TODO : Add spatial location maps ?
-        time_out = input_image
-        freq_out = input_image
+    def forward(self, input_features, spatial_location):
+
+        if spatial_location:
+            input_features = append_spatial_location(input_features, axis=spatial_location)
+
+        time_out = input_features
+        freq_out = input_features
 
         for time_block, freq_block in zip(self.time_blocks, self.freq_blocks):
             time_out = time_block(time_out)
             freq_out = freq_block(freq_out)
-
-        # FIXME : Won't work if time block & freq block don't have the same kernels (inversed).
-        # FIXME : We might want to pad and concat ? Or find a better fusing mechanism ?
 
         out = pad2d_and_cat_tensors([time_out, freq_out], pad_mode='end')
 
@@ -229,9 +229,12 @@ class Freq_Time_Interlaced_Extractor(nn.Module):
         if self.need_projection:
             self.channel_projection = nn.Conv2d(in_channels, self.out_channels, kernel_size=[1, 1], stride=[1, 1])
 
-    def forward(self, input_image):
+    def forward(self, input_features, spatial_location):
+        if spatial_location:
+            input_features = append_spatial_location(input_features, axis=spatial_location)
+
         # TODO : Add spatial location maps ?
-        out = input_image
+        out = input_features
 
         for block in self.blocks:
             out = block(out)
@@ -259,7 +262,7 @@ class Freq_Time_Pooled_Extractor(nn.Module):
 
             in_channels = out_channels
 
-    def forward(self, input_image):
+    def forward(self, input_image, spatial_location):
         # FIXME : spatial location map ?
         out = input_image
         for block in self.blocks:

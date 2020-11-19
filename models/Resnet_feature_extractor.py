@@ -52,7 +52,7 @@ class Resnet_feature_extractor(nn.Module):
                 for param in self.extractor.parameters():
                     param.requires_grad = False
 
-    def forward(self, image):
+    def forward(self, image, spatial_location):
         return self.extractor(image)
 
     def get_last_bottleneck(self):

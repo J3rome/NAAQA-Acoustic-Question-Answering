@@ -563,7 +563,8 @@ def prepare_for_task(args):
             film_model_config['optimizer']['type'] = 'sgd'
 
         # Patch for individual spatial location feature maps (Backward compatibility)
-        for block in ['stem', 'resblock', 'classifier']:
+        film_model_config['image_extractor']['spatial_location'] = film_model_config['image_extractor'].get('spatial_location', False)
+        for block in ['image_extractor', 'stem', 'resblock', 'classifier']:
             if isinstance(film_model_config[block]['spatial_location'], bool):
                 film_model_config[block]['spatial_location'] = [0, 1] if film_model_config[block]['spatial_location'] else []
 

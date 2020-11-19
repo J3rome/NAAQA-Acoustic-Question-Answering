@@ -42,6 +42,7 @@ class CLEAR_FiLM_model(nn.Module):
         with Reproductible_Block(initial_random_state, 125):
             extractor_config = config['image_extractor']
             extractor_type = extractor_config['type'].lower()
+            input_image_channels += len(extractor_config['spatial_location'])
             if extractor_type == "film_original":
                 self.image_pipeline = Original_Film_Extractor(config['image_extractor'], input_image_channels)
             elif extractor_type == "resnet":
@@ -62,7 +63,7 @@ class CLEAR_FiLM_model(nn.Module):
         with Reproductible_Block(initial_random_state, 42):
             stem_conv_in = self.image_pipeline.get_out_channels() + len(config['stem']['spatial_location'])
             self.stem_conv = nn.Sequential(OrderedDict([
-                ('conv', Conv2d_padded(in_channels= stem_conv_in,
+                ('conv', Conv2d_padded(in_channels=stem_conv_in,
                                        out_channels=config['stem']['conv_out'], kernel_size=[3, 3],
                                        stride=1, dilation=1, bias=False, padding='SAME')),
                 ('batchnorm', nn.BatchNorm2d(config['stem']['conv_out'], eps=0.001)),
@@ -122,7 +123,7 @@ class CLEAR_FiLM_model(nn.Module):
 
         # Image Pipeline
         if self.config['image_extractor']['type'].lower() != 'resnet_h5':
-            conv_out = self.image_pipeline(input_image)
+            conv_out = self.image_pipeline(input_image, self.config['image_extractor']['spatial_location'])
         else:
             conv_out = input_image
 
