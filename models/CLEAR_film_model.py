@@ -1,13 +1,13 @@
 from collections import OrderedDict, namedtuple
 
-import torch
 import torch.nn as nn
 
 from models.CLEAR_nlp import Question_pipeline
-from models.CLEAR_feature_extractor import Original_Film_Extractor, Freq_Time_Pooled_Extractor, Freq_Time_Separated_Extractor, Freq_Time_Interlaced_Extractor, Freq_Time_Separated_Extractor_no_pooling
+from models.CLEAR_feature_extractor import Original_Film_Extractor, Freq_Time_Pooled_Extractor
+from models.CLEAR_feature_extractor import Freq_Time_Separated_Extractor, Freq_Time_Interlaced_Extractor
+from models.CLEAR_feature_extractor import Freq_Time_Separated_No_Pool_Extractor
 from models.blocks.FiLM_layers import FiLMed_resblock
 from models.blocks.Classifiers import Conv_classifier, Fcn_classifier
-from models.utils import get_trainable_childs
 
 from models.utils import append_spatial_location, Conv2d_padded
 from models.Resnet_feature_extractor import Resnet_feature_extractor
@@ -15,8 +15,7 @@ from utils.Reproducibility_Handler import Reproductible_Block
 
 
 class CLEAR_FiLM_model(nn.Module):
-    def __init__(self, config, input_image_channels, nb_words, nb_answers, feature_extraction_config=None,    # FIXME : The index should probably be in the config
-                 sequence_padding_idx=0, save_features=True):
+    def __init__(self, config, input_image_channels, nb_words, nb_answers, sequence_padding_idx=0):
         super(CLEAR_FiLM_model, self).__init__()
 
         self.current_device = 'cpu'
@@ -28,7 +27,6 @@ class CLEAR_FiLM_model(nn.Module):
         dropout_drop_prob = float(config['optimizer'].get('dropout_drop_prob', 0.0))
 
         film_layer_transformation = config['resblock'].get('film_projection_type', None)
-        #self.dropout = nn.Dropout(p=dropout_drop_prob)
 
         # Reproducibility Handling
         initial_random_state = Reproductible_Block.get_random_state()
@@ -36,7 +34,6 @@ class CLEAR_FiLM_model(nn.Module):
         # Question Pipeline
         with Reproductible_Block(initial_random_state, 10):
             self.question_pipeline = Question_pipeline(config, nb_words, dropout_drop_prob, sequence_padding_idx)
-            #self.question_pipeline = Question_pipeline_no_GRU(config, nb_words, dropout_drop_prob, sequence_padding_idx)
 
         # Image Pipeline
         with Reproductible_Block(initial_random_state, 125):
@@ -54,7 +51,7 @@ class CLEAR_FiLM_model(nn.Module):
             elif extractor_type == "freq_time_separated":
                 self.image_pipeline = Freq_Time_Separated_Extractor(extractor_config, input_image_channels)
             elif extractor_type == "freq_time_separated_no_pooling":
-                self.image_pipeline = Freq_Time_Separated_Extractor_no_pooling(extractor_config, input_image_channels)
+                self.image_pipeline = Freq_Time_Separated_No_Pool_Extractor(extractor_config, input_image_channels)
             elif extractor_type == "freq_time_interlaced":
                 self.image_pipeline = Freq_Time_Interlaced_Extractor(extractor_config, input_image_channels)
             elif extractor_type == "freq_time_pool":

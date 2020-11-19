@@ -9,7 +9,7 @@ from torchvision import transforms
 
 from runner import train_model, prepare_model, inference
 from baselines import random_answer_baseline, random_weight_baseline
-from preprocessing import create_dict_from_questions, extract_features, images_to_h5, get_lr_finder_curves
+from preprocessing import create_dict_from_questions, images_to_h5, get_lr_finder_curves
 from preprocessing import get_dataset_stats_and_write
 from visualization import visualize_gamma_beta, grad_cam_visualization
 from data_interfaces.CLEAR_dataset import CLEAR_dataset, CLEAR_collate_fct
@@ -22,7 +22,7 @@ from utils.file import save_model_config, save_json, read_json, create_symlink_t
 from utils.file import create_folders_save_args, fix_best_epoch_symlink_if_necessary
 from utils.random import set_random_seed, get_random_state, set_random_state
 from utils.visualization import save_model_summary, save_graph_to_tensorboard
-from utils.argument_parsing import get_args_task_flags_paths, get_feature_extractor_config_from_args
+from utils.argument_parsing import get_args_task_flags_paths
 from utils.logging import create_tensorboard_writers, close_tensorboard_writers
 from utils.generic import get_imagenet_stats, set_dimensions_to_power_of_two
 
@@ -574,11 +574,9 @@ def prepare_for_task(args):
             film_model_config['image_extractor']['out'] = 1024      # FIXME : Hardcoded...
 
         input_image_torch_shape = datasets['train'].get_input_shape(channel_first=True)  # Torch size have Channel as first dimension
-        feature_extractor_config = get_feature_extractor_config_from_args(args)
 
         film_model, optimizer, loss_criterion, scheduler = prepare_model(args, flags, paths, dataloaders, device,
-                                                                         film_model_config, input_image_torch_shape,
-                                                                         feature_extractor_config)
+                                                                         film_model_config, input_image_torch_shape)
 
         if flags['create_output_folder']:
             save_model_config(args, paths, film_model_config)

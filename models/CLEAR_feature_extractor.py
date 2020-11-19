@@ -179,6 +179,76 @@ class Freq_Time_Separated_Extractor(nn.Module):
         return self.out_channels
 
 
+class Freq_Time_Separated_No_Pool_Extractor(nn.Module):
+    def __init__(self, config, input_channels, with_bias=True):
+        super(Freq_Time_Separated_No_Pool_Extractor, self).__init__()
+
+        self.config = config
+
+        self.out_channels = config['out'][-1]
+
+        self.time_blocks = nn.ModuleList()
+        self.freq_blocks = nn.ModuleList()
+        self.nb_time_blocks = len(config['time_kernels'])
+        self.nb_freq_blocks = len(config['freq_kernels'])
+
+        self.do_fusion = len(config['out']) > self.nb_time_blocks
+
+        # TODO : Permit different number of time and freq blocks
+        assert self.nb_time_blocks == self.nb_freq_blocks, "Invalid config. Must have same number of time & freq block"
+
+        in_channels = input_channels
+        iterator = zip(config['out'][:-1], config['time_kernels'], config['time_strides'],
+                       config['freq_kernels'], config['freq_strides'])
+        for out_channels, time_kernel, time_stride, freq_kernel, freq_stride in iterator:
+
+            stride = [freq_stride[0], time_stride[1]]
+
+            self.time_blocks.append(nn.Sequential(OrderedDict([
+                ('conv', Conv2d_padded(in_channels=in_channels,
+                                       out_channels=out_channels, kernel_size=time_kernel,
+                                       stride=stride, dilation=1, bias=with_bias, padding='SAME')),
+                ('batchnorm', nn.BatchNorm2d(out_channels, eps=0.001)),
+                ('relu', nn.ReLU(inplace=True))
+            ])))
+
+            self.freq_blocks.append(nn.Sequential(OrderedDict([
+                ('conv', Conv2d_padded(in_channels=in_channels,
+                                       out_channels=out_channels, kernel_size=freq_kernel,
+                                       stride=stride, dilation=1, bias=with_bias, padding='SAME')),
+                ('batchnorm', nn.BatchNorm2d(out_channels, eps=0.001)),
+                ('relu', nn.ReLU(inplace=True))
+            ])))
+
+            in_channels = out_channels
+
+        if self.do_fusion:
+            self.fusion_conv = nn.Conv2d(in_channels=in_channels*2, out_channels=self.out_channels, kernel_size=[1, 1],
+                                         stride=[1, 1], bias=False)
+
+    def forward(self, input_features, spatial_location):
+
+        if spatial_location:
+            input_features = append_spatial_location(input_features, axis=spatial_location)
+
+        time_out = input_features
+        freq_out = input_features
+
+        for time_block, freq_block in zip(self.time_blocks, self.freq_blocks):
+            time_out = time_block(time_out)
+            freq_out = freq_block(freq_out)
+
+        out = pad2d_and_cat_tensors([time_out, freq_out], pad_mode='end')
+
+        if self.do_fusion:
+            out = self.fusion_conv(out)
+
+        return out
+
+    def get_out_channels(self):
+        return self.out_channels
+
+
 class Freq_Time_Interlaced_Extractor(nn.Module):
     def __init__(self, config, input_channels, with_bias=True):
         super(Freq_Time_Interlaced_Extractor, self).__init__()
