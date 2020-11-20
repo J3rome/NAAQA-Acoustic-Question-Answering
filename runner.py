@@ -21,8 +21,7 @@ from utils.processing import process_predictions, process_gamma_beta
 from utils.file import create_folder_if_necessary, save_json, save_gamma_beta_h5
 
 
-def prepare_model(args, flags, paths, dataloaders, device, model_config, input_image_torch_shape,
-                  feature_extractor_config=None):
+def prepare_model(args, flags, paths, dataloaders, device, model_config, input_image_torch_shape):
     print("Creating model")
     # Retrieve informations to instantiate model
     train_dataset = dataloaders['train'].dataset
@@ -31,8 +30,7 @@ def prepare_model(args, flags, paths, dataloaders, device, model_config, input_i
 
     film_model = CLEAR_FiLM_model(model_config, input_image_channels=input_image_torch_shape[0],
                                   nb_words=nb_words, nb_answers=nb_answers,
-                                  sequence_padding_idx=padding_token,
-                                  feature_extraction_config=feature_extractor_config)
+                                  sequence_padding_idx=padding_token)
 
     # Default values
     optimizer, loss_criterion, scheduler = None, None, None
