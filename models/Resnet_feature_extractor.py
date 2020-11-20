@@ -70,7 +70,7 @@ class Resnet_feature_extractor(nn.Module):
         return last_bottleneck.bn3.num_features
 
     def get_output_shape(self, input_image, channel_first=True):
-        output = self(input_image)
+        output = self(input_image, spatial_location=False)
         output_size = output.size()[1:]     # Remove batch size dimension
 
         if channel_first:
