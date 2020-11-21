@@ -240,7 +240,7 @@ def images_to_h5(device, dataloaders, output_folder_name='preprocessed', feature
                 if feature_extractor:
                     features.to(device)
                     with torch.set_grad_enabled(False):
-                        features = feature_extractor(features)
+                        features = feature_extractor(features, spatial_location=[])
 
                 if features.device != 'cpu':
                     features = features.detach().cpu()
