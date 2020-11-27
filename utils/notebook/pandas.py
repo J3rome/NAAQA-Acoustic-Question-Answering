@@ -116,8 +116,13 @@ def color_by_multi_attribute(df, main_attribute, attributes=None, cmaps=None, fo
             if categorical_values:
                 val = categorical_values[val]
 
-            # Will generate a value in the range of 20,220
-            val = int(((val - min_max[0]) / (min_max[1] - min_max[0])) * 200 + 20)
+
+            if min_max[0] != min_max[1]:
+                # Will generate a value in the range of 20,220
+                val = int(((val - min_max[0]) / (min_max[1] - min_max[0])) * 200 + 20)
+            else:
+                # Only one value
+                val = 40
 
             color = tuple([int(c * 255) for i, c in enumerate(cmap(val)) if i < 3])
             css = f"background-color: rgb{color}; color: {text_color_from_rgb(color)};"
