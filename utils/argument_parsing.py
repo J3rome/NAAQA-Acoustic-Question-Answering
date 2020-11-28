@@ -97,14 +97,17 @@ def update_arguments(args, task, paths, flags):
     else:
         args['input_image_type'] = "raw"
 
-    args['nb_dataloader_worker'] = 2
+    # Revert to using only 1 worker. More workers give unreproductible results..
+    #   This might be cause by the fact that each worker get a different random seed. TODO : Investigate this
+    args['nb_dataloader_worker'] = 1
+    #args['nb_dataloader_worker'] = 2
 
-    if args['input_image_type'] == 'raw':
+    #if args['input_image_type'] == 'raw':
         # Default values when in RAW mode
-        args['nb_dataloader_worker'] = 3
+    #    args['nb_dataloader_worker'] = 3
 
-    if args['resnet_feature_extractor']:
-        args['nb_dataloader_worker'] = 4
+    #if args['resnet_feature_extractor']:
+    #    args['nb_dataloader_worker'] = 4
 
     if args['do_transforms_on_gpu']:
         args['nb_dataloader_worker'] = 0
