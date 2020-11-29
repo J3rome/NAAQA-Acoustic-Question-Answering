@@ -36,13 +36,13 @@
     "spatial_location":true,
     "type":"conv",
     "global_pool_type":"avg",
-    "conv_out":256,
+    "conv_out":null,
     "conv_kernel":[
       1,
       1
     ],
     "no_mlp_units":null,
-    "projection_size":null
+    "projection_size":256
   },
   "optimizer":{
     "type":"adam",
