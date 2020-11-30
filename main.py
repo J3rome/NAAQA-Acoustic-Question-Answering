@@ -239,7 +239,7 @@ def create_datasets(args, data_path, load_dataset_extra_stats=False):
                              empty_text_input=args['only_audio_modality'],
                              empty_image_input=args['only_text_modality']),
 
-        'test': dataset_class(test_data_root_path, test_version_name, args['input_image_type'], 'val',
+        'test': dataset_class(test_data_root_path, test_version_name, args['input_image_type'], 'test',
                               dict_file_path=args['dict_file_path'], tokenize_text=not args['create_dict'],
                               extra_stats=load_dataset_extra_stats,
                               preprocessed_folder_name=args['preprocessed_folder_name'],
