@@ -140,6 +140,12 @@ def update_arguments(args, task, paths, flags):
             clean_base_path = base_path[:-(len(args['film_model_weight_path']) + 1)]
             args['film_model_weight_path'] = '%s/%s/%s' % (clean_base_path, symlink_value, suffix)
 
+        config_base_path = args['film_model_weight_path'].split('/')
+        if config_base_path[-1] == "model.pt.tar":
+            config_base_path = config_base_path[:-2]
+
+        args['config_path'] = f"{'/'.join(config_base_path)}/config_raw_h5_input.json"   # FIXME : Ideally, we would look in the directory and find the "config*.json" file instead of hardcoding...
+
     args['clear_stats_file_path'] = f"{args['data_root_path']}/{args['version_name']}/{args['preprocessed_folder_name']}/clear_stats.json"
 
     # By default the start_epoch should is 0. Will only be modified if loading from checkpoint
