@@ -79,7 +79,8 @@ def get_experiments(experiment_result_path, exp_prefix=None):
                 'stop_accuracy': arguments['stop_at_val_acc'],
                 'random_seed': arguments['random_seed'],
                 'date': datetime.strptime(date_folder, '%Y-%m-%d_%Hh%M'),
-                'folder': exp_folder
+                'folder': exp_folder,
+                'folder_dated': f"{exp_folder}/{date_folder}"
             }
 
             additional_note = arguments['output_name_suffix'].replace(f'_{experiment["nb_epoch"]}_epoch', '').replace(experiment['config'], '').replace(f'_{experiment["random_seed"]}', '').replace(f"_stop_at_{experiment['stop_accuracy']}", '').replace('_resnet_extractor', '').replace('config_', '')
@@ -216,10 +217,19 @@ def get_experiments(experiment_result_path, exp_prefix=None):
             if experiment['input_type'] == 'audio':
                 experiment['input_type'] = 'RGB' if experiment['spectrogram_rgb'] else '1D'
 
+            experiment['RGB_colormap'] = None
+            if experiment['spectrogram_rgb']:
+                if experiment['folder_dated'] in get_blues_experiment_id():
+                    experiment['RGB_colormap'] = 'Blues'
+                else:
+                    experiment['RGB_colormap'] = 'Viridis'
+
             experiment['norm_zero_one'] = img_arguments['normalize_zero_one']
             experiment['norm_zero_one_again'] = arguments['normalize_zero_one']
             experiment['norm_clear_stats'] = img_arguments['normalize_with_clear_stats']
             experiment['norm_imagenet_stats'] = img_arguments['normalize_with_imagenet_stats']
+            experiment['normalisation'] = 'data_stats' if img_arguments['normalize_with_clear_stats'] else None
+            experiment['normalisation'] = 'imagenet_stats' if img_arguments['normalize_with_imagenet_stats'] else experiment['normalisation']
 
             experiment['pad_to_largest'] = img_arguments['pad_to_largest_image']
             experiment['resized_height'] = to_int(img_arguments['img_resize_height']) if img_arguments['resize_img'] else None
@@ -250,11 +260,12 @@ def get_experiments(experiment_result_path, exp_prefix=None):
 
             config = read_json(config_filepath)
 
+            experiment['extractor_spatial_location'] = config['image_extractor'].get('spatial_location', False)
             experiment['stem_spatial_location'] = config['stem']['spatial_location']
             experiment['resblock_spatial_location'] = config['resblock']['spatial_location']
             experiment['classifier_spatial_location'] = config['classifier']['spatial_location']
 
-            for prefix in ['stem', 'resblock', 'classifier']:
+            for prefix in ['extractor', 'stem', 'resblock', 'classifier']:
                 key = f'{prefix}_spatial_location'
                 if isinstance(experiment[key], bool):
                     experiment[key] = [0, 1] if experiment[key] else []
@@ -281,7 +292,13 @@ def get_experiments(experiment_result_path, exp_prefix=None):
             elif 'separated' in experiment['extractor_type']:
                 experiment['extractor_type'] = 'Parallel'
             elif 'interlaced' in experiment['extractor_type']:
-                experiment['extractor_type'] = 'interleaved'
+                experiment['extractor_type'] = 'Interleaved'
+
+                if config['image_extractor']['time_first']:
+                    experiment['extractor_type'] += "_Time_First"
+                else:
+                    experiment['extractor_type'] += "_Freq_First"
+
             else:
                 experiment['extractor_type'] = experiment['extractor_type'].capitalize()
 
@@ -361,10 +378,26 @@ def get_format_dicts():
     latex_format_dict['train_acc'] = lambda x: "{:.2f}".format(x * 100) if not pd.isnull(x) else None
     latex_format_dict['test_acc'] = lambda x: "{:.2f}".format(x * 100) if not pd.isnull(x) else None
     latex_format_dict['classifier_type'] = lambda x: 'Fcn' if x == 'fcn' else 'Conv-Avg'
-    latex_format_dict['classifier_conv_out'] = lambda x: '{:d}'.format(int(x)) if not pd.isnull(x) else "--"
-    latex_format_dict['classifier_projection_out'] = lambda x: '{:d}'.format(int(x)) if not pd.isnull(x) else "--"
-    latex_format_dict['extractor_projection_size'] = lambda x: '{:d}'.format(int(x)) if not pd.isnull(x) else "--"
+    latex_format_dict['classifier_conv_out'] = lambda x: '{:d}'.format(int(x)) if not pd.isnull(x) and x > 0 else "--"
+    latex_format_dict['classifier_projection_out'] = lambda x: '{:d}'.format(int(x)) if not pd.isnull(x) and x > 0 else "--"
+    latex_format_dict['extractor_projection_size'] = lambda x: '{:d}'.format(int(x)) if not pd.isnull(x) and x > 0 else "--"
     latex_format_dict['extractor_filters'] = lambda x: str(x)[1:-1]  # Remove the '[' and ']' of str(array)
+
+    latex_format_dict['extractor_spatial_location'] = lambda x: x if x != "None" else "--"
+    latex_format_dict['stem_spatial_location'] = lambda x: x if x != "None" else "--"
+    latex_format_dict['resblock_spatial_location'] = lambda x: x if x != "None" else "--"
+    latex_format_dict['classifier_spatial_location'] = lambda x: x if x != "None" else "--"
+
+    def normalisation_format(norm_type):
+        if norm_type and norm_type == "imagenet_stats":
+            return "ImageNet"
+        elif norm_type == "data_stats":
+            return "CLEAR"
+        else:
+            return None
+    latex_format_dict['normalisation'] = normalisation_format
+
+
 
     return format_dict, latex_format_dict
 
@@ -377,3 +410,42 @@ def get_nb_param_from_summary(summary_filepath):
         nb_params = [int(l.split(':')[1].strip().replace(',', '')) for l in summary_lines if 'params' in l]
 
     return tuple(nb_params)
+
+
+def get_delete_experiment_from_drive_script(df, dryrun=False):
+    cmds = []
+    for f, d in df[['folder', 'date']].values:
+        res_path = f"{f}/{d.strftime('%Y-%m-%d_%Hh%M')}"
+        cmd = f"rclone delete Drive:result/training/{res_path} -P"
+        if dryrun:
+            cmd += " --dry-run"
+        cmds.append(cmd)
+
+    return cmds
+
+
+def get_full_sync_experiment_from_drive_script(df, dest, dryrun=False):
+    cmds = []
+    for f, d in df[['folder', 'date']].values:
+        res_path = f"{f}/{d.strftime('%Y-%m-%d_%Hh%M')}"
+        cmd = f"rclone copy Drive:result/training/{res_path} {dest}/{res_path} -l -P"
+        if dryrun:
+            cmd += " --dry-run"
+        cmds.append(cmd)
+
+    return cmds
+
+
+def get_blues_experiment_id():
+    return [
+        'CLEAR_50k_4_inst_audio_win_512_hop_2048_keep_256_RGB_norm_zero_one_norm_clear_stats_extractor_slim_parallel_3_block_64_proj_40_epoch_876944_original_test/2020-10-29_12h33',
+        'CLEAR_50k_4_inst_audio_win_512_hop_2048_keep_256_RGB_norm_zero_one_norm_clear_stats_extractor_slim_interleaved_3_block_32_proj_40_epoch_876944_original_test/2020-10-29_21h32',
+        'CLEAR_50k_4_inst_audio_win_512_hop_2048_keep_256_RGB_norm_zero_one_norm_clear_stats_extractor_slim_parallel_3_block_64_proj_no_pool_40_epoch_876944_no_pooling_no_pooling/2020-11-20_14h42',
+        'CLEAR_50k_4_inst_audio_win_512_hop_2048_keep_256_RGB_norm_zero_one_norm_imagenet_stats_resnet_film_original_40_epoch_876944_original_resnet/2020-10-31_18h38',
+        'CLEAR_50k_4_inst_audio_win_512_hop_2048_keep_256_RGB_norm_zero_one_norm_imagenet_stats_resnet_resize_to_224_square_film_original_40_epoch_876944_resized_224_resized_224/2020-11-11_16h20',
+        'CLEAR_50k_4_inst_audio_win_512_hop_2048_keep_256_RGB_norm_zero_one_norm_clear_stats_film_original_40_epoch_876944_original_test/2020-10-28_22h22',
+        'CLEAR_50k_4_inst_audio_win_512_hop_2048_keep_256_RGB_norm_zero_one_norm_clear_stats_resnet_film_original_40_epoch_876944_original_test/2020-10-31_01h38',
+        'CLEAR_50k_4_inst_audio_win_512_hop_2048_keep_256_RGB_norm_zero_one_norm_clear_stats_resnet_film_original_40_epoch_876944_original_resnet/2020-10-31_13h58',
+        'CLEAR_50k_4_inst_audio_win_512_hop_2048_keep_256_RGB_norm_zero_one_norm_imagenet_stats_resnet_film_original_40_epoch_876944_original_resnet/2020-11-01_00h09'
+    ]
+
