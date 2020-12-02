@@ -114,8 +114,7 @@ def prepare_model(args, flags, paths, dataloaders, device, model_config, input_i
 
             set_random_state(checkpoint['rng_state'])
 
-        # We need non-strict because feature extractor weight are not included in the saved state dict
-        film_model.load_state_dict(checkpoint['model_state_dict'], strict=False)
+        film_model.load_state_dict(checkpoint['model_state_dict'])
 
         if optimizer and "optimizer_state_dict" in checkpoint:
             current_optimizer_param_keys = optimizer.state_dict()['param_groups'][0].keys()
@@ -425,7 +424,7 @@ def train_model(device, model, dataloaders, output_folder, criterion, optimizer,
                 # The learning rate was reduced, reload the last best weights and restart from there with a lower LR
                 print("Learning rate has been reduced. Reloading last best weights and starting from there")
                 checkpoint = torch.load(f"{best_epoch_symlink_path}/model.pt.tar", map_location=device)
-                model.load_state_dict(checkpoint['model_state_dict'], strict=False)
+                model.load_state_dict(checkpoint['model_state_dict'])
 
         stats = save_training_stats(stats_file_path, epoch, train_acc, train_loss, val_acc, val_loss, epoch_train_time)
         save_batch_metrics(epoch, train_metrics, val_metrics, output_folder, filename="batch_metrics.json")
@@ -505,7 +504,7 @@ def train_model(device, model, dataloaders, output_folder, criterion, optimizer,
 
     # Load the best weights before leaving the training function
     checkpoint = torch.load(f"{best_epoch_symlink_path}/model.pt.tar", map_location=device)
-    model.load_state_dict(checkpoint['model_state_dict'], strict=False)
+    model.load_state_dict(checkpoint['model_state_dict'])
 
     return model
 
