@@ -155,6 +155,7 @@ def prepare_model(args, flags, paths, dataloaders, device, model_config, input_i
             torch.backends.cudnn.deterministic = True
 
     film_model.to(device)
+    film_model.eval()
 
     print("Model ready to run\n")
 
