@@ -190,7 +190,8 @@ def process_dataloader(is_training, device, model, dataloader, criterion=None, o
         if not images_already_on_gpu:
             images = batch['image'].to(device, non_blocking=True)
         else:
-            images = batch['images']
+            images = batch['image']
+
         questions = batch['question'].to(device)
         answers = batch['answer'].to(device)
         seq_lengths = batch['seq_length'].to(device)
@@ -201,7 +202,6 @@ def process_dataloader(is_training, device, model, dataloader, criterion=None, o
         images_padding = batch['image_padding']
 
         if is_training:
-            # zero the parameter gradients
             optimizer.zero_grad()
 
         with torch.set_grad_enabled(is_training):
@@ -217,7 +217,6 @@ def process_dataloader(is_training, device, model, dataloader, criterion=None, o
                 batch_accs.append(correct_in_batch/batch_size)
 
             if is_training:
-                # backward + optimize only if in training phase
                 loss.backward()
                 optimizer.step()
                 batch_lrs.append(optimizer.param_groups[0]['lr'])
