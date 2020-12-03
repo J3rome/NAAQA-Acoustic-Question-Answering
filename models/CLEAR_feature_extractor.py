@@ -197,8 +197,9 @@ class Freq_Time_Separated_No_Pool_Extractor(nn.Module):
         # TODO : Permit different number of time and freq blocks
         assert self.nb_time_blocks == self.nb_freq_blocks, "Invalid config. Must have same number of time & freq block"
 
+        nb_filters = config['out'][:-1] if self.do_fusion else config['out']
         in_channels = input_channels
-        iterator = zip(config['out'][:-1], config['time_kernels'], config['time_strides'],
+        iterator = zip(nb_filters, config['time_kernels'], config['time_strides'],
                        config['freq_kernels'], config['freq_strides'])
         for out_channels, time_kernel, time_stride, freq_kernel, freq_stride in iterator:
 
