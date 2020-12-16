@@ -48,25 +48,38 @@ def color_row_by_attribute(sample, attribute, colors_by_config):
     return [css] * len(sample.index)
 
 
-def groupby_mean(df, groupby_columns, mean_columns, selected_columns, add_count_col=True):
+def groupby_mean(df, groupby_columns, mean_columns, selected_columns, add_count_col=True, add_std_str=True, inplace_std_str=False):
     if type(groupby_columns) == str:
         groupby_columns = [groupby_columns]
 
+    additional_cols = []
     agg_cols = {name: 'first' for name in selected_columns if name not in groupby_columns}
 
     # Mean only for certain columns
     for col in mean_columns:
         agg_cols[col] = 'mean'
 
+        if add_std_str or inplace_std_str:
+            std_col_id = f"{col}_std"
+            df[std_col_id] = df[col]
+            agg_cols[std_col_id] = 'std'
+
+            if not inplace_std_str:
+                additional_cols.append(std_col_id)
+
     grouped_df = df.groupby(groupby_columns, as_index=False)
 
     aggregated = grouped_df.agg(agg_cols)
 
+    if inplace_std_str:
+        for col in mean_columns:
+            std_col = f"{col}_std"
+            aggregated[std_col] = aggregated.apply(lambda x: f"{x[col]:.2f} (± {x[std_col]:.3f})" if not pd.isnull(x[std_col]) else f"{x[col]:.2f}", axis=1)
+            additional_cols.append(std_col)
+
     if add_count_col:
-        aggregated['count'] = grouped_df.size().values
-        additional_cols = ['count']
-    else:
-        additional_cols = []
+        aggregated['count'] = grouped_df.size()['size']
+        additional_cols.append('count')
 
     # We re-select the columns to set all columns in the desired order (Otherwise the grouped columns come first)
     return aggregated[selected_columns + additional_cols]
@@ -137,7 +150,9 @@ def color_by_multi_attribute(df, main_attribute=None, attributes=None, cmaps=Non
         return to_return
 
     # Filling NaN values so their value can be expressed as color with cmap
-    df_copy = df.fillna(value=0)
+    na_fill_dict = {att: -1 for att in attributes}
+    na_fill_dict[main_attribute] = -1
+    df_copy = df.fillna(value=na_fill_dict)
 
     if main_attribute:
         # Prepare data normalization

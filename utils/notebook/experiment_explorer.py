@@ -288,7 +288,7 @@ def get_experiments(experiment_result_path, exp_prefix=None):
                 experiment['extractor_type'] = 'resnet'
 
             if experiment['extractor_type'] == 'film_original':
-                experiment['extractor_type'] = 'ConvLearned'
+                experiment['extractor_type'] = 'Baseline'
             elif 'separated' in experiment['extractor_type']:
                 experiment['extractor_type'] = 'Parallel'
             elif 'interlaced' in experiment['extractor_type']:
@@ -305,7 +305,7 @@ def get_experiments(experiment_result_path, exp_prefix=None):
             experiment['extractor_out_chan'] = to_int(config['image_extractor']['out'][-1]) if type(config['image_extractor']['out']) == list else config['image_extractor']['out']
             experiment['extractor_filters'] = config['image_extractor']['out']
 
-            if experiment['extractor_type'] in ['ConvLearned', 'Conv']:
+            if experiment['extractor_type'] in ['Baseline', 'Conv']:
                 experiment['extractor_nb_block'] = len(config['image_extractor']['kernels'])
                 experiment['extractor_projection_size'] = None
             elif not 'Resnet' in experiment['extractor_type']:
@@ -346,6 +346,12 @@ def get_experiments(experiment_result_path, exp_prefix=None):
 
     # Round number params to the closest thousand to facilitate comparison
     experiments_df['nb_trainable_param_round'] = experiments_df['nb_trainable_param'].apply(lambda x: x // 1000 * 1000)
+    #experiments_df['nb_trainable_param_million'] = experiments_df['nb_trainable_param'].apply(lambda x: f"{x / 1000000:.2f} M" if x >= 1000000 else f"{x // 1000} k")
+    experiments_df['nb_trainable_param_million'] = experiments_df['nb_trainable_param'].apply(lambda x: x / 1000000)
+
+    #convert_dict = { key: 'int32' for key, val in experiments[0].items() if type(val) == int }
+
+    #experiments_df.astype(convert_dict)
 
     return experiments_df
 
@@ -357,6 +363,7 @@ def get_format_dicts():
         'nb_non_trainable_param': "{:,d}".format,
         'nb_trainable_param': "{:,d}".format,
         'nb_trainable_param_round': "~ {:,d}".format,
+        "nb_trainable_param_million": "~ {:.2f} M".format,
         'nb_sample': "{:,d}".format,
         'nb_scene': "{:,d}".format,
         'rnn_state_size': "{:,d}".format,
@@ -380,8 +387,10 @@ def get_format_dicts():
     latex_format_dict['classifier_type'] = lambda x: 'Fcn' if x == 'fcn' else 'Conv-Avg'
     latex_format_dict['classifier_conv_out'] = lambda x: '{:d}'.format(int(x)) if not pd.isnull(x) and x > 0 else "--"
     latex_format_dict['classifier_projection_out'] = lambda x: '{:d}'.format(int(x)) if not pd.isnull(x) and x > 0 else "--"
+    latex_format_dict['extractor_nb_block'] = lambda x: '{:d}'.format(int(x)) if not pd.isnull(x) else "--"
     latex_format_dict['extractor_projection_size'] = lambda x: '{:d}'.format(int(x)) if not pd.isnull(x) and x > 0 else "--"
     latex_format_dict['extractor_filters'] = lambda x: str(x)[1:-1]  # Remove the '[' and ']' of str(array)
+    latex_format_dict['extractor_type'] = lambda x: x.replace("_", " ").capitalize()
 
     latex_format_dict['extractor_spatial_location'] = lambda x: x if x != "None" else "--"
     latex_format_dict['stem_spatial_location'] = lambda x: x if x != "None" else "--"
@@ -396,8 +405,6 @@ def get_format_dicts():
         else:
             return None
     latex_format_dict['normalisation'] = normalisation_format
-
-
 
     return format_dict, latex_format_dict
 
@@ -434,6 +441,14 @@ def get_full_sync_experiment_from_drive_script(df, dest, dryrun=False):
         cmds.append(cmd)
 
     return cmds
+
+
+def get_exp_folder_path(df):
+    paths = []
+    for f, d in df[['folder', 'date']].values:
+        paths.append(f"{f}/{d.strftime('%Y-%m-%d_%Hh%M')}")
+
+    return paths
 
 
 def get_blues_experiment_id():
