@@ -1,7 +1,7 @@
 {
   "question":{
     "word_embedding_dim":200,
-    "rnn_state_size":1024
+    "rnn_state_size":4096
   },
   "image_extractor":{
     "type":"freq_time_separated",
