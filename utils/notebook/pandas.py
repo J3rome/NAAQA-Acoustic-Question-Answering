@@ -48,6 +48,10 @@ def color_row_by_attribute(sample, attribute, colors_by_config):
     return [css] * len(sample.index)
 
 
+def np_std(x):
+    return np.std(x)
+
+
 def groupby_mean(df, groupby_columns, mean_columns, selected_columns, add_count_col=True, add_std_str=True, inplace_std_str=False):
     if type(groupby_columns) == str:
         groupby_columns = [groupby_columns]
@@ -62,19 +66,19 @@ def groupby_mean(df, groupby_columns, mean_columns, selected_columns, add_count_
         if add_std_str or inplace_std_str:
             std_col_id = f"{col}_std"
             df[std_col_id] = df[col]
-            agg_cols[std_col_id] = 'std'
+            agg_cols[std_col_id] = np_std
 
             if not inplace_std_str:
                 additional_cols.append(std_col_id)
 
-    grouped_df = df.groupby(groupby_columns, as_index=False)
+    grouped_df = df.groupby(groupby_columns, as_index=False, dropna=False)
 
     aggregated = grouped_df.agg(agg_cols)
 
     if inplace_std_str:
         for col in mean_columns:
             std_col = f"{col}_std"
-            aggregated[std_col] = aggregated.apply(lambda x: f"{x[col]:.2f} (± {x[std_col]:.3f})" if not pd.isnull(x[std_col]) else f"{x[col]:.2f}", axis=1)
+            aggregated[std_col] = aggregated.apply(lambda x: f"{x[col]:.4f} ± {x[std_col]:.4f}" if not pd.isnull(x[std_col]) else f"{x[col]:.4f}", axis=1)
             additional_cols.append(std_col)
 
     if add_count_col:
@@ -99,6 +103,11 @@ def color_by_multi_attribute(df, main_attribute=None, attributes=None, cmaps=Non
     elif type(cmaps) != list:
         cmaps = [cmaps]
 
+    if attributes is None:
+        attributes = []
+    elif type(attributes) != list:
+        attributes = [attributes]
+
     for i, cmap in enumerate(cmaps):
         if type(cmap) == str:
             cmaps[i] = plt.get_cmap(cmap)
@@ -107,7 +116,7 @@ def color_by_multi_attribute(df, main_attribute=None, attributes=None, cmaps=Non
         attributes.remove(main_attribute)
 
     main_attribute_cmap = cmaps[0]
-    other_attributes_cmaps = cmaps[1:]
+    other_attributes_cmaps = [c for c in cmaps[1:] if c is not None]
 
     # Styler fct for both column & row styling
     def styler_fct(sample, target_attribute, min_max, categorical_values=None, cmap=None, on_column=False):

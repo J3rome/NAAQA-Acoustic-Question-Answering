@@ -7,6 +7,7 @@ import pandas as pd
 import numpy as np
 
 from utils.file import read_json, save_json
+from utils.generic import get_answer_to_family_map
 
 
 def to_float(string):
@@ -32,8 +33,185 @@ def get_max_freq(exp):
     return None
 
 
-def get_experiments(experiment_result_path, exp_prefix=None):
+def load_test_questions(data_folder):
+    question_path = f"{data_folder}/questions/CLEAR_test_questions.json"
+    if os.path.exists(question_path):
+        return read_json(question_path)['questions']
+
+    return None
+
+
+def get_acc_per_q_type(exp_folder_path, exp, test_questions, answer_to_family_map, force_recalc=False):
+    per_q_acc_stats_path = f"{exp_folder_path}/test_stats_per_q.json"
+
+    if os.path.exists(per_q_acc_stats_path) and not force_recalc:
+        per_family_acc = read_json(per_q_acc_stats_path)
+
+    else:
+        print("Calculating per question accuracies")
+        per_family_acc = {}
+        test_pred_path = f"{exp_folder_path}/test_predictions.json"
+
+        test_preds = read_json(test_pred_path)       # FIXME: Will raise exception if file doesn't exist
+
+        unique_filters = set()
+
+        for pred in test_preds:
+            # Assume questions are ordered by id
+            question = test_questions[pred['question_id']]
+
+            # for some reason, some 'ground_truth_answer_family' in loaded predictions are wrong... let's patch this...
+            pred['ground_truth_answer_family'] = answer_to_family_map[str(question['answer']).lower()]
+
+            last_program_node = question['program'][-1]['type']
+
+            if last_program_node == "query_position_instrument":
+                pred['ground_truth_answer_family'] = "position_rel"
+
+            if pred['ground_truth_answer_family'] == 'count' and last_program_node == 'count_different_instrument':
+                pred['ground_truth_answer_family'] = "count_diff"
+
+            if pred['ground_truth_answer_family'] == 'boolean':
+                if last_program_node in ['exist', 'or']:
+                    pred['ground_truth_answer_family'] = "exist"
+                elif last_program_node in ['equal_integer', 'greater_than', 'less_than']:
+                    pred['ground_truth_answer_family'] = "count_compare"
+
+            pred['relate_count'] = sum([1 for p in question['program'] if p['type'] == "relate"])
+            pred['has_or'] = 'or' in question['question']
+
+            filters = {p['type'] for p in question['program'] if 'filter' in p['type']}
+            unique_filters.update(filters)
+            pred['filters'] = ",".join(filters)
+
+
+        # FIXME : THIS IS MOST PROBABLY NOT THE GOOD WAY OF DOING THIS... JUST NEED SOME QUICK DATA
+        predictions_df = pd.DataFrame(test_preds,
+                                      columns=['question_id', 'scene_id', 'scene_length', 'correct', 'prediction',
+                                               'ground_truth', 'prediction_answer_family', 'ground_truth_answer_family',
+                                               'confidence', 'relate_count', 'filters', 'has_or'])
+        grouped = predictions_df.groupby(['ground_truth_answer_family', 'correct', 'relate_count', 'filters', 'has_or'],
+                                         as_index=False)
+
+        predictions_df.to_latex
+
+        families = {k[0] for k in grouped.groups.keys()}
+
+        grouped_count = grouped.count()
+
+        # Global stats
+        global_correct_entries = grouped_count[grouped_count['correct'] == True]
+        global_incorrect_entries = grouped_count[grouped_count['correct'] == False]
+
+        # No relate
+        nb_global_correct_no_relate = global_correct_entries[global_correct_entries['relate_count'] == 0]['prediction'].sum()
+        nb_global_incorrect_no_relate = global_incorrect_entries[global_incorrect_entries['relate_count'] == 0]['prediction'].sum()
+        nb_global_total_no_relate = nb_global_correct_no_relate + nb_global_incorrect_no_relate
+
+        per_family_acc[f'all_no_rel_test_acc'] = nb_global_correct_no_relate / nb_global_total_no_relate if nb_global_total_no_relate > 0 else -1
+
+        # No relate with filter
+        for f in unique_filters:
+            nb_filter_correct_no_relate = global_correct_entries[(global_correct_entries['relate_count'] == 0) & (global_correct_entries['filters'].str.contains(f))]['prediction'].sum()
+            nb_filter_incorrect_no_relate = global_incorrect_entries[(global_incorrect_entries['relate_count'] == 0) & (global_incorrect_entries['filters'].str.contains(f))]['prediction'].sum()
+            nb_filter_total_no_relate = nb_filter_correct_no_relate + nb_filter_incorrect_no_relate
+
+            per_family_acc[f'all_no_rel_with_{f}_test_acc'] = nb_filter_correct_no_relate / nb_filter_total_no_relate if nb_filter_total_no_relate > 0 else -1
+
+        # With relate
+        nb_global_correct_with_relate = global_correct_entries[global_correct_entries['relate_count'] > 0]['prediction'].sum()
+        nb_global_incorrect_with_relate = global_incorrect_entries[global_incorrect_entries['relate_count'] > 0]['prediction'].sum()
+        nb_global_total_with_relate = nb_global_correct_with_relate + nb_global_incorrect_with_relate
+
+        per_family_acc[f'all_with_rel_test_acc'] = nb_global_correct_with_relate / nb_global_total_with_relate if nb_global_total_with_relate > 0 else -1
+
+        # With OR
+        nb_global_correct_with_or = global_correct_entries[global_correct_entries['has_or'] == True]['prediction'].sum()
+        nb_global_incorrect_with_or = global_incorrect_entries[global_incorrect_entries['has_or'] == True]['prediction'].sum()
+        nb_global_total_with_or = nb_global_correct_with_or + nb_global_incorrect_with_or
+
+        per_family_acc[f'all_with_or_test_acc'] = nb_global_correct_with_or / nb_global_total_with_or if nb_global_total_with_or > 0 else -1
+
+        # No OR --- FIXME : This global stat is not fair, we only have OR in 'compare','count' or 'exist' question
+        nb_global_correct_no_or = global_correct_entries[global_correct_entries['has_or'] == False]['prediction'].sum()
+        nb_global_incorrect_no_or = global_incorrect_entries[global_incorrect_entries['has_or'] == False]['prediction'].sum()
+        nb_global_total_no_or = nb_global_correct_no_or + nb_global_incorrect_no_or
+
+        per_family_acc[f'all_no_or_test_acc'] = nb_global_correct_no_or / nb_global_total_no_or if nb_global_total_no_or > 0 else -1
+
+        # Per family stats
+        for family in families:
+            correct_entries = global_correct_entries[(global_correct_entries['ground_truth_answer_family'] == family)]
+            incorrect_entries = global_incorrect_entries[(global_incorrect_entries['ground_truth_answer_family'] == family)]
+
+            # Global acc by family
+            nb_correct = correct_entries['prediction'].sum()
+            nb_incorrect = incorrect_entries['prediction'].sum()
+            nb_total = nb_correct + nb_incorrect
+
+            per_family_acc[f'{family}_test_acc'] = nb_correct / nb_total if nb_total > 0 else -1
+
+            # No relation acc by family
+            nb_correct_no_relate = correct_entries[correct_entries['relate_count'] == 0]['prediction'].sum()
+            nb_incorrect_no_relate = incorrect_entries[incorrect_entries['relate_count'] == 0]['prediction'].sum()
+            nb_total_no_relate = nb_correct_no_relate + nb_incorrect_no_relate
+
+            per_family_acc[f'{family}_no_rel_test_acc'] = nb_correct_no_relate / nb_total_no_relate if nb_total_no_relate > 0 else -1
+
+            # No relation acc -- with filter by family
+            for f in unique_filters:
+                nb_filter_correct_no_relate = global_correct_entries[(global_correct_entries['relate_count'] == 0) & (global_correct_entries['filters'].str.contains(f))]['prediction'].sum()
+                nb_filter_incorrect_no_relate = global_incorrect_entries[(global_incorrect_entries['relate_count'] == 0) & (global_incorrect_entries['filters'].str.contains(f))]['prediction'].sum()
+                nb_filter_total_no_relate = nb_filter_correct_no_relate + nb_filter_incorrect_no_relate
+
+                per_family_acc[f'{family}_no_rel_with_{f}_test_acc'] = nb_filter_correct_no_relate / nb_filter_total_no_relate if nb_filter_total_no_relate > 0 else -1
+
+            # With relation acc by family
+            nb_correct_with_relate = correct_entries[correct_entries['relate_count'] > 0]['prediction'].sum()
+            nb_incorrect_with_relate = incorrect_entries[incorrect_entries['relate_count'] > 0]['prediction'].sum()
+            nb_total_with_relate = nb_correct_with_relate + nb_incorrect_with_relate
+
+            per_family_acc[f'{family}_with_rel_test_acc'] = nb_correct_with_relate / nb_total_with_relate if nb_total_with_relate > 0 else -1
+
+            # With OR
+            nb_correct_with_or = correct_entries[correct_entries['has_or'] == True]['prediction'].sum()
+            nb_incorrect_with_or = incorrect_entries[incorrect_entries['has_or'] == True]['prediction'].sum()
+            nb_total_with_or = nb_correct_with_or + nb_incorrect_with_or
+
+            per_family_acc[f'{family}_with_or_test_acc'] = nb_correct_with_or / nb_total_with_or if nb_total_with_or > 0 else -1
+
+            # No OR
+            nb_correct_no_or = correct_entries[correct_entries['has_or'] == False]['prediction'].sum()
+            nb_incorrect_no_or = incorrect_entries[incorrect_entries['has_or'] == False]['prediction'].sum()
+            nb_total_no_or = nb_correct_no_or + nb_incorrect_no_or
+
+            per_family_acc[f'{family}_no_or_test_acc'] = nb_correct_no_or / nb_total_no_or if nb_total_no_or > 0 else -1
+
+        # Writing stats to file so we don't recalculate them
+        save_json(per_family_acc, per_q_acc_stats_path, sort_keys=True)
+
+    # Merge dicts together
+    exp = {**exp, **per_family_acc}
+
+    return exp
+
+
+def get_experiments(experiment_result_path, exp_prefix=None, data_folder="data/CLEAR_50k_4_inst_audio",
+                    question_type_analysis=True, min_date=None):
     experiments = []
+    if question_type_analysis:
+        test_questions = load_test_questions(data_folder)
+
+        answer_to_family_map = get_answer_to_family_map(f'{data_folder}/attributes.json')
+
+        if test_questions is None:
+            # Deactivate question type analysis if we can't load questions
+            question_type_analysis = False
+
+    if min_date:
+        min_date = datetime.strptime(min_date, '%Y-%m-%d_%Hh%M')
+
+    #count = 0
 
     for exp_folder in os.listdir(experiment_result_path):
         exp_folder_path = f'{experiment_result_path}/{exp_folder}'
@@ -82,6 +260,15 @@ def get_experiments(experiment_result_path, exp_prefix=None):
                 'folder': exp_folder,
                 'folder_dated': f"{exp_folder}/{date_folder}"
             }
+
+            if min_date and experiment['date'] < min_date:
+                # Skip experiments older than min_date, reduce loading time
+                continue
+
+            #if count > 10:
+            #    continue
+            #count += 1
+
 
             additional_note = arguments['output_name_suffix'].replace(f'_{experiment["nb_epoch"]}_epoch', '').replace(experiment['config'], '').replace(f'_{experiment["random_seed"]}', '').replace(f"_stop_at_{experiment['stop_accuracy']}", '').replace('_resnet_extractor', '').replace('config_', '')
 
@@ -175,6 +362,12 @@ def get_experiments(experiment_result_path, exp_prefix=None):
 
             experiment['batch_size'] = arguments['batch_size']
             experiment['preprocessed_folder_name'] = arguments['preprocessed_folder_name']
+
+
+            # Question type analysis
+            if question_type_analysis:
+                # FIXME : Should probably add the family columns with NaN ?
+                experiment = get_acc_per_q_type(exp_dated_folder_path, experiment, test_questions, answer_to_family_map)
 
             img_arguments = arguments
 
@@ -356,8 +549,35 @@ def get_experiments(experiment_result_path, exp_prefix=None):
     return experiments_df
 
 
-
 def get_format_dicts():
+    question_families = [
+        'count_diff',
+        'exist',
+        'count_compare',
+        'boolean',
+        'brightness',
+        'count',
+        'instrument',
+        'loudness',
+        'note',
+        'position_global',
+        'position_rel',
+        'position'
+    ]
+
+    def percent_format(x):
+        return "{:.2f}".format(x * 100) if not pd.isnull(x) and x > 0 else None
+
+    def std_format(x):
+        if type(x) != str:
+            return f"± {x * 100:.2f}"
+
+        values = [f"{float(v) * 100:.2f}" for v in x.split(' ± ')]
+        if len(values) > 1:
+            return " ± ".join(values)
+        else:
+            return "± " + values[0]
+
     format_dict = {
         'total_nb_param': "{:,d}".format,
         'nb_non_trainable_param': "{:,d}".format,
@@ -369,21 +589,35 @@ def get_format_dicts():
         'rnn_state_size': "{:,d}".format,
         'optimizer_lr': "{:.2e}".format,
         'optimizer_weight_decay': "{:.2e}".format,
-        'best_val_acc': lambda x: "{:.2f}%".format(x * 100) if not pd.isnull(x) else None,
-        'train_acc': lambda x: "{:.2f}%".format(x * 100) if not pd.isnull(x) else None,
-        'test_acc': lambda x: "{:.2f}%".format(x * 100) if not pd.isnull(x) else None,
+        'best_val_acc': percent_format,
+        'best_val_acc_std': std_format,
+        'train_acc': percent_format,
+        'train_acc_std': std_format,
+        'test_acc': percent_format,
+        'test_acc_std': std_format,
+        'mean_std': std_format,
         '0.6_at_epoch': lambda x: x if not pd.isnull(x) and x != 0 else None,
         '0.7_at_epoch': lambda x: x if not pd.isnull(x) and x != 0 else None,
         '0.8_at_epoch': lambda x: x if not pd.isnull(x) and x != 0 else None,
         '0.9_at_epoch': lambda x: x if not pd.isnull(x) and x != 0 else None
     }
 
+    for family in question_families:
+        format_dict[f"{family}_test_acc"] = percent_format
+        format_dict[f"{family}_test_acc_std"] = std_format
+
+        format_dict[f"{family}_no_rel_test_acc"] = percent_format
+        format_dict[f"{family}_no_rel_test_acc_std"] = std_format
+
+        format_dict[f"{family}_with_rel_test_acc"] = percent_format
+        format_dict[f"{family}_with_rel_test_acc_std"] = std_format
+
     latex_format_dict = deepcopy(format_dict)
     latex_format_dict['nb_sample'] = lambda x: "{:d}k".format(x // 1000)
     latex_format_dict['nb_scene'] = lambda x: "{:d}k".format(x // 1000)
-    latex_format_dict['best_val_acc'] = lambda x: "{:.2f}".format(x * 100) if not pd.isnull(x) else None
-    latex_format_dict['train_acc'] = lambda x: "{:.2f}".format(x * 100) if not pd.isnull(x) else None
-    latex_format_dict['test_acc'] = lambda x: "{:.2f}".format(x * 100) if not pd.isnull(x) else None
+    latex_format_dict['best_val_acc'] = percent_format
+    latex_format_dict['train_acc'] = percent_format
+    latex_format_dict['test_acc'] = percent_format
     latex_format_dict['classifier_type'] = lambda x: 'Fcn' if x == 'fcn' else 'Conv-Avg'
     latex_format_dict['classifier_conv_out'] = lambda x: '{:d}'.format(int(x)) if not pd.isnull(x) and x > 0 else "--"
     latex_format_dict['classifier_projection_out'] = lambda x: '{:d}'.format(int(x)) if not pd.isnull(x) and x > 0 else "--"
@@ -405,6 +639,8 @@ def get_format_dicts():
         else:
             return None
     latex_format_dict['normalisation'] = normalisation_format
+
+
 
     return format_dict, latex_format_dict
 
