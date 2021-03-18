@@ -177,6 +177,20 @@ def set_dimensions_to_power_of_two(dims):
     return h, w
 
 
+def set_dimensions_to_next_multiple(dims, multiple):
+    h = get_next_multiple(dims[0], multiple)
+    w = get_next_multiple(dims[1], multiple)
+
+    return h, w
+
+
+def get_next_multiple(x, multiple):
+    if x % multiple == 0:
+        return x
+
+    return x + (multiple - x % multiple)
+
+
 def get_imagenet_stats():
     return {"mean": [0.485, 0.456, 0.406], "std": [0.229, 0.224, 0.225]}
 

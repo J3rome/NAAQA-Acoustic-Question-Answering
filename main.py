@@ -24,7 +24,7 @@ from utils.random import set_random_seed, get_random_state, set_random_state
 from utils.visualization import save_model_summary, save_graph_to_tensorboard
 from utils.argument_parsing import get_args_task_flags_paths
 from utils.logging import create_tensorboard_writers, close_tensorboard_writers
-from utils.generic import get_imagenet_stats, set_dimensions_to_power_of_two
+from utils.generic import get_imagenet_stats, set_dimensions_to_power_of_two, set_dimensions_to_next_multiple
 
 from models.Resnet_feature_extractor import Resnet_feature_extractor
 from models.tools.TF_weight_transfer import tf_weight_transfer
@@ -371,9 +371,14 @@ def set_transforms_on_datasets(args, datasets, transforms_device):
         max_test_img_dims = datasets['test'].get_max_width_image_dims()
 
         if args['pad_to_power_of_2']:
-            max_train_img_dims = set_dimensions_to_power_of_two(max_train_img_dims)
-            max_val_img_dims = set_dimensions_to_power_of_two(max_val_img_dims)
-            max_test_img_dims = set_dimensions_to_power_of_two(max_test_img_dims)
+            #max_train_img_dims = set_dimensions_to_power_of_two(max_train_img_dims)
+            #max_val_img_dims = set_dimensions_to_power_of_two(max_val_img_dims)
+            #max_test_img_dims = set_dimensions_to_power_of_two(max_test_img_dims)
+
+            # FIXME : PATCH JUST TO TEST A CONFIGURATION, REMOVE THIS !!
+            max_train_img_dims = set_dimensions_to_next_multiple(max_train_img_dims, 8)
+            max_val_img_dims = set_dimensions_to_next_multiple(max_val_img_dims, 8)
+            max_test_img_dims = set_dimensions_to_next_multiple(max_test_img_dims, 8)
 
         if args['resize_img']:
             resize_height = args['img_resize_height']
