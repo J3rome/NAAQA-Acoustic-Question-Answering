@@ -29,7 +29,7 @@ class Original_Film_Extractor(nn.Module):
 
             in_channels = out_chan
 
-    def forward(self, input_image, spatial_location):
+    def forward(self, input_image):
         out = input_image
 
         for conv in self.convs:
@@ -87,7 +87,7 @@ class Freq_Time_Separated_Extractor_no_pooling(nn.Module):
             self.fusion_conv = nn.Conv2d(in_channels=in_channels*2, out_channels=self.out_channels, kernel_size=[1, 1],
                                          stride=[1, 1], bias=False)
 
-    def forward(self, input_image, spatial_location):
+    def forward(self, input_image):
         # TODO : Add spatial location maps ?
         time_out = input_image
         freq_out = input_image
@@ -115,6 +115,8 @@ class Freq_Time_Separated_Extractor(nn.Module):
         super(Freq_Time_Separated_Extractor, self).__init__()
 
         self.config = config
+        self.spatial_location = config['spatial_location']
+        self.nb_spatial_location = len(self.spatial_location)
 
         self.out_channels = config['out'][-1]
 
@@ -128,7 +130,7 @@ class Freq_Time_Separated_Extractor(nn.Module):
         # TODO : Permit different number of time and freq blocks
         assert self.nb_time_blocks == self.nb_freq_blocks, "Invalid config. Must have same number of time & freq block"
 
-        in_channels = input_channels
+        in_channels = input_channels + self.nb_spatial_location
         iterator = zip(config['out'][:-1], config['time_kernels'], config['time_strides'],
                        config['freq_kernels'], config['freq_strides'])
         for out_channels, time_kernel, time_stride, freq_kernel, freq_stride in iterator:
@@ -150,21 +152,22 @@ class Freq_Time_Separated_Extractor(nn.Module):
                 ('pooling', nn.MaxPool2d(time_stride))
             ])))
 
-            in_channels = out_channels
+            in_channels = out_channels + self.nb_spatial_location
 
         if self.do_fusion:
+            in_channels -= self.nb_spatial_location
             self.fusion_conv = nn.Conv2d(in_channels=in_channels*2, out_channels=self.out_channels, kernel_size=[1, 1],
                                          stride=[1, 1], bias=False)
 
-    def forward(self, input_features, spatial_location):
-
-        if spatial_location:
-            input_features = append_spatial_location(input_features, axis=spatial_location)
-
+    def forward(self, input_features):
         time_out = input_features
         freq_out = input_features
 
         for time_block, freq_block in zip(self.time_blocks, self.freq_blocks):
+            if self.nb_spatial_location > 0:
+                time_out = append_spatial_location(time_out, axis=self.spatial_location)
+                freq_out = append_spatial_location(freq_out, axis=self.spatial_location)
+
             time_out = time_block(time_out)
             freq_out = freq_block(freq_out)
 
@@ -184,6 +187,8 @@ class Freq_Time_Separated_No_Pool_Extractor(nn.Module):
         super(Freq_Time_Separated_No_Pool_Extractor, self).__init__()
 
         self.config = config
+        self.spatial_location = config['spatial_location']
+        self.nb_spatial_location = len(self.spatial_location)
 
         self.out_channels = config['out'][-1]
 
@@ -198,7 +203,7 @@ class Freq_Time_Separated_No_Pool_Extractor(nn.Module):
         assert self.nb_time_blocks == self.nb_freq_blocks, "Invalid config. Must have same number of time & freq block"
 
         nb_filters = config['out'][:-1] if self.do_fusion else config['out']
-        in_channels = input_channels
+        in_channels = input_channels + self.nb_spatial_location
         iterator = zip(nb_filters, config['time_kernels'], config['time_strides'],
                        config['freq_kernels'], config['freq_strides'])
         for out_channels, time_kernel, time_stride, freq_kernel, freq_stride in iterator:
@@ -221,21 +226,21 @@ class Freq_Time_Separated_No_Pool_Extractor(nn.Module):
                 ('relu', nn.ReLU(inplace=True))
             ])))
 
-            in_channels = out_channels
+            in_channels = out_channels + self.nb_spatial_location
 
         if self.do_fusion:
             self.fusion_conv = nn.Conv2d(in_channels=in_channels*2, out_channels=self.out_channels, kernel_size=[1, 1],
                                          stride=[1, 1], bias=False)
 
-    def forward(self, input_features, spatial_location):
-
-        if spatial_location:
-            input_features = append_spatial_location(input_features, axis=spatial_location)
-
+    def forward(self, input_features):
         time_out = input_features
         freq_out = input_features
 
         for time_block, freq_block in zip(self.time_blocks, self.freq_blocks):
+            if self.nb_spatial_location > 0:
+                time_out = append_spatial_location(time_out, axis=self.spatial_location)
+                freq_out = append_spatial_location(freq_out, axis=self.spatial_location)
+
             time_out = time_block(time_out)
             freq_out = freq_block(freq_out)
 
@@ -255,6 +260,8 @@ class Freq_Time_Interlaced_Extractor(nn.Module):
         super(Freq_Time_Interlaced_Extractor, self).__init__()
 
         self.config = config
+        self.spatial_location = config['spatial_location']
+        self.nb_spatial_location = len(self.spatial_location)
 
         self.out_channels = config['out'][-1]
 
@@ -273,7 +280,7 @@ class Freq_Time_Interlaced_Extractor(nn.Module):
             iterator = zip(config['out'], config['freq_kernels'], config['freq_strides'],
                            config['time_kernels'], config['time_strides'])
 
-        in_channels = input_channels
+        in_channels = input_channels + self.nb_spatial_location
         for out_channels, first_kernel, first_stride, second_kernel, second_stride in iterator:
 
             first_conv = nn.Sequential(OrderedDict([
@@ -286,7 +293,8 @@ class Freq_Time_Interlaced_Extractor(nn.Module):
 
             self.blocks.append(first_conv)
 
-            in_channels = out_channels
+            in_channels = out_channels + self.nb_spatial_location
+
             second_conv = nn.Sequential(OrderedDict([
                 ('conv', Conv2d_padded(in_channels=in_channels,
                                        out_channels=out_channels, kernel_size=second_kernel,
@@ -298,16 +306,15 @@ class Freq_Time_Interlaced_Extractor(nn.Module):
             self.blocks.append(second_conv)
 
         if self.need_projection:
-            self.channel_projection = nn.Conv2d(in_channels, self.out_channels, kernel_size=[1, 1], stride=[1, 1])
+            self.channel_projection = nn.Conv2d(in_channels - self.nb_spatial_location, self.out_channels, kernel_size=[1, 1], stride=[1, 1])
 
-    def forward(self, input_features, spatial_location):
-        if spatial_location:
-            input_features = append_spatial_location(input_features, axis=spatial_location)
-
-        # TODO : Add spatial location maps ?
+    def forward(self, input_features):
         out = input_features
 
         for block in self.blocks:
+            if self.nb_spatial_location > 0:
+                out = append_spatial_location(out, axis=self.spatial_location)
+
             out = block(out)
 
         if self.need_projection:
@@ -333,7 +340,7 @@ class Freq_Time_Pooled_Extractor(nn.Module):
 
             in_channels = out_channels
 
-    def forward(self, input_image, spatial_location):
+    def forward(self, input_image):
         # FIXME : spatial location map ?
         out = input_image
         for block in self.blocks:
