@@ -43,7 +43,7 @@
       1
     ],
     "no_mlp_units":1024,
-    "projection_size":512
+    "projection_size":1024
   },
   "optimizer":{
     "type":"adam",
