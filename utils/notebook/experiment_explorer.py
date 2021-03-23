@@ -93,8 +93,6 @@ def get_acc_per_q_type(exp_folder_path, exp, test_questions, answer_to_family_ma
         grouped = predictions_df.groupby(['ground_truth_answer_family', 'correct', 'relate_count', 'filters', 'has_or'],
                                          as_index=False)
 
-        predictions_df.to_latex
-
         families = {k[0] for k in grouped.groups.keys()}
 
         grouped_count = grouped.count()
@@ -211,8 +209,6 @@ def get_experiments(experiment_result_path, exp_prefix=None, data_folder="data/C
     if min_date:
         min_date = datetime.strptime(min_date, '%Y-%m-%d_%Hh%M')
 
-    #count = 0
-
     for exp_folder in os.listdir(experiment_result_path):
         exp_folder_path = f'{experiment_result_path}/{exp_folder}'
 
@@ -264,11 +260,6 @@ def get_experiments(experiment_result_path, exp_prefix=None, data_folder="data/C
             if min_date and experiment['date'] < min_date:
                 # Skip experiments older than min_date, reduce loading time
                 continue
-
-            #if count > 10:
-            #    continue
-            #count += 1
-
 
             additional_note = arguments['output_name_suffix'].replace(f'_{experiment["nb_epoch"]}_epoch', '').replace(experiment['config'], '').replace(f'_{experiment["random_seed"]}', '').replace(f"_stop_at_{experiment['stop_accuracy']}", '').replace('_resnet_extractor', '').replace('config_', '')
 
@@ -362,6 +353,8 @@ def get_experiments(experiment_result_path, exp_prefix=None, data_folder="data/C
 
             experiment['batch_size'] = arguments['batch_size']
             experiment['preprocessed_folder_name'] = arguments['preprocessed_folder_name']
+
+            experiment['reduce_lr_on_plateau'] = arguments.get('reduce_lr_on_plateau', False)
 
 
             # Question type analysis
@@ -481,7 +474,7 @@ def get_experiments(experiment_result_path, exp_prefix=None, data_folder="data/C
                 experiment['extractor_type'] = 'resnet'
 
             if experiment['extractor_type'] == 'film_original':
-                experiment['extractor_type'] = 'Baseline'
+                experiment['extractor_type'] = 'Conv_2d'
             elif 'separated' in experiment['extractor_type']:
                 experiment['extractor_type'] = 'Parallel'
             elif 'interlaced' in experiment['extractor_type']:
@@ -498,7 +491,7 @@ def get_experiments(experiment_result_path, exp_prefix=None, data_folder="data/C
             experiment['extractor_out_chan'] = to_int(config['image_extractor']['out'][-1]) if type(config['image_extractor']['out']) == list else config['image_extractor']['out']
             experiment['extractor_filters'] = config['image_extractor']['out']
 
-            if experiment['extractor_type'] in ['Baseline', 'Conv']:
+            if experiment['extractor_type'] in ['Baseline', 'Conv', 'Conv_2d']:
                 experiment['extractor_nb_block'] = len(config['image_extractor']['kernels'])
                 experiment['extractor_projection_size'] = None
             elif not 'Resnet' in experiment['extractor_type']:
@@ -572,11 +565,16 @@ def get_format_dicts():
         if type(x) != str:
             return f"± {x * 100:.2f}"
 
-        values = [f"{float(v) * 100:.2f}" for v in x.split(' ± ')]
-        if len(values) > 1:
-            return " ± ".join(values)
+        values = x.split(' ± ')
+        nb_values = len(values)
+
+        if nb_values == 2:
+            # For some reason (probably because of float representation) 90.05 doesn't get rounded to 90.1, adding a small value to it make it work.
+            return f"{(float(values[0]) + 0.000000001)* 100:.1f} ± {float(values[1]) * 100:.2f}"
+        elif nb_values == 1:
+            return f"± {float(values[1]) * 100:.2f}"
         else:
-            return "± " + values[0]
+            raise Exception("Format error")
 
     format_dict = {
         'total_nb_param': "{:,d}".format,

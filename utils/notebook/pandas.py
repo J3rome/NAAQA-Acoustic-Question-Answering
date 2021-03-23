@@ -89,7 +89,7 @@ def groupby_mean(df, groupby_columns, mean_columns, selected_columns, add_count_
     return aggregated[selected_columns + additional_cols]
 
 
-def color_by_multi_attribute(df, main_attribute=None, attributes=None, cmaps=None, format_dict=None, print_infos=True):
+def color_by_multi_attribute(df, main_attribute=None, attributes=None, cmaps=None, format_dict=None, print_infos=False):
     """
     Will color the whole rows based on the main_attribute values.
     Will color specific columns based on attributes values (Over the main_attribute color)
