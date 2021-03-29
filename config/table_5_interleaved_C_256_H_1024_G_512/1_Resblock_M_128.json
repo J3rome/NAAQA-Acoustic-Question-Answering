@@ -14,7 +14,7 @@
   },
   "stem":{
     "spatial_location":true,
-    "conv_out":256,
+    "conv_out":128,
     "conv_kernel":[
       3,
       3
