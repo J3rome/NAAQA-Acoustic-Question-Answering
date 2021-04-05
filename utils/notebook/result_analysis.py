@@ -47,7 +47,7 @@ def filter_outliers(df, groupby_columns, outlier_col='nb_epoch_trained'):
 
 def keep_x_best(filtered_df, groupby_columns, nb_to_keep, discriminative_attribute='test_acc'):
     return filtered_df.sort_values([*groupby_columns, discriminative_attribute], ascending=False).groupby(
-        groupby_columns, as_index=False).apply(lambda x: x.iloc[:nb_to_keep])
+        groupby_columns, as_index=False, dropna=False).apply(lambda x: x.iloc[:nb_to_keep])
 
 
 def print_missing_seeds(df, groupby_cols, all_seeds):
