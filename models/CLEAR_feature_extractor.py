@@ -15,6 +15,7 @@ class Original_Film_Extractor(nn.Module):
 
         self.config = config
         self.convs = nn.ModuleList()
+        self.out_chan = config['out'][:-1]
 
         in_channels = input_image_channels
 
@@ -53,7 +54,7 @@ class Original_Film_Extractor(nn.Module):
         return out
 
     def get_out_channels(self):
-        return self.config['out'][-1]
+        return self.out_chan
 
 
 class Freq_Time_Separated_Extractor_no_pooling(nn.Module):
