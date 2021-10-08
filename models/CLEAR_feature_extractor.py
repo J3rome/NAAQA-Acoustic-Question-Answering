@@ -15,7 +15,7 @@ class Original_Film_Extractor(nn.Module):
 
         self.config = config
         self.convs = nn.ModuleList()
-        self.out_chan = config['out'][:-1]
+        self.out_chan = config['out'][-1]
 
         in_channels = input_image_channels
 
