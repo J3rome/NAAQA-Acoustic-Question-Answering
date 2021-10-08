@@ -18,6 +18,12 @@ class Original_Film_Extractor(nn.Module):
 
         in_channels = input_image_channels
 
+        projection_size = None
+
+        if len(config['out']) > len(config['kernels']):
+            projection_size = config['out'][-1]
+            config['out'] = config['out'][:-1]
+
         for out_chan, kernel, stride in zip(config['out'], config['kernels'], config['strides']):
             self.convs.append(nn.Sequential(OrderedDict([
                 ('conv', Conv2d_padded(in_channels=in_channels,
@@ -29,11 +35,20 @@ class Original_Film_Extractor(nn.Module):
 
             in_channels = out_chan
 
+        if projection_size is not None:
+            self.projection = nn.Conv2d(in_channels=in_channels, out_channels=projection_size, kernel_size=[1, 1],
+                                         stride=[1, 1], bias=False)
+        else:
+            self.projection = None
+
     def forward(self, input_image):
         out = input_image
 
         for conv in self.convs:
             out = conv(out)
+
+        if self.projection is not None:
+            out = self.projection(out)
 
         return out
 
