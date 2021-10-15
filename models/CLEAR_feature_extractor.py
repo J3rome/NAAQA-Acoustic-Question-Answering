@@ -19,6 +19,7 @@ class Original_Film_Extractor(nn.Module):
 
         in_channels = input_image_channels
 
+        with_bias = 'bias' in config and config['bias']
         projection_size = None
 
         if len(config['out']) > len(config['kernels']):
@@ -29,7 +30,7 @@ class Original_Film_Extractor(nn.Module):
             self.convs.append(nn.Sequential(OrderedDict([
                 ('conv', Conv2d_padded(in_channels=in_channels,
                                        out_channels=out_chan, kernel_size=kernel,
-                                       stride=stride, dilation=1, bias=False, padding='SAME')),
+                                       stride=stride, dilation=1, bias=with_bias, padding='SAME')),
                 ('batchnorm', nn.BatchNorm2d(out_chan, eps=0.001)),
                 ('relu', nn.ReLU(inplace=True))
             ])))
