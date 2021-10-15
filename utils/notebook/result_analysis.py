@@ -146,7 +146,7 @@ def show_table(df, filters, groupby_columns, acc_columns, extra_columns=None, fo
     # Latex code
     if print_latex:
         latex = exp_grouped[columns_to_show].to_latex(index=False, formatters=format_dict, escape=False).replace(
-            "\\textasciitilde", "$\\approx$").replace(" ± ", " ±")
+            "\\textasciitilde", "$\\sim$").replace(" ± ", " ±")
         latex = re.sub(r'&\s*', '& ', latex)
 
         print("\n", latex)
