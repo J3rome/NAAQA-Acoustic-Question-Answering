@@ -194,7 +194,7 @@ def process_dataloader(is_training, device, model, dataloader, criterion=None, o
 
         questions = batch['question'].to(device)
         answers = batch['answer'].to(device)
-        seq_lengths = batch['seq_length'].to(device)
+        seq_lengths = batch['seq_length']
 
         # Those are not processed by the network, only used to create statistics. Therefore, no need to copy to GPU
         questions_id = batch['id']
