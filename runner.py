@@ -195,6 +195,9 @@ def process_dataloader(is_training, device, model, dataloader, criterion=None, o
         else:
             images = batch['image']
 
+        if batch_idx == 0:
+            print(f"Image tensor type : {images.type()}")
+
         questions = batch['question'].to(device)
         answers = batch['answer'].to(device)
         seq_lengths = batch['seq_length']
@@ -218,6 +221,8 @@ def process_dataloader(is_training, device, model, dataloader, criterion=None, o
                 correct_in_batch = torch.sum(preds == answers.data).item()
                 running_corrects += correct_in_batch
                 batch_accs.append(correct_in_batch/batch_size)
+
+                print(f"Batch {batch_idx} loss: {loss_value}")
 
             if is_training:
                 loss.backward()
