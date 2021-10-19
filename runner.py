@@ -188,13 +188,13 @@ def process_dataloader(is_training, device, model, dataloader, criterion=None, o
     # w = model.image_pipeline.conv3.conv.weight
     # print(f"image_pipeline.conv3 -- Min : {w.min()} Max : {w.max()} Mean : {w.mean()}  std : {w.std()}")
     w = model.stem_conv.conv.weight
-    print(f"stem_conv -- Min : {w.min()} Max : {w.max()} Mean : {w.mean()}  std : {w.std()}")
+    print(f"stem_conv -- Min : {w.min()} Max : {w.max()} Mean : {w.mean()}  std : {w.std()} type : {w.type()}")
     w = model.resblocks[0].conv1.conv.weight
-    print(f"resblocks[0].conv1-- Min : {w.min()} Max : {w.max()} Mean : {w.mean()}  std : {w.std()}")
+    print(f"resblocks[0].conv1-- Min : {w.min()} Max : {w.max()} Mean : {w.mean()}  std : {w.std()}  type : {w.type()}")
     w = model.resblocks[1].conv1.conv.weight
-    print(f"resblocks[1].conv1-- Min : {w.min()} Max : {w.max()} Mean : {w.mean()}  std : {w.std()}")
+    print(f"resblocks[1].conv1-- Min : {w.min()} Max : {w.max()} Mean : {w.mean()}  std : {w.std()}  type : {w.type()}")
     w = model.classifier.hidden_layer.linear.weight
-    print(f"classifier.hidden_layer.linear.weight -- Min : {w.min()} Max : {w.max()} Mean : {w.mean()}  std : {w.std()}")
+    print(f"classifier.hidden_layer.linear.weight -- Min : {w.min()} Max : {w.max()} Mean : {w.mean()}  std : {w.std()} type : {w.type()}")
 
     images_already_on_gpu = dataloader.dataset.do_transforms_on_device and dataloader.dataset.do_transforms_on_device.startswith('cuda')
 
