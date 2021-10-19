@@ -68,7 +68,7 @@ def get_dataset_stats_and_write(dataset, device, stats_filepath=None, recalculat
         print(f"Loading CLEAR stats from {stats_filepath}")
         return read_json(stats_filepath)
 
-    dataset_copy = CLEAR_dataset.from_dataset_object(dataset, dataset.games)
+    dataset_copy = dataset.__class__.from_dataset_object(dataset, dataset.games)
 
     dataset_copy.keep_1_game_per_scene()
 

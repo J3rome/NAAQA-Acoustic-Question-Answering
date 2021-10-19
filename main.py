@@ -13,6 +13,7 @@ from preprocessing import create_dict_from_questions, images_to_h5, get_lr_finde
 from preprocessing import get_dataset_stats_and_write
 from visualization import visualize_gamma_beta, grad_cam_visualization
 from data_interfaces.CLEAR_dataset import CLEAR_dataset, CLEAR_collate_fct
+from data_interfaces.DAQA_dataset import DAQA_dataset
 #from data_interfaces.CLEVR_dataset import CLEVR_dataset    # FIXME : This is temporarly disabled
 from data_interfaces.transforms import ImgBetweenZeroOne, PadTensor, NormalizeSample, PadTensorHeight
 from data_interfaces.transforms import ResizeTensorBasedOnMaxWidth, RemovePadding, ApplyColormapToSpectrogram
@@ -216,7 +217,11 @@ def create_datasets(args, data_path, load_dataset_extra_stats=False):
     #else:
     #    dataset_class = CLEVR_dataset
 
-    dataset_class = CLEAR_dataset
+    if 'DAQA' not in args['version_name']:
+        dataset_class = CLEAR_dataset
+    else:
+        print("Using DAQA dataset")
+        dataset_class = DAQA_dataset
 
     transforms_device = args['device'] if args['do_transforms_on_gpu'] else None
 
