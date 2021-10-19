@@ -184,6 +184,11 @@ def process_dataloader(is_training, device, model, dataloader, criterion=None, o
     all_questions = []
     nb_written = 0
 
+    # Printing random values
+    import random
+    import numpy as np
+    print(f"Torch random number : {torch.randint(0,9999999,(1,)).item()}  -- Python random number {random.randint(0,9999999)}  -- Numpy random number : {np.random.randint(0,9999999)}")
+
     # printing weights
     # w = model.image_pipeline.conv3.conv.weight
     # print(f"image_pipeline.conv3 -- Min : {w.min()} Max : {w.max()} Mean : {w.mean()}  std : {w.std()}")
