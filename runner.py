@@ -221,6 +221,8 @@ def process_dataloader(is_training, device, model, dataloader, criterion=None, o
 
                 if batch_idx == 0:
                     print(f"Batch {batch_idx} loss: {loss_value}")
+                    print("Ids : ")
+                    print(questions_id)
 
             if is_training:
                 loss.backward()
