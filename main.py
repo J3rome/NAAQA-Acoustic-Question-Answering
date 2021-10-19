@@ -528,6 +528,7 @@ def prepare_for_task(args):
     #   Argument & Config parsing
     ####################################
     args, task, flags, paths = get_args_task_flags_paths(args)
+    args['use_cpu'] = True
     if torch.cuda.is_available() and not args['use_cpu']:
         device = f'cuda:{args["gpu_index"]}'
         torch.cuda.set_device(args['gpu_index'])
