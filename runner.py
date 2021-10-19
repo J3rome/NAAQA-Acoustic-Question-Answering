@@ -153,9 +153,6 @@ def prepare_model(args, flags, paths, dataloaders, device, model_config, input_i
             torch.backends.cudnn.benchmark = False
             torch.backends.cudnn.deterministic = True
 
-            if torch.__version__.startswith('1.7'):
-                torch.set_deterministic(True)
-
     film_model.to(device)
     film_model.eval()
 
@@ -222,7 +219,8 @@ def process_dataloader(is_training, device, model, dataloader, criterion=None, o
                 running_corrects += correct_in_batch
                 batch_accs.append(correct_in_batch/batch_size)
 
-                print(f"Batch {batch_idx} loss: {loss_value}")
+                if batch_idx == 0:
+                    print(f"Batch {batch_idx} loss: {loss_value}")
 
             if is_training:
                 loss.backward()
