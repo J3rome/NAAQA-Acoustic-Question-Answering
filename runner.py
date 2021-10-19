@@ -184,6 +184,18 @@ def process_dataloader(is_training, device, model, dataloader, criterion=None, o
     all_questions = []
     nb_written = 0
 
+    # printing weights
+    # w = model.image_pipeline.conv3.conv.weight
+    # print(f"image_pipeline.conv3 -- Min : {w.min()} Max : {w.max()} Mean : {w.mean()}  std : {w.std()}")
+    w = model.stem_conv.conv.weight
+    print(f"stem_conv -- Min : {w.min()} Max : {w.max()} Mean : {w.mean()}  std : {w.std()}")
+    w = model.resblocks[0].conv1.conv.weight
+    print(f"resblocks[0].conv1-- Min : {w.min()} Max : {w.max()} Mean : {w.mean()}  std : {w.std()}")
+    w = model.resblocks[1].conv1.conv.weight
+    print(f"resblocks[1].conv1-- Min : {w.min()} Max : {w.max()} Mean : {w.mean()}  std : {w.std()}")
+    w = model.classifier.hidden_layer.linear.weight
+    print(f"classifier.hidden_layer.linear.weight -- Min : {w.min()} Max : {w.max()} Mean : {w.mean()}  std : {w.std()}")
+
     images_already_on_gpu = dataloader.dataset.do_transforms_on_device and dataloader.dataset.do_transforms_on_device.startswith('cuda')
 
     for batch_idx, batch in enumerate(tqdm(dataloader)):
@@ -221,8 +233,6 @@ def process_dataloader(is_training, device, model, dataloader, criterion=None, o
 
                 if batch_idx == 0:
                     print(f"Batch {batch_idx} loss: {loss_value}")
-                    print("Ids : ")
-                    print(questions_id)
 
             if is_training:
                 loss.backward()
