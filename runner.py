@@ -153,9 +153,6 @@ def prepare_model(args, flags, paths, dataloaders, device, model_config, input_i
             torch.backends.cudnn.benchmark = False
             torch.backends.cudnn.deterministic = True
 
-            if torch.__version__.startswith('1.7'):
-                torch.set_deterministic(True)
-
     film_model.to(device)
     film_model.eval()
 
