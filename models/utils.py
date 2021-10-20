@@ -1,6 +1,9 @@
+import math
+
 import torch
 from torch import nn
 import torch.nn.functional as F
+import numpy as np
 
 # Replicate tensorflow 'SAME' padding (Taken from https://github.com/mlperf/inference/blob/master/others/edge/object_detection/ssd_mobilenet/pytorch/utils.py#L40)
 class Conv2d_padded(nn.Conv2d):
@@ -112,6 +115,53 @@ def pad2d_and_cat_tensors(tensors, pad_mode="end"):
         tensors[i] = F.pad(tensor, padding)
 
     return torch.cat(tensors, dim=1)
+
+
+def reproducible_uniform_(tensor, lower_bound, higher_bound):
+    """
+    For some reason, we get inconsistent results when the tensor.uniform_ method is called from different machines
+    This lead to difference in initialization which hinder our capability to reproduce the results.
+    We use numpy to generate the uniform distribution instead of torch implementation
+    """
+
+    uniform_distribution = torch.tensor(np.random.uniform(lower_bound, higher_bound, tensor.shape),
+                                        device=tensor.device, dtype=tensor.dtype)
+    # FIXME : There is most probably a more efficient way to replace the tensor data
+    tensor.data.copy_(uniform_distribution.data)
+
+    return tensor
+
+
+def reproducible_xavier_init_(tensor, gain=1.):
+    fan_in, fan_out = torch.nn.init._calculate_fan_in_and_fan_out(tensor)
+    std = gain * math.sqrt(2.0 / float(fan_in + fan_out))
+    a = math.sqrt(3.0) * std  # Calculate uniform bounds from standard deviation
+
+    reproducible_uniform_(tensor, -a, a)
+
+    return tensor
+
+
+def reproducible_kaiming_uniform_init_(tensor, a=0, mode='fan_in', nonlinearity='leaky_relu'):
+    fan = torch.nn.init._calculate_correct_fan(tensor, mode)
+    gain = torch.nn.init.calculate_gain(nonlinearity, a)
+    std = gain / math.sqrt(fan)
+    bound = math.sqrt(3.0) * std  # Calculate uniform bounds from standard deviation
+
+    return reproducible_uniform_(tensor, -bound, bound)
+
+
+def reproducible_initialize_model_weights(model):
+    def initialize(layer):
+        if isinstance(layer, (torch.nn.Linear, torch.nn.Conv2d)):
+            reproducible_kaiming_uniform_init_(layer.weight)
+
+            if layer.bias is not None:
+                fan_in, _ = torch.nn.init._calculate_fan_in_and_fan_out(layer.weight)
+                bound = 1 / math.sqrt(fan_in)
+                reproducible_uniform_(layer.bias, -bound, bound)
+
+    model.apply(initialize)
 
 
 def get_trainable_childs(model):

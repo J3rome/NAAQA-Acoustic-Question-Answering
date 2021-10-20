@@ -14,6 +14,7 @@ from models.CLEAR_film_model import CLEAR_FiLM_model
 from data_interfaces.CLEAR_dataset import CLEAR_dataset
 from models.metrics import calc_f1_score
 from models.LR_scheduler import ReduceLROnPlateau
+from models.utils import reproducible_initialize_model_weights
 from utils.generic import save_batch_metrics, sort_stats, save_training_stats, chain_load_experiment_stats
 from utils.generic import optimizer_load_state_dict
 from utils.random import get_random_state, set_random_state
@@ -138,6 +139,9 @@ def prepare_model(args, flags, paths, dataloaders, device, model_config, input_i
                 scheduler.load_state_dict(checkpoint['scheduler_state_dict'])
             else:
                 print(">>>> Scheduler params changed, not loading from checkpoint. MAKE SURE THIS IS YOUR EXPECTED BEHAVIOUR.")
+    else:
+        # Reinitialize weight so that the behavior is fully reproducible
+        reproducible_initialize_model_weights(film_model)
 
     if args['continue_training']:
         # Recover stats from previous run
