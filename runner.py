@@ -199,13 +199,13 @@ def process_dataloader(is_training, device, model, dataloader, criterion=None, o
     # w = model.image_pipeline.conv3.conv.weight
     # print(f"image_pipeline.conv3 -- Min : {w.min()} Max : {w.max()} Mean : {w.mean()}  std : {w.std()}")
     w = model.stem_conv.conv.weight
-    print(f"stem_conv -- Min : {w.min()} Max : {w.max()} Mean : {w.mean()}  std : {w.std()} sum: {w.sum().item()} Unique : {len(w.unique())}/{len(w.unique())} Median : {w.median().item()}")
+    print(f"stem_conv -- Min : {w.min()} Max : {w.max()} Mean : {w.mean()}  std : {w.std()} sum: {w.sum().item()} Unique : {len(w.unique())}/{np.prod(w.shape)} Median : {w.median().item()}")
     w = model.resblocks[0].conv1.conv.weight
-    print(f"resblocks[0].conv1-- Min : {w.min()} Max : {w.max()} Mean : {w.mean()}  std : {w.std()} sum: {w.sum().item()} Unique : {len(w.unique())}/{len(w.unique())} Median : {w.median().item()}")
+    print(f"resblocks[0].conv1-- Min : {w.min()} Max : {w.max()} Mean : {w.mean()}  std : {w.std()} sum: {w.sum().item()} Unique : {len(w.unique())}/{np.prod(w.shape)} Median : {w.median().item()}")
     w = model.resblocks[1].conv1.conv.weight
-    print(f"resblocks[1].conv1-- Min : {w.min()} Max : {w.max()} Mean : {w.mean()}  std : {w.std()} sum: {w.sum().item()} Unique : {len(w.unique())}/{len(w.unique())} Median : {w.median().item()}")
+    print(f"resblocks[1].conv1-- Min : {w.min()} Max : {w.max()} Mean : {w.mean()}  std : {w.std()} sum: {w.sum().item()} Unique : {len(w.unique())}/{np.prod(w.shape)} Median : {w.median().item()}")
     w = model.classifier.hidden_layer.linear.weight
-    print(f"classifier.hidden_layer.linear -- Min : {w.min()} Max : {w.max()} Mean : {w.mean()}  std : {w.std()} sum: {w.sum().item()} Unique : {len(w.unique())}/{len(w.unique())} Median : {w.median().item()}")
+    print(f"classifier.hidden_layer.linear -- Min : {w.min()} Max : {w.max()} Mean : {w.mean()}  std : {w.std()} sum: {w.sum().item()} Unique : {len(w.unique())}/{np.prod(w.shape)} Median : {w.median().item()}")
 
     exit(0)
 
