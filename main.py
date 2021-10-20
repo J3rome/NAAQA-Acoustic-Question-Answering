@@ -528,7 +528,7 @@ def prepare_for_task(args):
     #   Argument & Config parsing
     ####################################
     args, task, flags, paths = get_args_task_flags_paths(args)
-    args['use_cpu'] = True
+    #args['use_cpu'] = True
     if torch.cuda.is_available() and not args['use_cpu']:
         device = f'cuda:{args["gpu_index"]}'
         torch.cuda.set_device(args['gpu_index'])
@@ -586,15 +586,8 @@ def prepare_for_task(args):
 
         input_image_torch_shape = datasets['train'].get_input_shape(channel_first=True)  # Torch size have Channel as first dimension
 
-        # Printing random values
-        import random
-        import numpy as np
-        print("Before model creation : ")
-        print(f"Torch random number : {torch.randint(0, 9999999, (1,)).item()}  -- Python random number {random.randint(0, 9999999)}  -- Numpy random number : {np.random.randint(0, 9999999)}")
         film_model, optimizer, loss_criterion, scheduler = prepare_model(args, flags, paths, dataloaders, device,
                                                                          film_model_config, input_image_torch_shape)
-        print("After model creation : ")
-        print(f"Torch random number : {torch.randint(0, 9999999, (1,)).item()}  -- Python random number {random.randint(0, 9999999)}  -- Numpy random number : {np.random.randint(0, 9999999)}")
 
         if flags['create_output_folder']:
             save_model_config(args, paths, film_model_config)

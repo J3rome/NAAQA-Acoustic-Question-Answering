@@ -184,22 +184,30 @@ def process_dataloader(is_training, device, model, dataloader, criterion=None, o
     all_questions = []
     nb_written = 0
 
+    #import math
+    #test_tensor = torch.ones([19, 230, 200])
+
+    #torch.nn.init.kaiming_uniform_(test_tensor, a=math.sqrt(5))
+
     # Printing random values
     import random
     import numpy as np
+
     print(f"Torch random number : {torch.randint(0,9999999,(1,)).item()}  -- Python random number {random.randint(0,9999999)}  -- Numpy random number : {np.random.randint(0,9999999)}")
 
     # printing weights
     # w = model.image_pipeline.conv3.conv.weight
     # print(f"image_pipeline.conv3 -- Min : {w.min()} Max : {w.max()} Mean : {w.mean()}  std : {w.std()}")
     w = model.stem_conv.conv.weight
-    print(f"stem_conv -- Min : {w.min()} Max : {w.max()} Mean : {w.mean()}  std : {w.std()} type : {w.type()}")
+    print(f"stem_conv -- Min : {w.min()} Max : {w.max()} Mean : {w.mean()}  std : {w.std()} sum: {w.sum().item()} Unique : {len(w.unique())}/{len(w.unique())} Median : {w.median().item()}")
     w = model.resblocks[0].conv1.conv.weight
-    print(f"resblocks[0].conv1-- Min : {w.min()} Max : {w.max()} Mean : {w.mean()}  std : {w.std()}  type : {w.type()}")
+    print(f"resblocks[0].conv1-- Min : {w.min()} Max : {w.max()} Mean : {w.mean()}  std : {w.std()} sum: {w.sum().item()} Unique : {len(w.unique())}/{len(w.unique())} Median : {w.median().item()}")
     w = model.resblocks[1].conv1.conv.weight
-    print(f"resblocks[1].conv1-- Min : {w.min()} Max : {w.max()} Mean : {w.mean()}  std : {w.std()}  type : {w.type()}")
+    print(f"resblocks[1].conv1-- Min : {w.min()} Max : {w.max()} Mean : {w.mean()}  std : {w.std()} sum: {w.sum().item()} Unique : {len(w.unique())}/{len(w.unique())} Median : {w.median().item()}")
     w = model.classifier.hidden_layer.linear.weight
-    print(f"classifier.hidden_layer.linear.weight -- Min : {w.min()} Max : {w.max()} Mean : {w.mean()}  std : {w.std()} type : {w.type()}")
+    print(f"classifier.hidden_layer.linear -- Min : {w.min()} Max : {w.max()} Mean : {w.mean()}  std : {w.std()} sum: {w.sum().item()} Unique : {len(w.unique())}/{len(w.unique())} Median : {w.median().item()}")
+
+    exit(0)
 
     images_already_on_gpu = dataloader.dataset.do_transforms_on_device and dataloader.dataset.do_transforms_on_device.startswith('cuda')
 
@@ -208,9 +216,6 @@ def process_dataloader(is_training, device, model, dataloader, criterion=None, o
             images = batch['image'].to(device, non_blocking=True)
         else:
             images = batch['image']
-
-        if batch_idx == 0:
-            print(f"Image tensor type : {images.type()}")
 
         questions = batch['question'].to(device)
         answers = batch['answer'].to(device)
