@@ -14,6 +14,7 @@ from models.CLEAR_film_model import CLEAR_FiLM_model
 from data_interfaces.CLEAR_dataset import CLEAR_dataset
 from models.metrics import calc_f1_score
 from models.LR_scheduler import ReduceLROnPlateau
+from models.utils import initialize_weights
 from utils.generic import save_batch_metrics, sort_stats, save_training_stats, chain_load_experiment_stats
 from utils.generic import optimizer_load_state_dict
 from utils.random import get_random_state, set_random_state
@@ -138,6 +139,9 @@ def prepare_model(args, flags, paths, dataloaders, device, model_config, input_i
                 scheduler.load_state_dict(checkpoint['scheduler_state_dict'])
             else:
                 print(">>>> Scheduler params changed, not loading from checkpoint. MAKE SURE THIS IS YOUR EXPECTED BEHAVIOUR.")
+    else:
+        print("Initializing weights")
+        initialize_weights(film_model)
 
     if args['continue_training']:
         # Recover stats from previous run
@@ -193,21 +197,22 @@ def process_dataloader(is_training, device, model, dataloader, criterion=None, o
     import random
     import numpy as np
 
-    print(f"Torch random number : {torch.randint(0,9999999,(1,)).item()}  -- Python random number {random.randint(0,9999999)}  -- Numpy random number : {np.random.randint(0,9999999)}")
+    with torch.no_grad():
+        print(f"Torch random number : {torch.randint(0,9999999,(1,)).item()}  -- Python random number {random.randint(0,9999999)}  -- Numpy random number : {np.random.randint(0,9999999)}")
 
-    # printing weights
-    # w = model.image_pipeline.conv3.conv.weight
-    # print(f"image_pipeline.conv3 -- Min : {w.min()} Max : {w.max()} Mean : {w.mean()}  std : {w.std()}")
-    w = model.stem_conv.conv.weight
-    print(f"stem_conv -- Min : {w.min()} Max : {w.max()} Mean : {w.mean()}  std : {w.std()} sum: {w.sum().item()} Unique : {len(w.unique())}/{np.prod(w.shape)} Median : {w.median().item()}")
-    w = model.resblocks[0].conv1.conv.weight
-    print(f"resblocks[0].conv1-- Min : {w.min()} Max : {w.max()} Mean : {w.mean()}  std : {w.std()} sum: {w.sum().item()} Unique : {len(w.unique())}/{np.prod(w.shape)} Median : {w.median().item()}")
-    w = model.resblocks[1].conv1.conv.weight
-    print(f"resblocks[1].conv1-- Min : {w.min()} Max : {w.max()} Mean : {w.mean()}  std : {w.std()} sum: {w.sum().item()} Unique : {len(w.unique())}/{np.prod(w.shape)} Median : {w.median().item()}")
-    w = model.classifier.hidden_layer.linear.weight
-    print(f"classifier.hidden_layer.linear -- Min : {w.min()} Max : {w.max()} Mean : {w.mean()}  std : {w.std()} sum: {w.sum().item()} Unique : {len(w.unique())}/{np.prod(w.shape)} Median : {w.median().item()}")
+        # printing weights
+        # w = model.image_pipeline.conv3.conv.weight
+        # print(f"image_pipeline.conv3 -- Min : {w.min()} Max : {w.max()} Mean : {w.mean()}  std : {w.std()}")
+        w = model.stem_conv.conv.weight
+        print(f"stem_conv -- Min : {w.min()} Max : {w.max()} Mean : {w.mean()}  std : {w.std()} sum: {w.sum().item()} Unique : {len(w.unique())}/{np.prod(w.shape)} Median : {w.median().item()}")
+        w = model.resblocks[0].conv1.conv.weight
+        print(f"resblocks[0].conv1-- Min : {w.min()} Max : {w.max()} Mean : {w.mean()}  std : {w.std()} sum: {w.sum().item()} Unique : {len(w.unique())}/{np.prod(w.shape)} Median : {w.median().item()}")
+        w = model.resblocks[1].conv1.conv.weight
+        print(f"resblocks[1].conv1-- Min : {w.min()} Max : {w.max()} Mean : {w.mean()}  std : {w.std()} sum: {w.sum().item()} Unique : {len(w.unique())}/{np.prod(w.shape)} Median : {w.median().item()}")
+        w = model.classifier.hidden_layer.linear.weight
+        print(f"classifier.hidden_layer.linear -- Min : {w.min()} Max : {w.max()} Mean : {w.mean()}  std : {w.std()} sum: {w.sum().item()} Unique : {len(w.unique())}/{np.prod(w.shape)} Median : {w.median().item()}")
 
-    exit(0)
+        exit(0)
 
     images_already_on_gpu = dataloader.dataset.do_transforms_on_device and dataloader.dataset.do_transforms_on_device.startswith('cuda')
 

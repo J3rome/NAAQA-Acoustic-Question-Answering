@@ -114,6 +114,20 @@ def pad2d_and_cat_tensors(tensors, pad_mode="end"):
     return torch.cat(tensors, dim=1)
 
 
+def initialize_weights(model):
+    def initialize(layer):
+        if isinstance(layer, (torch.nn.Linear, torch.nn.Conv2d)):
+            print("init weights")
+            torch.nn.init.xavier_uniform_(layer.weight)
+
+            if layer.bias is not None:
+                print("Init bias")
+                torch.nn.init.zeros_(layer.bias)
+
+    print("Initializing weights")
+    model.apply(initialize)
+
+
 def get_trainable_childs(model):
     to_init = []
 
