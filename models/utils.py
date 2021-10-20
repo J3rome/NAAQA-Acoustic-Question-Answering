@@ -113,12 +113,30 @@ def pad2d_and_cat_tensors(tensors, pad_mode="end"):
 
     return torch.cat(tensors, dim=1)
 
+import math
+import numpy as np
+def reproducible_xavier_init(tensor, gain=1.):
+    # For some reason, we get inconsistent results when the tensor.uniform_ method is called from different machines
+    # This lead to difference in initialization which hinder our capability to reproduce the results.
+    # We use numpy to generate the uniform distribution instead of torch implementation
+
+    # Code taken from torch.nn.init.xavier_uniform_
+    fan_in, fan_out = torch.nn.init._calculate_fan_in_and_fan_out(tensor)
+    std = gain * math.sqrt(2.0 / float(fan_in + fan_out))
+    a = math.sqrt(3.0) * std  # Calculate uniform bounds from standard deviation
+
+    # FIXME : There is most probably a more efficient way to replace the tensor data with our uniform distribution
+    initialized_values = torch.tensor(np.random.uniform(-a, a, tensor.shape), device=tensor.device, dtype=tensor.dtype)
+    tensor.data.copy_(initialized_values.data)
+
+    return tensor
 
 def initialize_weights(model):
     def initialize(layer):
         if isinstance(layer, (torch.nn.Linear, torch.nn.Conv2d)):
             print("init weights")
-            torch.nn.init.xavier_uniform_(layer.weight)
+            #torch.nn.init.xavier_uniform_(layer.weight)
+            reproducible_xavier_init(layer.weight)
 
             if layer.bias is not None:
                 print("Init bias")
