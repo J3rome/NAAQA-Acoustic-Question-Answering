@@ -75,7 +75,7 @@ class DAQA_dataset(Dataset):
         if questions is None:
             question_file_path = '{}/questions/daqa_{}_questions_answers.json'.format(self.root_folder_path, self.set)
 
-            questions = read_json(question_file_path)["questions"][:400]
+            questions = read_json(question_file_path)["questions"]
 
         scene_file_path = '{}/narratives/daqa_{}_narratives.json'.format(self.root_folder_path, self.set)
         if os.path.isfile(scene_file_path):
