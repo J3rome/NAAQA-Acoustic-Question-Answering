@@ -4,7 +4,7 @@
 ## Installing requirements (Ubuntu 20.04)
 ```
 sudo apt install python3.8-venv
-sudo apt install libpq-dev libhdf5-dev cython3 python-dev libfreetype6-dev nvidia-cuda-toolkit
+sudo apt install libpq-dev libhdf5-dev cython3 python-dev libfreetype6-dev
 ```
 
 For automatically synching with google doc (but need to configure ~/.config/rclone/rclone.conf):
