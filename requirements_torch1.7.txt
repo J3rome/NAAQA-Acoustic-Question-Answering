@@ -1,0 +1,16 @@
+wheel
+numpy==1.19.1 
+matplotlib==3.1.1 
+torch==1.7.1+cu110 
+torchvision==0.8.2+cu110 
+torchaudio==0.7.2
+torchsummary==1.5.1 
+tqdm==4.25.0 
+h5py==2.8.0 
+plotly==4.1.0 
+sklearn==0.0 
+tsnecuda==0.1.1 
+nltk==3.3 
+tensorboardX==1.8 
+pandas==0.25.3
+ujson==2.0.3
