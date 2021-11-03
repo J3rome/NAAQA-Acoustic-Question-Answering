@@ -18,6 +18,7 @@ from data_interfaces.DAQA_dataset import DAQA_dataset
 from data_interfaces.transforms import ImgBetweenZeroOne, PadTensor, NormalizeSample, PadTensorHeight
 from data_interfaces.transforms import ResizeTensorBasedOnMaxWidth, RemovePadding, ApplyColormapToSpectrogram
 from data_interfaces.transforms import GenerateMelSpectrogram, GenerateSpectrogram, ResampleAudio
+from data_interfaces.transforms import RepeatSpectrogramChannels
 
 from utils.file import save_model_config, save_json, read_json, create_symlink_to_latest_folder
 from utils.file import create_folders_save_args, fix_best_epoch_symlink_if_necessary
@@ -99,6 +100,8 @@ parser.add_argument("--spectrogram_keep_freq_point", help="Number of frequency p
                     type=int, default=None)
 parser.add_argument("--spectrogram_rgb", help="Spectrograms will be converted to 3 channels RGB images "
                                               "(colormap on spectrogram)", action='store_true')
+parser.add_argument("--spectrogram_repeat_channels", help="The spectrogram will first channel will be repeated 3 times "
+                                              "(Resnet compatibility)", action='store_true')
 
 parser.add_argument("--resample_audio_to", help="Define the new sampling frequency for the audio signal",
                     type=float, default=None)
@@ -344,6 +347,17 @@ def set_transforms_on_datasets(args, datasets, transforms_device):
                                                 batch_size=args['batch_size'],
                                                 nb_dataloader_worker=args['nb_dataloader_worker'],
                                                 recalculate=args['force_mean_recalculate'])
+
+    if args['spectrogram_repeat_channels']:
+        # Will copy the first channel to create an image with 3 channels
+        # (Resnet pretrained model expect 3 channels input)
+        transform = RepeatSpectrogramChannels()
+        for dataset in datasets.values():
+            dataset.add_transform(transform)
+
+        # The statistics are the same for each channels since we repeat them
+        stats['mean'] = 3 * stats['mean']
+        stats['std'] = 3 * stats['std']
 
     # TODO : Add data augmentation ?
 

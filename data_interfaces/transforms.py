@@ -150,6 +150,16 @@ class MelScale(torch.nn.Module):
         return mel_specgram
 
 
+class RepeatSpectrogramChannels(object):
+    """
+    Will copy the first channel to create an image with 3 channels (Resnet pretrained model expect 3 channels input)
+    """
+    def __call__(self, sample):
+
+        sample['image'] = sample['image'].repeat(3, 1, 1)
+
+        return sample
+
 class ApplyColormapToSpectrogram(object):
     """
     Will use matplotlib colormap to convert 1 Channel image (Spectrogram) to 3 Channels RGB images (Colored spectrogram)
