@@ -237,6 +237,7 @@ def images_to_h5(device, dataloaders, output_folder_name='preprocessed', feature
             h5_idx = 0
             for batch in tqdm(dataloader):
                 features = batch['image']
+
                 if feature_extractor:
                     features.to(device)
                     with torch.set_grad_enabled(False):
@@ -259,8 +260,8 @@ def images_to_h5(device, dataloaders, output_folder_name='preprocessed', feature
 
 
 # >>> Dictionary Creation (For word tokenization)
-def create_dict_from_questions(dataset, word_min_occurence=1, dict_filename='dict.json', force_all_answers=False,
-                               output_folder_name='preprocessed', start_end_tokens=True):
+def create_dict_from_questions(dataset, word_min_occurence=1, dict_filename='dict.json', force_all_answers=True,
+                               output_folder_name='questions', start_end_tokens=True):
     word2i = {'<padding>': 0,
               '<unk>': 1
               }
