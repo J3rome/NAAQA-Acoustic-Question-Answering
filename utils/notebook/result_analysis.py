@@ -66,7 +66,11 @@ def show_table(df, filters, groupby_columns, acc_columns, extra_columns=None, fo
                mean_std_col=False, display_all=False, hardcoded_cols=None,
                show_count_col=False, inplace_std=False, remove_outliers=False, print_latex=True, nb_to_keep=None,
                all_seeds=None):
-    exp = df[filters]
+
+    if filters is not None:
+        exp = df[filters]
+    else:
+        exp = df
 
     if extra_columns is None:
         extra_columns = []
@@ -77,6 +81,8 @@ def show_table(df, filters, groupby_columns, acc_columns, extra_columns=None, fo
     if all_seeds is not None:
         print_missing_seeds(exp, groupby_columns, all_seeds)
 
+    main_acc_attribute = acc_columns[0]
+
     # Drop duplicates (Same experiment ran multiple time)
     exp = exp.sort_values('date', ascending=False).drop_duplicates(
         [*groupby_columns, 'random_seed', 'input_type', 'config'], keep='first')
@@ -85,7 +91,7 @@ def show_table(df, filters, groupby_columns, acc_columns, extra_columns=None, fo
         exp = filter_outliers(exp, groupby_columns)
 
     if nb_to_keep is not None:
-        exp = keep_x_best(exp, groupby_columns, nb_to_keep, 'test_acc')
+        exp = keep_x_best(exp, groupby_columns, nb_to_keep, main_acc_attribute)
 
     # Grouping - Mean & Std calc
     acc_std_columns = [f"{c}_std" for c in acc_columns]
@@ -96,17 +102,19 @@ def show_table(df, filters, groupby_columns, acc_columns, extra_columns=None, fo
     if display_all:
         all_exp = exp.sort_values([*groupby_columns, 'random_seed'], ascending=False)[columns_to_show]
         display(color_by_multi_attribute(all_exp,
-                                         main_attribute='test_acc',
+                                         main_attribute=main_acc_attribute,
                                          attributes=groupby_columns,
                                          format_dict=format_dict))
 
     exp_grouped = groupby_mean(exp, groupby_columns, acc_columns, columns, add_count_col=show_count_col,
-                               add_std_str=True, inplace_std_str=inplace_std).sort_values('test_acc',
+                               add_std_str=True, inplace_std_str=inplace_std).sort_values(main_acc_attribute,
                                                                                           ascending=False).reset_index(
         drop=True)
 
     if hardcoded_cols is not None:
         for col_name, col_conf in hardcoded_cols.items():
+
+            assert exp_grouped.shape[0] == len(col_conf['values']), "Hardcoded columns shape don't match dataframe"
 
             if col_conf['type'] == "replace_groupby":
                 columns_to_show = [c for c in columns_to_show if c not in groupby_columns]
@@ -135,7 +143,7 @@ def show_table(df, filters, groupby_columns, acc_columns, extra_columns=None, fo
 
     exp_grouped = exp_grouped[columns_to_show]
 
-    main_attribute_to_color = 'test_acc' if not inplace_std else 'test_acc_std'
+    main_attribute_to_color = main_acc_attribute if not inplace_std else f'{main_acc_attribute}_std'
 
     # Color display
     display(color_by_multi_attribute(exp_grouped, main_attribute=main_attribute_to_color,

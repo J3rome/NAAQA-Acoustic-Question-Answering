@@ -12,12 +12,12 @@ from utils.generic import get_answer_to_family_map
 
 def to_float(string):
     # Conversion with None handling
-    return float(string) if string else None
+    return float(string) if string or string == 0 else None
 
 
 def to_int(string):
     # Conversion with None handling
-    return int(string) if string else None
+    return int(string) if string or string == 0 else None
 
 
 def get_max_freq(exp):
@@ -41,8 +41,11 @@ def load_test_questions(data_folder):
     return None
 
 
-def get_acc_per_q_type(exp_folder_path, exp, test_questions, answer_to_family_map, force_recalc=False):
+def get_acc_per_q_type(exp_folder_path, exp, test_questions, answer_to_family_map, test_pred_path, force_recalc=False, cogent=False):
     per_q_acc_stats_path = f"{exp_folder_path}/test_stats_per_q.json"
+
+    if "cogent" in test_pred_path:
+        per_q_acc_stats_path = per_q_acc_stats_path.replace(".json", "_cogent.json")
 
     if os.path.exists(per_q_acc_stats_path) and not force_recalc:
         per_family_acc = read_json(per_q_acc_stats_path)
@@ -50,7 +53,6 @@ def get_acc_per_q_type(exp_folder_path, exp, test_questions, answer_to_family_ma
     else:
         print("Calculating per question accuracies")
         per_family_acc = {}
-        test_pred_path = f"{exp_folder_path}/test_predictions.json"
 
         test_preds = read_json(test_pred_path)       # FIXME: Will raise exception if file doesn't exist
 
@@ -195,10 +197,15 @@ def get_acc_per_q_type(exp_folder_path, exp, test_questions, answer_to_family_ma
 
 
 def get_experiments(experiment_result_path, exp_prefix=None, data_folder="data/CLEAR_50k_4_inst_audio",
-                    question_type_analysis=True, min_date=None):
+                    cogent_data_folder="data/CLEAR_cogent_50k_4_inst_audio", question_type_analysis=True, min_date=None,
+                    cogent_analysis=False):
     experiments = []
     if question_type_analysis:
-        test_questions = load_test_questions(data_folder)
+
+        if not cogent_analysis:
+            test_questions = load_test_questions(data_folder)
+        else:
+            test_questions = load_test_questions(cogent_data_folder)
 
         answer_to_family_map = get_answer_to_family_map(f'{data_folder}/attributes.json')
 
@@ -207,10 +214,17 @@ def get_experiments(experiment_result_path, exp_prefix=None, data_folder="data/C
             question_type_analysis = False
 
     if min_date:
-        min_date = datetime.strptime(min_date, '%Y-%m-%d_%Hh%M')
+        if '_' in min_date:
+            format_str = '%Y-%m-%d_%Hh%M'
+        else:
+            format_str = '%Y-%m-%d'
+
+        min_date = datetime.strptime(min_date, format_str)
 
     for exp_folder in os.listdir(experiment_result_path):
         exp_folder_path = f'{experiment_result_path}/{exp_folder}'
+
+        do_question_type_analysis = question_type_analysis
 
         if not os.path.isdir(exp_folder_path):
             continue
@@ -225,24 +239,37 @@ def get_experiments(experiment_result_path, exp_prefix=None, data_folder="data/C
                 # We skip the 'latest' symlink
                 continue
 
-            if 'best' not in os.listdir(exp_dated_folder_path):
+            # A random id might be appended to the experiment folder when uploaded to drive, remove it
+            date_folder = re.sub(r'-\d+$', '', date_folder)
+            experiment_date = datetime.strptime(date_folder, '%Y-%m-%d_%Hh%M')
+
+            if min_date and experiment_date < min_date:
+                # Skip experiments older than min_date, reduce loading time
+                continue
+
+            file_list = os.listdir(exp_dated_folder_path)
+            if 'best' not in file_list or 'test_predictions.json' not in file_list:
                 # Failed experiment. Was stopped before first epoch could be saved
                 print(f"Failed experiment -- {exp_dated_folder_path}")
+                print('==========================')
                 continue
 
             # Load arguments
             arguments = read_json(f"{exp_dated_folder_path}/arguments.json")
 
             # Retrieve Prefix, nb_scene and nb_question_per_scene from version name
-            matches = re.match('(.*)_(\d+)k_(\d+)_(.*)', arguments['version_name'])
+            if 'DAQA' not in arguments['version_name']:
+                matches = re.match('(.*)_(\d+)k_(\d+)_(.*)', arguments['version_name'])
 
-            if not matches:
-                continue
+                if not matches:
+                    continue
 
-            matches = matches.groups()
+                matches = matches.groups()
 
-            # A random id might be appended to the experiment folder when uploaded to drive, remove it
-            date_folder = re.sub(r'-\d+$', '', date_folder)
+            else:
+                matches = ['DAQA', 0, 0]
+
+                do_question_type_analysis = False
 
             experiment = {
                 'prefix': matches[0],
@@ -252,14 +279,10 @@ def get_experiments(experiment_result_path, exp_prefix=None, data_folder="data/C
                 'nb_epoch': arguments['nb_epoch'],
                 'stop_accuracy': arguments['stop_at_val_acc'],
                 'random_seed': arguments['random_seed'],
-                'date': datetime.strptime(date_folder, '%Y-%m-%d_%Hh%M'),
+                'date': experiment_date,
                 'folder': exp_folder,
                 'folder_dated': f"{exp_folder}/{date_folder}"
             }
-
-            if min_date and experiment['date'] < min_date:
-                # Skip experiments older than min_date, reduce loading time
-                continue
 
             additional_note = arguments['output_name_suffix'].replace(f'_{experiment["nb_epoch"]}_epoch', '').replace(experiment['config'], '').replace(f'_{experiment["random_seed"]}', '').replace(f"_stop_at_{experiment['stop_accuracy']}", '').replace('_resnet_extractor', '').replace('config_', '')
 
@@ -274,6 +297,13 @@ def get_experiments(experiment_result_path, exp_prefix=None, data_folder="data/C
                 additional_note = None
 
             experiment['note'] = additional_note
+
+            experiment['queue'] = experiment['note'].split("__")[-1]
+
+            if 'device' in arguments:
+                experiment['device'] = arguments['device']
+            else:
+                experiment['device'] = None
 
             experiment['nb_sample'] = experiment['nb_scene'] * experiment['nb_q_per_scene']
 
@@ -356,12 +386,6 @@ def get_experiments(experiment_result_path, exp_prefix=None, data_folder="data/C
 
             experiment['reduce_lr_on_plateau'] = arguments.get('reduce_lr_on_plateau', False)
 
-
-            # Question type analysis
-            if question_type_analysis:
-                # FIXME : Should probably add the family columns with NaN ?
-                experiment = get_acc_per_q_type(exp_dated_folder_path, experiment, test_questions, answer_to_family_map)
-
             img_arguments = arguments
 
             if arguments['h5_image_input']:
@@ -399,6 +423,7 @@ def get_experiments(experiment_result_path, exp_prefix=None, data_folder="data/C
             experiment['n_mels'] = img_arguments['spectrogram_n_mels'] if 'mel_spectrogram' in img_arguments and 'spectrogram_n_mels' in img_arguments and img_arguments['mel_spectrogram'] else None
             experiment['resample_audio'] = img_arguments['resample_audio_to'] if 'resample_audio_to' in img_arguments else None
             experiment['max_freq'] = get_max_freq(experiment)
+            experiment['spectrogram_repeat_channels'] = img_arguments['spectrogram_repeat_channels'] if 'spectrogram_repeat_channels' in img_arguments else None
 
             if experiment['input_type'] == 'audio':
                 experiment['input_type'] = 'RGB' if experiment['spectrogram_rgb'] else '1D'
@@ -420,6 +445,46 @@ def get_experiments(experiment_result_path, exp_prefix=None, data_folder="data/C
             experiment['pad_to_largest'] = img_arguments['pad_to_largest_image']
             experiment['resized_height'] = to_int(img_arguments['img_resize_height']) if img_arguments['resize_img'] else None
             experiment['resized_width'] = to_int(img_arguments['img_resize_width']) if img_arguments['resize_img'] else None
+
+
+            # Cogent test set results
+            # TODO : Load spec test result
+            # TODO : Load mel test result
+            # TODO : Define cogent_test_same_type (Choose spec or mel depended on what was the training type)
+            # TODO : Add predictions
+            cogent_spec_test_stats_filepath = f"{exp_dated_folder_path}/cogent_spec_test_stats.json"
+            cogent_mel_test_stats_filepath = f"{exp_dated_folder_path}/cogent_mel_128_test_stats.json"
+            cogent_spec_test_predictions_filepath = f"{exp_dated_folder_path}/cogent_spec_test_predictions.json"
+            cogent_mel_test_predictions_filepath = f"{exp_dated_folder_path}/cogent_mel_128_test_predictions.json"
+
+            experiment['cogent_spec_test_acc'] = None
+            experiment['cogent_spec_test_loss'] = None
+            experiment['cogent_mel_test_acc'] = None
+            experiment['cogent_mel_test_loss'] = None
+            experiment['cogent_test_acc'] = None
+            experiment['cogent_test_loss'] = None
+            if os.path.isfile(cogent_spec_test_stats_filepath):
+                test_stats = read_json(cogent_spec_test_stats_filepath)
+                experiment['cogent_spec_test_acc'] = to_float(test_stats['accuracy'])
+                experiment['cogent_spec_test_loss'] = to_float(test_stats['loss'])
+            else:
+                print(f"[MISSING COGENT] -- {exp_dated_folder_path}")
+
+            if os.path.isfile(cogent_mel_test_stats_filepath):
+                test_stats = read_json(cogent_mel_test_stats_filepath)
+                experiment['cogent_mel_test_acc'] = to_float(test_stats['accuracy'])
+                experiment['cogent_mel_test_loss'] = to_float(test_stats['loss'])
+            else:
+                print(f"[MISSING COGENT] -- {exp_dated_folder_path}")
+
+            if experiment['n_mels'] == 128:
+                experiment['cogent_test_acc'] = experiment['cogent_mel_test_acc']
+                experiment['cogent_test_loss'] = experiment['cogent_mel_test_loss']
+                cogent_test_predictions_filepath = cogent_mel_test_predictions_filepath
+            else:
+                experiment['cogent_test_acc'] = experiment['cogent_spec_test_acc']
+                experiment['cogent_test_loss'] = experiment['cogent_spec_test_loss']
+                cogent_test_predictions_filepath = cogent_spec_test_predictions_filepath
 
             # Load dict
             exp_dict = read_json(f'{exp_dated_folder_path}/dict.json')
@@ -526,6 +591,17 @@ def get_experiments(experiment_result_path, exp_prefix=None, data_folder="data/C
             else:
                 experiment['gpu_name'] = None
 
+            # Question type analysis
+            if do_question_type_analysis:
+                # FIXME : Should probably add the family columns with NaN ?
+                if not cogent_analysis or not os.path.exists(cogent_test_predictions_filepath):
+                    test_pred_path = f"{exp_dated_folder_path}/test_predictions.json"
+                else:
+                    test_pred_path = cogent_test_predictions_filepath
+
+                experiment = get_acc_per_q_type(exp_dated_folder_path, experiment, test_questions,
+                                                answer_to_family_map, test_pred_path)
+
             experiments.append(experiment)
 
     experiments_df = pd.DataFrame(experiments, columns=list(experiments[0].keys()))
@@ -559,7 +635,7 @@ def get_format_dicts():
     ]
 
     def percent_format(x):
-        return "{:.2f}".format(x * 100) if not pd.isnull(x) and x > 0 else None
+        return "{:.2f}".format(x * 100) if not pd.isnull(x) and x > 0 else "NaN"
 
     def std_format(x):
         if type(x) != str:
@@ -572,7 +648,7 @@ def get_format_dicts():
             # For some reason (probably because of float representation) 90.05 doesn't get rounded to 90.1, adding a small value to it make it work.
             return f"{(float(values[0]) + 0.000000001)* 100:.1f} ± {float(values[1]) * 100:.2f}"
         elif nb_values == 1:
-            return f"± {float(values[1]) * 100:.2f}"
+            return f"± {float(values[0]) * 100:.2f}"
         else:
             raise Exception("Format error")
 
@@ -593,7 +669,10 @@ def get_format_dicts():
         'train_acc_std': std_format,
         'test_acc': percent_format,
         'test_acc_std': std_format,
+        'cogent_test_acc': percent_format,
+        'cogent_test_acc_std': std_format,
         'mean_std': std_format,
+        'n_mels': '{:.0f}'.format,
         '0.6_at_epoch': lambda x: x if not pd.isnull(x) and x != 0 else None,
         '0.7_at_epoch': lambda x: x if not pd.isnull(x) and x != 0 else None,
         '0.8_at_epoch': lambda x: x if not pd.isnull(x) and x != 0 else None,
