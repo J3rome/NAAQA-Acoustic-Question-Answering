@@ -123,3 +123,4 @@ ENV/
 *.txt
 *.bak
 /to_clean
+*.pdf
