@@ -127,7 +127,11 @@ def update_arguments(args, task, paths, flags):
                                                            'do inference or to continue training.'
 
         # If path specified is a date, we construct the path to the best model weights for the specified run
-        base_path = f"{args['output_root_path']}/training/{paths['output_name']}/{args['film_model_weight_path']}"
+        splitted_weight_path = args['film_model_weight_path'].split("/")
+        if splitted_weight_path[0].startswith("output") or len(splitted_weight_path[0]) == 0:
+            base_path = args['film_model_weight_path']
+        else:
+            base_path = f"{args['output_root_path']}/training/{paths['output_name']}/{args['film_model_weight_path']}"
         # Note : We might redo some epoch when continuing training because the 'best' epoch is not necessarily the last
         suffix = "best/model.pt.tar"
 
@@ -140,9 +144,11 @@ def update_arguments(args, task, paths, flags):
             clean_base_path = base_path[:-(len(args['film_model_weight_path']) + 1)]
             args['film_model_weight_path'] = '%s/%s/%s' % (clean_base_path, symlink_value, suffix)
 
-        config_base_path = args['film_model_weight_path'].split('/')
+        config_base_path = base_path.split('/')
         if config_base_path[-1] == "model.pt.tar":
             config_base_path = config_base_path[:-2]
+        else:
+            args['film_model_weight_path'] = "%s/%s" % (base_path, suffix)
 
         args['config_path'] = f"{'/'.join(config_base_path)}/config_raw_h5_input.json"   # FIXME : Ideally, we would look in the directory and find the "config*.json" file instead of hardcoding...
 
