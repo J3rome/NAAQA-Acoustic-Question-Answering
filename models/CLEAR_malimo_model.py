@@ -160,8 +160,7 @@ class CLEAR_FiLM_Malimo_model(nn.Module):
 
         # Malimo module
         malimo_rnn_out, malimo_rnn_hidden = self.malimo_rnn(image_vector)
-
-        # TODO : GRU on pooled conv_out and feed to resblock_malimo
+        malimo_rnn_hidden = malimo_rnn_hidden.squeeze(0)
 
         # Question and Audio fusion
         for i, (resblock, resblock_malimo) in enumerate(zip(self.resblocks, self.resblocks_malimo)):
