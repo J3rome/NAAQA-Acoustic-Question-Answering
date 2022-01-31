@@ -130,6 +130,7 @@ parser.add_argument("--film_model_weight_path", type=str, default=None, help="Pa
 parser.add_argument("--feature_extractor_layer_index", type=int, default=6, help="Layer id of the pretrained Resnet")
 parser.add_argument("--no_feature_extractor", help="Raw images won't go through Resnet feature extractor before "
                                                     "training", action='store_true')
+parser.add_argument("--malimo", help="Add a malimo module to the model", action='store_true')
 
 # Training parameters
 parser.add_argument("--nb_epoch", type=int, default=15, help="Nb of epoch for training")

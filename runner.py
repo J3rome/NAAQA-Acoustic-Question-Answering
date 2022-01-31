@@ -11,6 +11,7 @@ from torch.optim.lr_scheduler import CyclicLR
 from torch.utils.data import DataLoader
 
 from models.CLEAR_film_model import CLEAR_FiLM_model
+from models.CLEAR_malimo_model import CLEAR_FiLM_Malimo_model
 from data_interfaces.CLEAR_dataset import CLEAR_dataset
 from models.metrics import calc_f1_score
 from models.LR_scheduler import ReduceLROnPlateau
@@ -29,9 +30,14 @@ def prepare_model(args, flags, paths, dataloaders, device, model_config, input_i
     nb_words, nb_answers = train_dataset.get_token_counts()
     padding_token = train_dataset.get_padding_token()
 
-    film_model = CLEAR_FiLM_model(model_config, input_image_channels=input_image_torch_shape[0],
-                                  nb_words=nb_words, nb_answers=nb_answers,
-                                  sequence_padding_idx=padding_token)
+    if args['malimo']:
+        model = CLEAR_FiLM_Malimo_model
+    else:
+        model = CLEAR_FiLM_model
+
+    film_model = model(model_config, input_image_channels=input_image_torch_shape[0],
+                       nb_words=nb_words, nb_answers=nb_answers,
+                       sequence_padding_idx=padding_token)
 
     # Default values
     optimizer, loss_criterion, scheduler = None, None, None
