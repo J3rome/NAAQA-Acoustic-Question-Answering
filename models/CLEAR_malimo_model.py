@@ -93,7 +93,7 @@ class CLEAR_FiLM_Malimo_model(nn.Module):
                                                       dropout_drop_prob=dropout_drop_prob,
                                                       film_layer_transformation=film_layer_transformation))
 
-                self.resblocks_malimo.append(FiLMed_resblock(in_channels=resblock_out_channels,
+                self.resblocks_malimo.append(FiLMed_resblock(in_channels=resblock_out_channels + len(config['resblock']['spatial_location']),
                                                              out_channels=resblock_out_channels,
                                                              context_size=malimo_hidden_size,
                                                              kernel1=config['resblock']['kernel1'],
