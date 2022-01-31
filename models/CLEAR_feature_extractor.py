@@ -4,6 +4,7 @@ import torch
 from torch import nn
 from models.utils import Conv2d_padded, append_spatial_location, pad2d_and_cat_tensors
 from models.blocks.Freq_Time_Blocks import Freq_Time_Depthwise_Block
+from models.Resnet_feature_extractor import Resnet_feature_extractor
 
 
 class Original_Film_Extractor(nn.Module):
@@ -39,7 +40,7 @@ class Original_Film_Extractor(nn.Module):
 
         if projection_size is not None:
             self.projection = nn.Conv2d(in_channels=in_channels, out_channels=projection_size, kernel_size=[1, 1],
-                                         stride=[1, 1], bias=False)
+                                        stride=[1, 1], bias=True)
         else:
             self.projection = None
 
