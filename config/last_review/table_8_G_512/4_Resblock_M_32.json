@@ -1,0 +1,69 @@
+{
+  "question":{
+    "word_embedding_dim":200,
+    "rnn_state_size":512
+  },
+  "image_extractor":{
+    "type":"freq_time_separated",
+    "out": [8, 16, 32, 64],
+    "freq_kernels": [[3, 1], [3, 1], [3, 1]],
+    "freq_strides": [[2, 1], [2, 1], [2, 1]],
+    "time_kernels": [[1, 3], [1, 3], [1, 3]],
+    "time_strides": [[1, 2], [1, 2], [1, 2]]
+  },
+  "stem":{
+    "spatial_location":true,
+    "conv_out":32,
+    "conv_kernel":[
+      3,
+      3
+    ]
+  },
+  "resblock":{
+    "conv_out": [32, 32, 32, 32],
+    "spatial_location":true,
+    "film_projection_type":"plus",
+    "kernel1":[
+      1,
+      1
+    ],
+    "kernel2":[
+      3,
+      3
+    ]
+  },
+  "classifier":{
+    "spatial_location":true,
+    "type":"fcn",
+    "global_pool_type":"max",
+    "conv_out":512,
+    "conv_kernel":[
+      1,
+      1
+    ],
+    "no_mlp_units":1024,
+    "projection_size":1024
+  },
+  "optimizer":{
+    "type":"adam",
+    "learning_rate":0.0003,
+    "clip_val":0.0,
+    "weight_decay":5e-6,
+    "sgd_momentum":0.0,
+    "dropout_drop_prob":0.25,
+    "cyclical":{
+      "base_learning_rate":0.0001,
+      "max_learning_rate":0.05,
+      "base_momentum":0.85,
+      "max_momentum":0.95,
+      "cycle_length":0.1,
+      "max_learning_rate_scaling_factor":0.9
+    }
+  },
+  "early_stopping":{
+    "enable":true,
+    "wait_first_n_epoch":5,
+    "stop_threshold":6,
+    "min_step":0.0005
+  }
+}
