@@ -281,7 +281,9 @@ def get_experiments(experiment_result_path, exp_prefix=None, data_folder="data/C
                 'random_seed': arguments['random_seed'],
                 'date': experiment_date,
                 'folder': exp_folder,
-                'folder_dated': f"{exp_folder}/{date_folder}"
+                'folder_dated': f"{exp_folder}/{date_folder}",
+                "version_name": arguments['version_name'],
+                "output_name_suffix": arguments['output_name_suffix']
             }
 
             additional_note = arguments['output_name_suffix'].replace(f'_{experiment["nb_epoch"]}_epoch', '').replace(experiment['config'], '').replace(f'_{experiment["random_seed"]}', '').replace(f"_stop_at_{experiment['stop_accuracy']}", '').replace('_resnet_extractor', '').replace('config_', '')
@@ -298,7 +300,8 @@ def get_experiments(experiment_result_path, exp_prefix=None, data_folder="data/C
 
             experiment['note'] = additional_note
 
-            experiment['queue'] = experiment['note'].split("__")[-1]
+            #experiment['queue'] = experiment['note'].split("__")[-1]
+            experiment['queue'] = re.split(r'epoch_\d+_', arguments['output_name_suffix'])[-1]
 
             if 'device' in arguments:
                 experiment['device'] = arguments['device']
@@ -452,10 +455,11 @@ def get_experiments(experiment_result_path, exp_prefix=None, data_folder="data/C
             # TODO : Load mel test result
             # TODO : Define cogent_test_same_type (Choose spec or mel depended on what was the training type)
             # TODO : Add predictions
+            n_mels = experiment['n_mels'] if experiment['n_mels'] is not None else "128"
             cogent_spec_test_stats_filepath = f"{exp_dated_folder_path}/cogent_spec_test_stats.json"
-            cogent_mel_test_stats_filepath = f"{exp_dated_folder_path}/cogent_mel_128_test_stats.json"
+            cogent_mel_test_stats_filepath = f"{exp_dated_folder_path}/cogent_mel_{n_mels}_test_stats.json"
             cogent_spec_test_predictions_filepath = f"{exp_dated_folder_path}/cogent_spec_test_predictions.json"
-            cogent_mel_test_predictions_filepath = f"{exp_dated_folder_path}/cogent_mel_128_test_predictions.json"
+            cogent_mel_test_predictions_filepath = f"{exp_dated_folder_path}/cogent_mel_{n_mels}_test_predictions.json"
 
             experiment['cogent_spec_test_acc'] = None
             experiment['cogent_spec_test_loss'] = None
@@ -463,28 +467,34 @@ def get_experiments(experiment_result_path, exp_prefix=None, data_folder="data/C
             experiment['cogent_mel_test_loss'] = None
             experiment['cogent_test_acc'] = None
             experiment['cogent_test_loss'] = None
-            if os.path.isfile(cogent_spec_test_stats_filepath):
-                test_stats = read_json(cogent_spec_test_stats_filepath)
-                experiment['cogent_spec_test_acc'] = to_float(test_stats['accuracy'])
-                experiment['cogent_spec_test_loss'] = to_float(test_stats['loss'])
-            else:
-                print(f"[MISSING COGENT] -- {exp_dated_folder_path}")
 
-            if os.path.isfile(cogent_mel_test_stats_filepath):
-                test_stats = read_json(cogent_mel_test_stats_filepath)
-                experiment['cogent_mel_test_acc'] = to_float(test_stats['accuracy'])
-                experiment['cogent_mel_test_loss'] = to_float(test_stats['loss'])
-            else:
-                print(f"[MISSING COGENT] -- {exp_dated_folder_path}")
+            if experiment['prefix'] in ["CLEAR_FINAL", "DAQA"]:
+                experiment['cogent_test_acc'] = experiment['test_acc']
+                experiment['cogent_test_loss'] = experiment['test_loss']
 
-            if experiment['n_mels'] == 128:
-                experiment['cogent_test_acc'] = experiment['cogent_mel_test_acc']
-                experiment['cogent_test_loss'] = experiment['cogent_mel_test_loss']
-                cogent_test_predictions_filepath = cogent_mel_test_predictions_filepath
             else:
-                experiment['cogent_test_acc'] = experiment['cogent_spec_test_acc']
-                experiment['cogent_test_loss'] = experiment['cogent_spec_test_loss']
-                cogent_test_predictions_filepath = cogent_spec_test_predictions_filepath
+                if os.path.isfile(cogent_spec_test_stats_filepath):
+                    test_stats = read_json(cogent_spec_test_stats_filepath)
+                    experiment['cogent_spec_test_acc'] = to_float(test_stats['accuracy'])
+                    experiment['cogent_spec_test_loss'] = to_float(test_stats['loss'])
+                else:
+                    print(f"[MISSING COGENT] -- {exp_dated_folder_path}")
+
+                if os.path.isfile(cogent_mel_test_stats_filepath):
+                    test_stats = read_json(cogent_mel_test_stats_filepath)
+                    experiment['cogent_mel_test_acc'] = to_float(test_stats['accuracy'])
+                    experiment['cogent_mel_test_loss'] = to_float(test_stats['loss'])
+                else:
+                    print(f"[MISSING COGENT] -- {exp_dated_folder_path}")
+
+                if img_arguments['mel_spectrogram']:
+                    experiment['cogent_test_acc'] = experiment['cogent_mel_test_acc']
+                    experiment['cogent_test_loss'] = experiment['cogent_mel_test_loss']
+                    cogent_test_predictions_filepath = cogent_mel_test_predictions_filepath
+                else:
+                    experiment['cogent_test_acc'] = experiment['cogent_spec_test_acc']
+                    experiment['cogent_test_loss'] = experiment['cogent_spec_test_loss']
+                    cogent_test_predictions_filepath = cogent_spec_test_predictions_filepath
 
             # Load dict
             exp_dict = read_json(f'{exp_dated_folder_path}/dict.json')
@@ -498,7 +508,8 @@ def get_experiments(experiment_result_path, exp_prefix=None, data_folder="data/C
                 experiment['git_revision'] = f.readlines()[0].replace('\n', '')
 
             # Load config
-            config_filepath = f'config/{experiment["config"]}.json'
+            #config_filepath = f'config/{experiment["config"]}.json'
+            config_filepath = arguments['config_path']
 
             if not os.path.exists(config_filepath):
                 # Config file doesn't exist on local instance, use the one in the exp_dated_folder
@@ -510,6 +521,8 @@ def get_experiments(experiment_result_path, exp_prefix=None, data_folder="data/C
                 config_filepath = f"{exp_dated_folder_path}/{config_filename[0]}"
 
             config = read_json(config_filepath)
+
+            experiment['malimo'] = arguments['malimo'] if 'malimo' in arguments else None
 
             experiment['extractor_spatial_location'] = config['image_extractor'].get('spatial_location', False)
             experiment['stem_spatial_location'] = config['stem']['spatial_location']
@@ -594,7 +607,7 @@ def get_experiments(experiment_result_path, exp_prefix=None, data_folder="data/C
             # Question type analysis
             if do_question_type_analysis:
                 # FIXME : Should probably add the family columns with NaN ?
-                if not cogent_analysis or not os.path.exists(cogent_test_predictions_filepath):
+                if experiment['prefix'] == "CLEAR_FINAL" or not cogent_analysis or not os.path.exists(cogent_test_predictions_filepath):
                     test_pred_path = f"{exp_dated_folder_path}/test_predictions.json"
                 else:
                     test_pred_path = cogent_test_predictions_filepath
@@ -604,7 +617,9 @@ def get_experiments(experiment_result_path, exp_prefix=None, data_folder="data/C
 
             experiments.append(experiment)
 
-    experiments_df = pd.DataFrame(experiments, columns=list(experiments[0].keys()))
+    cols = {k for e in experiments for k in e.keys()}
+
+    experiments_df = pd.DataFrame(experiments, columns=cols)
 
     # Round number params to the closest thousand to facilitate comparison
     experiments_df['nb_trainable_param_round'] = experiments_df['nb_trainable_param'].apply(lambda x: x // 1000 * 1000)
@@ -656,8 +671,8 @@ def get_format_dicts():
         'total_nb_param': "{:,d}".format,
         'nb_non_trainable_param': "{:,d}".format,
         'nb_trainable_param': "{:,d}".format,
-        'nb_trainable_param_round': "~ {:,d}".format,
-        "nb_trainable_param_million": "~ {:.2f} M".format,
+        'nb_trainable_param_round': "$\\sim${:,d}".format,
+        "nb_trainable_param_million": "{:.2f} M".format,
         'nb_sample': "{:,d}".format,
         'nb_scene': "{:,d}".format,
         'rnn_state_size': "{:,d}".format,

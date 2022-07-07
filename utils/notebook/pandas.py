@@ -59,6 +59,9 @@ def groupby_mean(df, groupby_columns, mean_columns, selected_columns, add_count_
     additional_cols = []
     agg_cols = {name: 'first' for name in selected_columns if name not in groupby_columns}
 
+    if 'train_time' in selected_columns:
+        agg_cols['train_time'] = lambda x: np.mean(x)
+
     # Mean only for certain columns
     for col in mean_columns:
         agg_cols[col] = 'mean'
@@ -73,7 +76,7 @@ def groupby_mean(df, groupby_columns, mean_columns, selected_columns, add_count_
 
     grouped_df = df.groupby(groupby_columns, as_index=False, dropna=False)
 
-    aggregated = grouped_df.agg(agg_cols)
+    aggregated = grouped_df.agg(agg_cols)#, numeric_only=False)
 
     if inplace_std_str:
         for col in mean_columns:
@@ -141,8 +144,10 @@ def color_by_multi_attribute(df, main_attribute=None, attributes=None, cmaps=Non
             if categorical_values:
                 val = categorical_values[val]
 
+            if isinstance(val, bool):
+                val = 180 if val else 40
 
-            if min_max[0] != min_max[1]:
+            elif min_max[0] != min_max[1]:
                 # Will generate a value in the range of 20,220
                 val = int(((val - min_max[0]) / (min_max[1] - min_max[0])) * 200 + 20)
             else:

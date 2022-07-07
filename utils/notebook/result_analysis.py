@@ -63,9 +63,9 @@ def print_missing_seeds(df, groupby_cols, all_seeds):
 
 
 def show_table(df, filters, groupby_columns, acc_columns, extra_columns=None, format_dict=None, attribute_by_color=None,
-               mean_std_col=False, display_all=False, hardcoded_cols=None,
+               mean_std_col=False, display_all=False, hardcoded_cols=None, extra_colums_before=None,
                show_count_col=False, inplace_std=False, remove_outliers=False, print_latex=True, nb_to_keep=None,
-               all_seeds=None):
+               all_seeds=None, sort_by_col=None):
 
     if filters is not None:
         exp = df[filters]
@@ -75,17 +75,23 @@ def show_table(df, filters, groupby_columns, acc_columns, extra_columns=None, fo
     if extra_columns is None:
         extra_columns = []
 
+    if extra_colums_before is None:
+        extra_colums_before = []
+
     if attribute_by_color is None:
         attribute_by_color = {}
 
     if all_seeds is not None:
         print_missing_seeds(exp, groupby_columns, all_seeds)
 
-    main_acc_attribute = acc_columns[0]
+    if sort_by_col is None:
+        main_acc_attribute = acc_columns[0]
+    else:
+        main_acc_attribute = sort_by_col
 
     # Drop duplicates (Same experiment ran multiple time)
     exp = exp.sort_values('date', ascending=False).drop_duplicates(
-        [*groupby_columns, 'random_seed', 'input_type', 'config'], keep='first')
+        [*groupby_columns, 'random_seed', 'input_type', 'config', 'malimo', 'hop_length', 'n_fft'], keep='first')
 
     if remove_outliers:
         exp = filter_outliers(exp, groupby_columns)
@@ -95,8 +101,8 @@ def show_table(df, filters, groupby_columns, acc_columns, extra_columns=None, fo
 
     # Grouping - Mean & Std calc
     acc_std_columns = [f"{c}_std" for c in acc_columns]
-    columns = groupby_columns + acc_columns + extra_columns
-    columns_to_show = [*groupby_columns, *acc_columns, *extra_columns]
+    columns = groupby_columns + extra_colums_before + acc_columns + extra_columns
+    columns_to_show = [*groupby_columns, *extra_colums_before, *acc_columns, *extra_columns]
 
     # All experiments
     if display_all:
