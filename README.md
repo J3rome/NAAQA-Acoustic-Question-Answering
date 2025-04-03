@@ -1,6 +1,6 @@
 # A Neural Architecture for Acoustic Question Answering
 
-![NAAQA Architecture](https://ieeexplore.ieee.org/mediastore/IEEE/content/media/34/10061515/9895197/abdel2-3194311-large.gif "NAAQA Architecture")
+<img src="https://ieeexplore.ieee.org/mediastore/IEEE/content/media/34/10061515/9895197/abdel2-3194311-large.gif">
 
 This repository contains the code used in the experiments for the paper (DOI [10.1109/TPAMI.2022.3194311](https://doi.org/10.1109/TPAMI.2022.3194311)):
 ```
