@@ -1,5 +1,22 @@
-# TODO : REWRITE THIS
+# A Neural Architecture for Acoustic Question Answering
 
+<img alt="NAAQA Architecture" height="300px" src="images/NAAQA_architecture.gif"/> &nbsp; &nbsp; &nbsp; <img alt="Interleaved Extractor" height="250px" src="images/interlaced_extractor.png"/> &nbsp; &nbsp; &nbsp; <img alt="Parallel Extractor" height="250px" src="images/parallel_extractor.png"/>
+
+This repository contains the code used in the experiments for the paper (DOI [10.1109/TPAMI.2022.3194311](https://doi.org/10.1109/TPAMI.2022.3194311)):
+```
+@article{AbdelnourEtAl2023PAMI,
+  author = 	 {Jérôme Abdelnour and Jean Rouat and Giampiero Salvi},
+  title = 	 {NAAQA: A Neural Architecture for Acoustic Question Answering},
+  journal = 	 {IEEE Transactions on Pattern Analysis and Machine Intelligence},
+  year = 	 {2023},
+  volume = 	 {45},
+  number = 	 {4},
+  pages = 	 {4997--5009},
+  month = 	 apr,
+}
+```
+The code creates a neural archtecture for solving the acoustic question answering problem defined by the [CLEAR dataset](https://github.com/J3rome/CLEAR-AQA-Dataset-Generator).
+Please consider citing the paper if you find this useful.
 
 ## Installing requirements (Ubuntu 20.04)
 ```
